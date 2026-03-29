@@ -27,7 +27,7 @@ const sendWelcomeEmail = async (userEmail, userName) => {
           <p style="color: #9ca3af; font-size: 16px; margin-bottom: 32px; line-height: 1.6;">
             Your ultimate AI creative studio is ready. Standard SMTP was blocked by the cloud, so we upgraded you to the Resend API.
           </p>
-          <a href="https://medialab-studio.onrender.com" 
+          <a href="https://medialab-6b20.onrender.com/?loggedIn=true" 
              style="background-color: #22d3ee; color: #000; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: bold; display: inline-block;">
              Open Studio
           </a>
