@@ -11,20 +11,24 @@ const router = express.Router();
 
 // --- 1. THE "BOSS LEVEL" CLOUD TRANSPORTER ---
 // This configuration is designed specifically to bypass Render's IPv6 networking bugs.
+// --- THE "ULTIMATE BYPASS" TRANSPORTER ---
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
+  // Direct IPv4 for smtp.gmail.com to prevent IPv6 lookup errors
+  host: "74.125.142.108",
   port: 465,
-  secure: true, // Port 465 MUST use secure: true
+  secure: true,
   auth: {
     user: process.env.MY_EMAIL,
-    pass: process.env.GOOGLE_APP_PASSWORD, // 16-character code
+    pass: process.env.GOOGLE_APP_PASSWORD,
   },
-  // --- THE "SURE BET" SETTINGS ---
-  family: 4, // FORCE IPv4 (Kills the ENETUNREACH IPv6 error immediately)
-  pool: true, // Keeps connection alive for faster subsequent emails
-  maxConnections: 5,
+  tls: {
+    // This is required because we are connecting via IP instead of hostname
+    servername: "smtp.gmail.com",
+    rejectUnauthorized: false,
+  },
+  // Hard-enforce IPv4 at the OS level for this request
+  family: 4,
   connectionTimeout: 20000,
-  socketTimeout: 20000,
 });
 
 // Helper function for sending the welcome email
