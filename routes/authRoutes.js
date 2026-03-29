@@ -9,17 +9,20 @@ dotenv.config();
 
 const router = express.Router();
 
-// --- 1. THE "BULLETPROOF" OAUTH2 TRANSPORTER ---
-// This bypasses SMTP port blocking by using Google's HTTP API.
+// --- 1. THE STABLE CLOUD TRANSPORTER ---
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    type: "OAuth2",
     user: process.env.MY_EMAIL,
-    clientId: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    refreshToken: process.env.GOOGLE_REFRESH_TOKEN, // Generated via OAuth Playground
+    pass: process.env.GOOGLE_APP_PASSWORD, // 16-character App Password
   },
+  // These settings are CRITICAL for Render
+  pool: true, // Reuse connections
+  maxConnections: 1,
+  maxMessages: Infinity,
+  connectionTimeout: 20000, // 20 seconds
+  greetingTimeout: 20000,
+  socketTimeout: 20000,
 });
 
 // Helper function for sending the welcome email
@@ -33,9 +36,9 @@ const sendWelcomeEmail = async (userEmail, userName) => {
         <div style="display: inline-block; width: 50px; height: 50px; background-color: #22d3ee; border-radius: 50%; line-height: 50px; font-size: 24px; font-weight: bold; color: #000; margin-bottom: 20px;">
           M
         </div>
-        <h1 style="font-size: 28px; margin-bottom: 10px;">Welcome, ${userName}!</h1>
+        <h1 style="font-size: 28px; margin-bottom: 10px; color: #ffffff;">Welcome, ${userName}!</h1>
         <p style="color: #9ca3af; font-size: 16px; margin-bottom: 30px;">Your ultimate AI creative studio is ready. Start converting and editing today.</p>
-        <a href="${process.env.CLIENT_URL || "https://medialab-studio.onrender.com"}" 
+        <a href="https://medialab-studio.onrender.com" 
            style="background-color: #22d3ee; color: #000; padding: 12px 30px; border-radius: 30px; text-decoration: none; font-weight: bold; display: inline-block;">
            Open Studio
         </a>
@@ -45,14 +48,13 @@ const sendWelcomeEmail = async (userEmail, userName) => {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`✅ Welcome email sent via OAuth2 to ${userEmail}`);
+    console.log(`✅ Welcome email sent to ${userEmail}`);
   } catch (error) {
-    console.error("❌ Email failed (OAuth2):", error.message);
-    // FALLBACK: If OAuth2 fails, you can log it here.
+    console.error("❌ Email failed:", error.message);
   }
 };
 
-// --- 2. PASSPORT SERIALIZATION ---
+// --- 2. PASSPORT LOGIC ---
 passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
   try {
@@ -63,7 +65,6 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
-// --- 3. GOOGLE STRATEGY ---
 passport.use(
   new GoogleStrategy(
     {
@@ -74,7 +75,6 @@ passport.use(
     async (accessToken, refreshToken, profile, done) => {
       try {
         let user = await User.findOne({ googleId: profile.id });
-
         if (!user) {
           user = await User.create({
             googleId: profile.id,
@@ -83,16 +83,11 @@ passport.use(
             profilePicture: profile.photos?.[0]?.value,
             provider: "google",
           });
-
-          // Send welcome email in the background
-          if (user.email) {
-            sendWelcomeEmail(user.email, user.name);
-          }
+          if (user.email) sendWelcomeEmail(user.email, user.name);
         } else {
           user.lastLogin = new Date();
           await user.save();
         }
-
         return done(null, user);
       } catch (err) {
         return done(err);
@@ -101,8 +96,7 @@ passport.use(
   ),
 );
 
-// --- 4. AUTH ROUTES ---
-
+// --- 3. ROUTES ---
 router.get(
   "/google",
   passport.authenticate("google", { scope: ["profile", "email"] }),
@@ -123,34 +117,22 @@ router.get("/logout", (req, res) => {
 
 router.get("/me", (req, res) => {
   if (req.isAuthenticated()) {
-    res.json({
-      success: true,
-      user: {
-        id: req.user._id,
-        name: req.user.name,
-        email: req.user.email,
-        profilePicture: req.user.profilePicture,
-        provider: req.user.provider,
-      },
-    });
+    res.json({ success: true, user: req.user });
   } else res.json({ success: false });
 });
 
-// --- 5. FINAL TEST ROUTE ---
+// --- 4. THE TEST ROUTE ---
 router.get("/test-email", async (req, res) => {
-  const testEmail = "amanikbt2@gmail.com";
-
   try {
     await transporter.sendMail({
-      from: `"MediaLab Studio" <${process.env.MY_EMAIL}>`,
-      to: testEmail,
-      subject: "OAuth2 Cloud Test ✅",
-      html: `<h2>✅ OAuth2 Successful</h2><p>This email bypassed Render's SMTP blocks.</p>`,
+      from: `"MediaLab Test" <${process.env.MY_EMAIL}>`,
+      to: "amanikbt2@gmail.com",
+      subject: "MediaLab Cloud Test ✅",
+      text: "Connection successful!",
     });
-    res.send(`<h1>✅ Success!</h1><p>Test email sent to ${testEmail}.</p>`);
+    res.send("<h1>✅ Success! Email sent.</h1>");
   } catch (error) {
-    console.error("❌ OAuth2 Test Failed:", error.message);
-    res.status(500).send(`<h1>❌ Failed</h1><p>Error: ${error.message}</p>`);
+    res.status(500).send(`<h1>❌ Failed</h1><p>${error.message}</p>`);
   }
 });
 
