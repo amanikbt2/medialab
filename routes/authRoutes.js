@@ -120,22 +120,20 @@ router.get("/me", (req, res) => {
   } else res.json({ success: false });
 });
 
-// --- 5. THE FINAL TEST ROUTE ---
 router.get("/test-email", async (req, res) => {
   try {
     const { data, error } = await resend.emails.send({
       from: "MediaLab <onboarding@resend.dev>",
-      to: "amanikbt2@gmail.com",
+      to: "amanikbt1@gmail.com", // Change this to match your signup email
       subject: "Final Cloud Bypass Test ✅",
       text: "This email was sent via the Resend API (HTTPS). Render cannot block this!",
     });
 
     if (error) throw error;
     res.send(
-      "<h1>✅ Success!</h1><p>We finally bypassed the network block using Resend API.</p>",
+      "<h1>✅ Success!</h1><p>Check your amanikbt1@gmail.com inbox!</p>",
     );
   } catch (error) {
-    console.error("❌ Test Failed:", error.message);
     res.status(500).send(`<h1>❌ Failed</h1><p>Error: ${error.message}</p>`);
   }
 });
