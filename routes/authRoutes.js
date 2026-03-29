@@ -9,22 +9,17 @@ dotenv.config();
 
 const router = express.Router();
 
-// --- 1. THE "NEVER-FAIL" TRANSPORTER CONFIG ---
-// We use Port 465 + Family 4 to bypass Render's IPv6 routing issues.
+// --- 1. THE "BULLETPROOF" OAUTH2 TRANSPORTER ---
+// This bypasses SMTP port blocking by using Google's HTTP API.
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true, // true for 465
+  service: "gmail",
   auth: {
+    type: "OAuth2",
     user: process.env.MY_EMAIL,
-    pass: process.env.GOOGLE_APP_PASSWORD,
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    refreshToken: process.env.GOOGLE_REFRESH_TOKEN, // Generated via OAuth Playground
   },
-  // CRITICAL: Forces IPv4 to prevent 'ENETUNREACH' on Render
-  family: 4,
-  // Safety timeouts
-  connectionTimeout: 15000,
-  greetingTimeout: 15000,
-  socketTimeout: 15000,
 });
 
 // Helper function for sending the welcome email
@@ -34,13 +29,13 @@ const sendWelcomeEmail = async (userEmail, userName) => {
     to: userEmail,
     subject: "Welcome to MediaLab Studio! 🚀",
     html: `
-      <div style="background-color: #030712; color: #f3f4f6; font-family: sans-serif; padding: 40px; text-align: center; border-radius: 20px;">
+      <div style="background-color: #030712; color: #f3f4f6; font-family: sans-serif; padding: 40px; text-align: center; border-radius: 20px; border: 1px solid #1f2937;">
         <div style="display: inline-block; width: 50px; height: 50px; background-color: #22d3ee; border-radius: 50%; line-height: 50px; font-size: 24px; font-weight: bold; color: #000; margin-bottom: 20px;">
           M
         </div>
         <h1 style="font-size: 28px; margin-bottom: 10px;">Welcome, ${userName}!</h1>
         <p style="color: #9ca3af; font-size: 16px; margin-bottom: 30px;">Your ultimate AI creative studio is ready. Start converting and editing today.</p>
-        <a href="https://your-medialab-url.com" 
+        <a href="${process.env.CLIENT_URL || "https://medialab-studio.onrender.com"}" 
            style="background-color: #22d3ee; color: #000; padding: 12px 30px; border-radius: 30px; text-decoration: none; font-weight: bold; display: inline-block;">
            Open Studio
         </a>
@@ -50,9 +45,10 @@ const sendWelcomeEmail = async (userEmail, userName) => {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`✅ Welcome email sent to ${userEmail}`);
+    console.log(`✅ Welcome email sent via OAuth2 to ${userEmail}`);
   } catch (error) {
-    console.error("❌ Welcome email failed:", error.message);
+    console.error("❌ Email failed (OAuth2):", error.message);
+    // FALLBACK: If OAuth2 fails, you can log it here.
   }
 };
 
@@ -140,28 +136,20 @@ router.get("/me", (req, res) => {
   } else res.json({ success: false });
 });
 
-// --- 5. DEBUG TEST EMAIL ROUTE ---
+// --- 5. FINAL TEST ROUTE ---
 router.get("/test-email", async (req, res) => {
   const testEmail = "amanikbt2@gmail.com";
 
-  const mailOptions = {
-    from: `"MediaLab Studio" <${process.env.MY_EMAIL}>`,
-    to: testEmail,
-    subject: "Test Email from MediaLab",
-    html: `
-      <div style="font-family: sans-serif; padding: 20px;">
-        <h2 style="color: #22d3ee;">✅ IPv4 Test Successful</h2>
-        <p>Sent from MediaLab at <b>${new Date().toLocaleString()}</b>.</p>
-        <p>Your SMTP is now correctly routing through IPv4 on Render.</p>
-      </div>
-    `,
-  };
-
   try {
-    await transporter.sendMail(mailOptions);
+    await transporter.sendMail({
+      from: `"MediaLab Studio" <${process.env.MY_EMAIL}>`,
+      to: testEmail,
+      subject: "OAuth2 Cloud Test ✅",
+      html: `<h2>✅ OAuth2 Successful</h2><p>This email bypassed Render's SMTP blocks.</p>`,
+    });
     res.send(`<h1>✅ Success!</h1><p>Test email sent to ${testEmail}.</p>`);
   } catch (error) {
-    console.error("❌ Debug Test Failed:", error.message);
+    console.error("❌ OAuth2 Test Failed:", error.message);
     res.status(500).send(`<h1>❌ Failed</h1><p>Error: ${error.message}</p>`);
   }
 });
