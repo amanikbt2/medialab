@@ -131,6 +131,50 @@ router.get(
   },
 );
 
+router.post("/dev-login", express.json(), async (req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    return res.status(404).json({ success: false, message: "Not found." });
+  }
+
+  const email = String(req.body?.email || "").trim();
+  const password = String(req.body?.password || "").trim();
+  const allowedEmail = process.env.DEV_LOGIN_EMAIL || "amani";
+  const allowedPassword = process.env.DEV_LOGIN_PASSWORD || "amani";
+
+  if (email !== allowedEmail || password !== allowedPassword) {
+    return res.status(401).json({ success: false, message: "Invalid developer login." });
+  }
+
+  let user = await User.findOne({ email: `${allowedEmail}@medialab.local` });
+  if (!user) {
+    user = await User.create({
+      name: "Amani Developer",
+      email: `${allowedEmail}@medialab.local`,
+      password: "dev-only",
+      provider: "developer",
+      lastLogin: new Date(),
+    });
+  } else {
+    user.lastLogin = new Date();
+    await user.save();
+  }
+
+  req.login(user, (err) => {
+    if (err) {
+      console.error("Developer login failed:", err);
+      return res.status(500).json({ success: false, message: "Could not start developer session." });
+    }
+
+    req.session.save((saveErr) => {
+      if (saveErr) {
+        console.error("Developer session save failed:", saveErr);
+        return res.status(500).json({ success: false, message: "Could not persist developer session." });
+      }
+      return res.json({ success: true, user });
+    });
+  });
+});
+
 // Get Current User (The "Me" Route)
 router.get("/me", (req, res) => {
   // Add Cache-Control to prevent old session data being cached by browser

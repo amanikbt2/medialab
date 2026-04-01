@@ -8,6 +8,14 @@ const ProjectSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
+const BuilderDraftSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  canvasHtml: { type: String, default: "" },
+  pageBackground: { type: String, default: "#ffffff" },
+  isAutoSave: { type: Boolean, default: false },
+  savedAt: { type: Date, default: Date.now },
+});
+
 const UserSchema = new mongoose.Schema({
   googleId: { type: String, unique: true, sparse: true },
   email: { type: String, required: true, unique: true },
@@ -18,6 +26,7 @@ const UserSchema = new mongoose.Schema({
   // --- PROJECT HISTORY ---
   // This stores the last 10-20 projects for the sidebar
   projects: [ProjectSchema],
+  builderDrafts: [BuilderDraftSchema],
 
   // --- PRO FEATURES & LIMITS ---
   isPro: { type: Boolean, default: false },

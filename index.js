@@ -242,6 +242,8 @@ app.post("/api/community-feedback", async (req, res) => {
       feedback: feedbackText,
       source: String(req.body?.source || "web-builder"),
       isAnonymous: !isLoggedIn,
+      status: "open",
+      hidden: false,
     });
 
     res.json({
@@ -252,6 +254,156 @@ app.post("/api/community-feedback", async (req, res) => {
   } catch (error) {
     console.error("Feedback save failed:", error);
     res.status(500).json({ success: false, message: "Could not save feedback right now." });
+  }
+});
+
+app.get("/api/builder-drafts", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Login required." });
+    }
+    const user = await User.findById(req.user._id).select("builderDrafts");
+    res.json({
+      success: true,
+      drafts: user?.builderDrafts || [],
+    });
+  } catch (error) {
+    console.error("Builder drafts fetch failed:", error);
+    res.status(500).json({ success: false, message: "Could not fetch drafts." });
+  }
+});
+
+app.post("/api/builder-drafts", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Login required." });
+    }
+
+    const canvasHtml = String(req.body?.canvasHtml || "");
+    const pageBackground = String(req.body?.pageBackground || "#ffffff");
+    const isAutoSave = Boolean(req.body?.isAutoSave);
+    const providedName = String(req.body?.name || "").trim();
+    const draftName = providedName || (isAutoSave ? "Auto Draft" : `Builder Draft ${new Date().toLocaleString()}`);
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    const nextDraft = {
+      name: draftName,
+      canvasHtml,
+      pageBackground,
+      isAutoSave,
+      savedAt: new Date(),
+    };
+
+    if (isAutoSave) {
+      const autosaveIndex = user.builderDrafts.findIndex((draft) => draft.isAutoSave);
+      if (autosaveIndex >= 0) user.builderDrafts.splice(autosaveIndex, 1, nextDraft);
+      else user.builderDrafts.push(nextDraft);
+    } else {
+      user.builderDrafts.push(nextDraft);
+    }
+
+    user.builderDrafts = user.builderDrafts
+      .sort((a, b) => new Date(a.savedAt) - new Date(b.savedAt))
+      .slice(-12);
+
+    await user.save();
+
+    res.json({
+      success: true,
+      drafts: user.builderDrafts,
+      savedDraft: user.builderDrafts[user.builderDrafts.length - 1] || nextDraft,
+    });
+  } catch (error) {
+    console.error("Builder draft save failed:", error);
+    res.status(500).json({ success: false, message: "Could not save draft." });
+  }
+});
+
+app.get("/api/admin/feedbacks", async (_req, res) => {
+  try {
+    const feedbacks = await Feedback.find({}).sort({ createdAt: -1 }).lean();
+    res.json({ success: true, feedbacks });
+  } catch (error) {
+    console.error("Admin feedback fetch failed:", error);
+    res.status(500).json({ success: false, message: "Could not load feedbacks." });
+  }
+});
+
+app.patch("/api/admin/feedbacks/:id", async (req, res) => {
+  try {
+    const updates = {};
+    if (typeof req.body?.status === "string") {
+      updates.status = req.body.status === "completed" ? "completed" : "open";
+    }
+    if (typeof req.body?.hidden === "boolean") {
+      updates.hidden = req.body.hidden;
+    }
+
+    const feedback = await Feedback.findByIdAndUpdate(
+      req.params.id,
+      { $set: updates },
+      { new: true },
+    ).lean();
+
+    if (!feedback) {
+      return res.status(404).json({ success: false, message: "Feedback not found." });
+    }
+
+    res.json({ success: true, feedback });
+  } catch (error) {
+    console.error("Admin feedback update failed:", error);
+    res.status(500).json({ success: false, message: "Could not update feedback." });
+  }
+});
+
+app.get("/api/admin/analytics", async (_req, res) => {
+  try {
+    const [
+      totalUsers,
+      proUsers,
+      totalFeedbacks,
+      openFeedbacks,
+      completedFeedbacks,
+      hiddenFeedbacks,
+      averageRatingRow,
+      recentUsers,
+    ] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ isPro: true }),
+      Feedback.countDocuments(),
+      Feedback.countDocuments({ status: "open", hidden: false }),
+      Feedback.countDocuments({ status: "completed" }),
+      Feedback.countDocuments({ hidden: true }),
+      Feedback.aggregate([{ $group: { _id: null, avgRating: { $avg: "$rating" } } }]),
+      User.find({})
+        .sort({ createdAt: -1 })
+        .limit(8)
+        .select("name email isPro createdAt")
+        .lean(),
+    ]);
+
+    res.json({
+      success: true,
+      analytics: {
+        totalUsers,
+        proUsers,
+        totalFeedbacks,
+        openFeedbacks,
+        completedFeedbacks,
+        hiddenFeedbacks,
+        averageRating: averageRatingRow?.[0]?.avgRating
+          ? Number(averageRatingRow[0].avgRating.toFixed(1))
+          : 0,
+        recentUsers,
+      },
+    });
+  } catch (error) {
+    console.error("Admin analytics fetch failed:", error);
+    res.status(500).json({ success: false, message: "Could not load analytics." });
   }
 });
 

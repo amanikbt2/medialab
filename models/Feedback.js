@@ -8,6 +8,12 @@ const FeedbackSchema = new mongoose.Schema({
   feedback: { type: String, required: true, trim: true },
   source: { type: String, default: "web-builder" },
   isAnonymous: { type: Boolean, default: true },
+  status: {
+    type: String,
+    enum: ["open", "completed"],
+    default: "open",
+  },
+  hidden: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
 });
 

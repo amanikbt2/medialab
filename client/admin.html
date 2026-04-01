@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MediaLab Admin Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+      body { font-family: "Space Grotesk", sans-serif; }
+      .glass { background: rgba(7, 12, 22, 0.78); backdrop-filter: blur(18px); }
+      .admin-tab.active { background: #67e8f9; color: #06202a; }
+      .feedback-row.open .feedback-detail { display: block; }
+      .feedback-row.open .feedback-chevron { transform: rotate(180deg); }
+      .feedback-detail { display: none; }
+    </style>
+  </head>
+  <body class="min-h-screen bg-slate-950 text-slate-100">
+    <div class="fixed inset-0 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.16),_transparent_32%),linear-gradient(180deg,_#020617_0%,_#020617_46%,_#08111f_100%)]"></div>
+
+    <div id="admin-auth-overlay" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/88 backdrop-blur-xl">
+      <div class="w-full max-w-md glass border border-white/10 rounded-[2rem] p-6 sm:p-8 shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
+        <p class="text-[11px] uppercase tracking-[0.32em] text-cyan-400 font-bold">Admin Access</p>
+        <h2 class="text-3xl font-bold mt-3">Enter admin password</h2>
+        <p class="text-slate-400 mt-3 text-sm">This local testing gate keeps the dashboard private on this device.</p>
+        <label class="block mt-6">
+          <span class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold">Password</span>
+          <input id="admin-password" type="password" class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-cyan-400" placeholder="Enter admin password" />
+        </label>
+        <div class="flex gap-3 mt-6">
+          <button onclick="unlockAdmin()" class="flex-1 rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-bold text-slate-950 hover:bg-cyan-300 transition-all">Unlock</button>
+          <a href="/index.html" class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-slate-200 hover:bg-white/10 transition-all">Back</a>
+        </div>
+        <p id="admin-auth-error" class="mt-4 text-sm text-rose-300 hidden">Wrong password. Try again.</p>
+      </div>
+    </div>
+
+    <main class="relative z-10 max-w-7xl mx-auto px-4 py-5 sm:px-6 sm:py-8">
+      <header class="glass border border-white/10 rounded-[2rem] p-5 sm:p-7 shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+        <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p class="text-[11px] uppercase tracking-[0.32em] text-cyan-400 font-bold">MediaLab Admin</p>
+            <h1 class="text-3xl sm:text-4xl font-bold mt-2">Feedback, users, and studio analytics</h1>
+            <p class="text-slate-400 mt-3 max-w-2xl">Review community feedback, track users, and manage the builder inbox from one polished admin workspace.</p>
+          </div>
+          <div class="flex flex-wrap gap-3">
+            <a href="/index.html" class="px-4 py-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-sm font-bold">Open MediaLab</a>
+            <button onclick="loadAdminData()" class="px-4 py-3 rounded-2xl bg-cyan-400 text-slate-950 hover:bg-cyan-300 transition-all text-sm font-bold">Refresh Data</button>
+          </div>
+        </div>
+      </header>
+
+      <section id="analytics-cards" class="grid grid-cols-2 lg:grid-cols-5 gap-4 mt-6"></section>
+
+      <section class="glass border border-white/10 rounded-[2rem] p-4 sm:p-6 mt-6 shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
+        <div class="flex flex-wrap gap-2">
+          <button class="admin-tab active px-4 py-2.5 rounded-2xl bg-white/5 text-sm font-bold transition-all" onclick="showAdminTab('feedbacks', this)">Feedbacks</button>
+          <button class="admin-tab px-4 py-2.5 rounded-2xl bg-white/5 text-sm font-bold transition-all" onclick="showAdminTab('users', this)">Users</button>
+          <button class="admin-tab px-4 py-2.5 rounded-2xl bg-white/5 text-sm font-bold transition-all" onclick="showAdminTab('analytics', this)">Analytics</button>
+        </div>
+
+        <div id="tab-feedbacks" class="mt-6 space-y-3"></div>
+        <div id="tab-users" class="mt-6 space-y-4 hidden"></div>
+        <div id="tab-analytics" class="mt-6 space-y-4 hidden"></div>
+      </section>
+    </main>
+
+    <script>
+      let adminFeedbacks = [];
+      let adminAnalytics = null;
+      const ADMIN_PASSWORD = "amani";
+      const ADMIN_ACCESS_KEY = "medialab_admin_access";
+
+      function showAdminTab(name, button) {
+        document.querySelectorAll(".admin-tab").forEach((tab) => tab.classList.remove("active"));
+        button?.classList.add("active");
+        ["feedbacks", "users", "analytics"].forEach((tabName) => {
+          document.getElementById(`tab-${tabName}`)?.classList.toggle("hidden", tabName !== name);
+        });
+      }
+
+      function formatDate(value) {
+        return value ? new Date(value).toLocaleString() : "Unknown";
+      }
+
+      function truncateText(value, limit = 118) {
+        const text = String(value || "");
+        return text.length > limit ? `${text.slice(0, limit).trim()}...` : text;
+      }
+
+      function unlockAdmin() {
+        const field = document.getElementById("admin-password");
+        const error = document.getElementById("admin-auth-error");
+        const password = field?.value?.trim() || "";
+        if (password !== ADMIN_PASSWORD) {
+          error?.classList.remove("hidden");
+          field?.focus();
+          return;
+        }
+        localStorage.setItem(ADMIN_ACCESS_KEY, "granted");
+        document.getElementById("admin-auth-overlay")?.classList.add("hidden");
+        error?.classList.add("hidden");
+        loadAdminData();
+      }
+
+      function ensureAdminAccess() {
+        const unlocked = localStorage.getItem(ADMIN_ACCESS_KEY) === "granted";
+        document.getElementById("admin-auth-overlay")?.classList.toggle("hidden", unlocked);
+        if (unlocked) loadAdminData();
+      }
+
+      function toggleFeedbackRow(id) {
+        document.getElementById(`feedback-row-${id}`)?.classList.toggle("open");
+      }
+
+      function renderAnalyticsCards() {
+        const el = document.getElementById("analytics-cards");
+        if (!el || !adminAnalytics) return;
+        const cards = [
+          ["Users", adminAnalytics.totalUsers || 0],
+          ["Pro Users", adminAnalytics.proUsers || 0],
+          ["Feedbacks", adminAnalytics.totalFeedbacks || 0],
+          ["Open", adminAnalytics.openFeedbacks || 0],
+          ["Avg Rating", adminAnalytics.averageRating || 0],
+        ];
+        el.innerHTML = cards.map(([label, value]) => `
+          <div class="glass border border-white/10 rounded-[1.5rem] p-4 sm:p-5">
+            <div class="text-[11px] uppercase tracking-[0.22em] text-slate-400 font-bold">${label}</div>
+            <div class="text-3xl font-bold mt-3">${value}</div>
+          </div>
+        `).join("");
+      }
+
+      function renderFeedbacks() {
+        const el = document.getElementById("tab-feedbacks");
+        if (!el) return;
+        if (!adminFeedbacks.length) {
+          el.innerHTML = `<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No feedback saved yet.</div>`;
+          return;
+        }
+        el.innerHTML = adminFeedbacks.map((item) => `
+          <article id="feedback-row-${item._id}" class="feedback-row rounded-[1.35rem] border border-white/10 bg-white/[0.03] overflow-hidden">
+            <button onclick="toggleFeedbackRow('${item._id}')" class="w-full text-left px-4 py-4 sm:px-5 hover:bg-white/[0.03] transition-all">
+              <div class="flex items-start gap-3">
+                <div class="mt-1 w-2.5 h-2.5 rounded-full ${item.status === "completed" ? "bg-emerald-400" : "bg-cyan-400"} shrink-0"></div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="text-sm sm:text-base font-bold text-white">${item.username || "Anonymous"}</h3>
+                    <span class="px-2.5 py-1 rounded-full bg-white/5 text-slate-300 text-[10px] font-bold uppercase tracking-[0.16em]">${item.rating}/5</span>
+                    <span class="px-2.5 py-1 rounded-full ${item.status === "completed" ? "bg-emerald-500/15 text-emerald-300" : "bg-cyan-500/15 text-cyan-300"} text-[10px] font-bold uppercase tracking-[0.16em]">${item.status || "open"}</span>
+                    <span class="px-2.5 py-1 rounded-full ${item.hidden ? "bg-amber-500/15 text-amber-300" : "bg-white/5 text-slate-400"} text-[10px] font-bold uppercase tracking-[0.16em]">${item.hidden ? "hidden" : "visible"}</span>
+                  </div>
+                  <p class="text-xs sm:text-sm text-slate-400 mt-1">${item.email || "Anonymous"} • ${formatDate(item.createdAt)}</p>
+                  <p class="text-xs uppercase tracking-[0.16em] text-slate-500 mt-3">Tap to expand feedback</p>
+                </div>
+                <svg class="feedback-chevron mt-1.5 h-4 w-4 text-slate-500 transition-transform" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 011.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"></path></svg>
+              </div>
+            </button>
+            <div class="feedback-detail border-t border-white/6 px-4 py-4 sm:px-5 sm:py-5 bg-slate-950/35">
+              <p class="text-sm sm:text-base text-slate-200 leading-relaxed">${item.feedback}</p>
+              <div class="flex flex-wrap gap-2 mt-4">
+                <button onclick="updateFeedback('${item._id}', { status: '${item.status === "completed" ? "open" : "completed"}' })" class="px-3.5 py-2 rounded-xl bg-cyan-400 text-slate-950 text-xs sm:text-sm font-bold hover:bg-cyan-300 transition-all shadow-[0_10px_30px_rgba(103,232,249,0.18)]">${item.status === "completed" ? "Reopen" : "Complete"}</button>
+                <button onclick="updateFeedback('${item._id}', { hidden: ${item.hidden ? "false" : "true"} })" class="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-xs sm:text-sm font-bold hover:bg-white/10 transition-all">${item.hidden ? "Unhide" : "Hide"}</button>
+              </div>
+            </div>
+          </article>
+        `).join("");
+      }
+
+      function renderUsers() {
+        const el = document.getElementById("tab-users");
+        if (!el || !adminAnalytics) return;
+        const users = adminAnalytics.recentUsers || [];
+        el.innerHTML = `
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            ${users.map((user) => `
+              <div class="rounded-[1.6rem] border border-white/10 bg-white/[0.03] p-5">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="text-lg font-bold">${user.name || "Unknown User"}</div>
+                    <div class="text-sm text-slate-400 mt-1 break-all">${user.email || "No email"}</div>
+                  </div>
+                  <span class="px-3 py-1 rounded-full ${user.isPro ? "bg-emerald-500/15 text-emerald-300" : "bg-white/5 text-slate-300"} text-xs font-bold uppercase tracking-[0.18em]">${user.isPro ? "Pro" : "Free"}</span>
+                </div>
+                <div class="text-xs uppercase tracking-[0.18em] text-slate-500 mt-5">Joined ${formatDate(user.createdAt)}</div>
+              </div>
+            `).join("") || '<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400 sm:col-span-2 xl:col-span-3">No users found yet.</div>'}
+          </div>
+        `;
+      }
+
+      function renderAnalyticsDetails() {
+        const el = document.getElementById("tab-analytics");
+        if (!el || !adminAnalytics) return;
+        el.innerHTML = `
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-[1.6rem] border border-white/10 bg-white/[0.03] p-5">
+              <div class="text-[11px] uppercase tracking-[0.22em] text-slate-400 font-bold">Feedback Health</div>
+              <div class="space-y-3 mt-4 text-sm">
+                <div class="flex items-center justify-between"><span class="text-slate-300">Open</span><strong>${adminAnalytics.openFeedbacks || 0}</strong></div>
+                <div class="flex items-center justify-between"><span class="text-slate-300">Completed</span><strong>${adminAnalytics.completedFeedbacks || 0}</strong></div>
+                <div class="flex items-center justify-between"><span class="text-slate-300">Hidden</span><strong>${adminAnalytics.hiddenFeedbacks || 0}</strong></div>
+              </div>
+            </div>
+            <div class="rounded-[1.6rem] border border-white/10 bg-white/[0.03] p-5">
+              <div class="text-[11px] uppercase tracking-[0.22em] text-slate-400 font-bold">User Growth</div>
+              <div class="space-y-3 mt-4 text-sm">
+                <div class="flex items-center justify-between"><span class="text-slate-300">Total users</span><strong>${adminAnalytics.totalUsers || 0}</strong></div>
+                <div class="flex items-center justify-between"><span class="text-slate-300">Pro users</span><strong>${adminAnalytics.proUsers || 0}</strong></div>
+                <div class="flex items-center justify-between"><span class="text-slate-300">Average rating</span><strong>${adminAnalytics.averageRating || 0}</strong></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      async function updateFeedback(id, payload) {
+        const res = await fetch(`/api/admin/feedbacks/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!data.success) {
+          alert(data.message || "Could not update feedback.");
+          return;
+        }
+        await loadAdminData();
+      }
+
+      async function loadAdminData() {
+        if (localStorage.getItem(ADMIN_ACCESS_KEY) !== "granted") return;
+        try {
+          const [feedbackRes, analyticsRes] = await Promise.all([
+            fetch("/api/admin/feedbacks"),
+            fetch("/api/admin/analytics"),
+          ]);
+          const feedbackData = await feedbackRes.json();
+          const analyticsData = await analyticsRes.json();
+          adminFeedbacks = feedbackData.feedbacks || [];
+          adminAnalytics = analyticsData.analytics || {};
+          renderAnalyticsCards();
+          renderFeedbacks();
+          renderUsers();
+          renderAnalyticsDetails();
+        } catch (error) {
+          console.error(error);
+          alert("Admin data could not be loaded.");
+        }
+      }
+
+      document.getElementById("admin-password")?.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") unlockAdmin();
+      });
+
+      ensureAdminAccess();
+    </script>
+  </body>
+</html>

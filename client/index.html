@@ -241,11 +241,13 @@
         z-index: 80;
       }
       .canvas-element.selected-premium {
-        box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.8),
+        box-shadow:
+          0 0 0 1px rgba(34, 211, 238, 0.8),
           0 0 0 8px rgba(34, 211, 238, 0.12);
       }
       .canvas-element.selected-secondary {
-        box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.65),
+        box-shadow:
+          0 0 0 1px rgba(148, 163, 184, 0.65),
           0 0 0 6px rgba(148, 163, 184, 0.08);
       }
       .canvas-element.selected-premium .resizer,
@@ -335,8 +337,13 @@
         gap: 8px;
         align-items: center;
         overflow-x: auto;
+        overflow-y: hidden;
         padding: 4px;
         scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+        min-width: 0;
+        flex: 1 1 auto;
       }
       .builder-tabbar::-webkit-scrollbar {
         display: none;
@@ -365,12 +372,15 @@
         top: calc(100% + 8px);
         left: 0;
         width: min(92vw, 760px);
+        max-height: min(72vh, 560px);
+        overflow-y: auto;
         padding: 12px;
         border-radius: 22px;
         background: rgba(2, 6, 23, 0.94);
         border: 1px solid rgba(255, 255, 255, 0.08);
         box-shadow: 0 30px 90px rgba(2, 6, 23, 0.4);
         backdrop-filter: blur(24px);
+        -webkit-overflow-scrolling: touch;
       }
       .builder-popover-grid {
         display: grid;
@@ -408,7 +418,11 @@
         border-radius: 24px;
         overflow: hidden;
         background:
-          radial-gradient(circle at top right, rgba(34, 211, 238, 0.12), transparent 34%),
+          radial-gradient(
+            circle at top right,
+            rgba(34, 211, 238, 0.12),
+            transparent 34%
+          ),
           linear-gradient(180deg, #020617 0%, #0f172a 100%);
         box-shadow: 0 30px 90px rgba(2, 6, 23, 0.4);
       }
@@ -477,7 +491,9 @@
         padding: 20px 10px 20px 0;
         text-align: right;
         color: #475569;
-        font: 12px/1.55 "Courier New", monospace;
+        font:
+          12px/1.55 "Courier New",
+          monospace;
         background: rgba(15, 23, 42, 0.88);
         border-right: 1px solid rgba(255, 255, 255, 0.05);
         user-select: none;
@@ -489,8 +505,16 @@
         overflow: hidden;
         background:
           linear-gradient(180deg, rgba(15, 23, 42, 0.42), rgba(2, 6, 23, 0.18)),
-          linear-gradient(90deg, rgba(255, 255, 255, 0.02) 0, rgba(255, 255, 255, 0.02) 1px, transparent 1px, transparent 100%);
-        background-size: auto, 28px 28px;
+          linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.02) 0,
+            rgba(255, 255, 255, 0.02) 1px,
+            transparent 1px,
+            transparent 100%
+          );
+        background-size:
+          auto,
+          28px 28px;
       }
       .code-editor-highlight,
       .code-editor-input {
@@ -499,7 +523,9 @@
         min-height: min(62vh, 650px);
         max-height: min(62vh, 650px);
         padding: 20px 22px;
-        font: 13px/1.55 "Courier New", monospace;
+        font:
+          13px/1.55 "Courier New",
+          monospace;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
         word-break: break-word;
@@ -510,7 +536,11 @@
       .code-editor-highlight {
         color: #cbd5e1;
         pointer-events: none;
-        background: linear-gradient(180deg, rgba(15, 23, 42, 0.16) 0%, rgba(2, 6, 23, 0.08) 100%);
+        background: linear-gradient(
+          180deg,
+          rgba(15, 23, 42, 0.16) 0%,
+          rgba(2, 6, 23, 0.08) 100%
+        );
       }
       .code-editor-input {
         position: absolute;
@@ -567,12 +597,47 @@
       }
       .builder-modal-card {
         width: min(100%, 460px);
+        max-height: min(88vh, 760px);
+        overflow-y: auto;
         border-radius: 28px;
         border: 1px solid rgba(255, 255, 255, 0.08);
         background:
-          radial-gradient(circle at top right, rgba(34, 211, 238, 0.12), transparent 34%),
+          radial-gradient(
+            circle at top right,
+            rgba(34, 211, 238, 0.12),
+            transparent 34%
+          ),
           rgba(2, 6, 23, 0.96);
         box-shadow: 0 30px 90px rgba(2, 6, 23, 0.45);
+        -webkit-overflow-scrolling: touch;
+      }
+      #design-modal {
+        background: transparent;
+        backdrop-filter: none;
+        align-items: flex-start;
+        justify-content: flex-end;
+        padding: 88px 16px 16px;
+      }
+      #design-modal .builder-modal-card {
+        width: min(100%, 420px);
+        box-shadow: 0 24px 70px rgba(2, 6, 23, 0.42);
+      }
+      #smart-inspector {
+        position: fixed; /* Changed from absolute/relative to fixed */
+        inset: 0;
+        z-index: 9999; /* Stay above everything */
+        display: flex;
+        align-items: center; /* Center vertically */
+        justify-content: center; /* Center horizontally */
+        background: rgba(2, 6, 23, 0.7);
+        backdrop-filter: blur(8px);
+      }
+      #smart-inspector.hidden {
+        display: none !important;
+      }
+      #smart-inspector > div {
+        width: min(100%, 392px);
+        max-height: min(82vh, 620px);
       }
       .feedback-stars {
         display: flex;
@@ -593,20 +658,41 @@
         border-color: rgba(250, 204, 21, 0.26);
         background: rgba(250, 204, 21, 0.12);
       }
+      @media (max-width: 900px) {
+        #smart-inspector {
+          align-items: flex-start;
+          padding: 1rem 0.85rem 0.85rem;
+        }
+        #smart-inspector > div {
+          width: min(100%, 400px);
+          max-height: calc(100vh - 1.4rem);
+        }
+      }
       @media (max-width: 640px) {
         .code-editor {
         }
+        .builder-tabbar {
+          width: 100%;
+          padding-bottom: 2px;
+        }
         .builder-popover {
-          width: calc(100vw - 16px);
-          left: -4px;
+          width: calc(100vw - 14px);
+          left: -3px;
           border-radius: 18px;
           padding: 10px;
+          max-height: min(62vh, 520px);
+          overflow-y: auto;
+        }
+        .builder-popover-grid {
+          grid-template-columns: 1fr;
         }
         .studio-menu-panel {
           width: calc(100vw - 16px);
           left: -4px;
           border-radius: 18px;
           padding: 10px;
+          max-height: min(72vh, 560px);
+          overflow-y: auto;
         }
         .code-editor-shell {
           border-radius: 20px;
@@ -639,18 +725,30 @@
           font-size: 12px;
         }
         .builder-modal-card {
+          max-height: calc(100vh - 20px);
           border-radius: 22px;
+        }
+        #design-modal {
+          align-items: flex-start;
+          justify-content: center;
+          padding: 86px 10px 10px;
+        }
+        #design-modal .builder-modal-card {
+          width: 100%;
+          max-width: calc(100vw - 20px);
         }
         #smart-inspector {
           align-items: flex-start;
           justify-content: center;
-          padding: 10.75rem 0.75rem 1rem;
+          padding: max(env(safe-area-inset-top), 0.35rem) 0.65rem 0.75rem;
           background: rgba(2, 6, 23, 0.45);
           backdrop-filter: blur(8px);
         }
         #smart-inspector > div {
-          max-width: calc(100vw - 1.5rem);
+          width: min(100%, 380px);
+          max-width: calc(100vw - 1.3rem);
           border-radius: 1.6rem;
+          max-height: calc(100vh - max(env(safe-area-inset-top), 0.45rem) - 0.55rem);
         }
       }
       body.builder-mode {
@@ -1202,66 +1300,215 @@
         </div>
       </div>
     </div>
-    <div id="builder-confirm-modal" class="hidden builder-modal-backdrop" onclick="if (event.target === this) closeBuilderConfirmModal();">
-      <div class="builder-modal-card p-6 sm:p-8" onclick="event.stopPropagation()">
+    <div
+      id="builder-confirm-modal"
+      class="hidden builder-modal-backdrop"
+      onclick="if (event.target === this) closeBuilderConfirmModal();"
+    >
+      <div
+        class="builder-modal-card p-6 sm:p-8"
+        onclick="event.stopPropagation()"
+      >
         <div class="flex items-start justify-between gap-4 mb-5">
           <div>
-            <p class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400">Studio Confirmation</p>
-            <h3 id="builder-confirm-title" class="text-2xl font-black text-white mt-2">Clear canvas?</h3>
+            <p
+              class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400"
+            >
+              Studio Confirmation
+            </p>
+            <h3
+              id="builder-confirm-title"
+              class="text-2xl font-black text-white mt-2"
+            >
+              Clear canvas?
+            </h3>
           </div>
-          <button onclick="closeBuilderConfirmModal()" class="w-10 h-10 rounded-2xl border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 transition-all"><i class="fas fa-times"></i></button>
+          <button
+            onclick="closeBuilderConfirmModal()"
+            class="w-10 h-10 rounded-2xl border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+          >
+            <i class="fas fa-times"></i>
+          </button>
         </div>
-        <p id="builder-confirm-message" class="text-sm text-slate-400 leading-relaxed mb-6">This will remove all current objects from the current builder canvas.</p>
+        <p
+          id="builder-confirm-message"
+          class="text-sm text-slate-400 leading-relaxed mb-6"
+        >
+          This will remove all current objects from the current builder canvas.
+        </p>
         <div class="flex flex-wrap justify-end gap-3">
-          <button onclick="closeBuilderConfirmModal()" class="px-4 py-3 rounded-2xl bg-white/5 text-sm font-bold text-slate-300 hover:bg-white/10 transition-all">Cancel</button>
-          <button id="builder-confirm-action" onclick="runBuilderConfirmAction()" class="px-5 py-3 rounded-2xl bg-red-500 text-sm font-black text-white hover:bg-red-400 transition-all">Confirm</button>
+          <button
+            onclick="closeBuilderConfirmModal()"
+            class="px-4 py-3 rounded-2xl bg-white/5 text-sm font-bold text-slate-300 hover:bg-white/10 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            id="builder-confirm-secondary"
+            onclick="runBuilderConfirmSecondaryAction()"
+            class="hidden px-5 py-3 rounded-2xl bg-white/5 text-sm font-black text-slate-200 hover:bg-white/10 transition-all"
+          >
+            Save Draft
+          </button>
+          <button
+            id="builder-confirm-action"
+            onclick="runBuilderConfirmAction()"
+            class="px-5 py-3 rounded-2xl bg-red-500 text-sm font-black text-white hover:bg-red-400 transition-all"
+          >
+            Confirm
+          </button>
         </div>
       </div>
     </div>
-    <div id="feedback-modal" class="hidden builder-modal-backdrop" onclick="if (event.target === this) closeFeedbackModal();">
-      <div class="builder-modal-card p-6 sm:p-8" onclick="event.stopPropagation()">
+    <div
+      id="feedback-modal"
+      class="hidden builder-modal-backdrop"
+      onclick="if (event.target === this) closeFeedbackModal();"
+    >
+      <div
+        class="builder-modal-card p-6 sm:p-8"
+        onclick="event.stopPropagation()"
+      >
         <div class="flex items-start justify-between gap-4 mb-5">
           <div>
-            <p class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400">Community</p>
-            <h3 class="text-2xl font-black text-white mt-2">Rate the builder</h3>
-            <p id="feedback-identity" class="text-sm text-slate-400 mt-2">Signed in feedback will include your account details.</p>
+            <p
+              class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400"
+            >
+              Community
+            </p>
+            <h3 class="text-2xl font-black text-white mt-2">
+              Rate the builder
+            </h3>
+            <p id="feedback-identity" class="text-sm text-slate-400 mt-2">
+              Signed in feedback will include your account details.
+            </p>
           </div>
-          <button onclick="closeFeedbackModal()" class="w-10 h-10 rounded-2xl border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 transition-all"><i class="fas fa-times"></i></button>
+          <button
+            onclick="closeFeedbackModal()"
+            class="w-10 h-10 rounded-2xl border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+          >
+            <i class="fas fa-times"></i>
+          </button>
         </div>
         <div class="space-y-5">
           <div>
-            <p class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3">Your Rating</p>
+            <p
+              class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500 mb-3"
+            >
+              Your Rating
+            </p>
             <div class="feedback-stars">
-              <button type="button" class="feedback-star" onclick="setFeedbackRating(1)"><i class="fas fa-star"></i></button>
-              <button type="button" class="feedback-star" onclick="setFeedbackRating(2)"><i class="fas fa-star"></i></button>
-              <button type="button" class="feedback-star" onclick="setFeedbackRating(3)"><i class="fas fa-star"></i></button>
-              <button type="button" class="feedback-star" onclick="setFeedbackRating(4)"><i class="fas fa-star"></i></button>
-              <button type="button" class="feedback-star" onclick="setFeedbackRating(5)"><i class="fas fa-star"></i></button>
+              <button
+                type="button"
+                class="feedback-star"
+                onclick="setFeedbackRating(1)"
+              >
+                <i class="fas fa-star"></i>
+              </button>
+              <button
+                type="button"
+                class="feedback-star"
+                onclick="setFeedbackRating(2)"
+              >
+                <i class="fas fa-star"></i>
+              </button>
+              <button
+                type="button"
+                class="feedback-star"
+                onclick="setFeedbackRating(3)"
+              >
+                <i class="fas fa-star"></i>
+              </button>
+              <button
+                type="button"
+                class="feedback-star"
+                onclick="setFeedbackRating(4)"
+              >
+                <i class="fas fa-star"></i>
+              </button>
+              <button
+                type="button"
+                class="feedback-star"
+                onclick="setFeedbackRating(5)"
+              >
+                <i class="fas fa-star"></i>
+              </button>
             </div>
           </div>
           <label class="block">
-            <span class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Suggestion</span>
-            <textarea id="feedback-text" placeholder="Tell us what should improve next..." class="w-full mt-3 min-h-[150px] rounded-[1.4rem] bg-white/5 border border-white/10 text-white text-sm leading-relaxed p-4 outline-none focus:border-cyan-500 resize-none"></textarea>
+            <span
+              class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500"
+              >Suggestion</span
+            >
+            <textarea
+              id="feedback-text"
+              placeholder="Tell us what should improve next..."
+              class="w-full mt-3 min-h-[150px] rounded-[1.4rem] bg-white/5 border border-white/10 text-white text-sm leading-relaxed p-4 outline-none focus:border-cyan-500 resize-none"
+            ></textarea>
           </label>
           <div class="flex flex-wrap justify-end gap-3">
-            <button onclick="closeFeedbackModal()" class="px-4 py-3 rounded-2xl bg-white/5 text-sm font-bold text-slate-300 hover:bg-white/10 transition-all">Cancel</button>
-            <button id="feedback-submit-btn" onclick="submitCommunityFeedback()" class="px-5 py-3 rounded-2xl bg-cyan-600 text-sm font-black text-white hover:bg-cyan-500 transition-all">Send Feedback</button>
+            <button
+              onclick="closeFeedbackModal()"
+              class="px-4 py-3 rounded-2xl bg-white/5 text-sm font-bold text-slate-300 hover:bg-white/10 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              id="feedback-submit-btn"
+              onclick="submitCommunityFeedback()"
+              class="px-5 py-3 rounded-2xl bg-cyan-600 text-sm font-black text-white hover:bg-cyan-500 transition-all"
+            >
+              Send Feedback
+            </button>
           </div>
         </div>
       </div>
     </div>
-    <div id="design-modal" class="hidden builder-modal-backdrop" onclick="if (event.target === this) closeDesignModal();">
-      <div class="builder-modal-card p-6 sm:p-8" onclick="event.stopPropagation()">
+    <div
+      id="design-modal"
+      class="hidden builder-modal-backdrop"
+      onclick="if (event.target === this) closeDesignModal();"
+    >
+      <div
+        class="builder-modal-card p-6 sm:p-8"
+        onclick="event.stopPropagation()"
+      >
         <div class="flex items-start justify-between gap-4 mb-5">
           <div>
-            <p class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400">Page Design</p>
-            <h3 id="design-modal-title" class="text-2xl font-black text-white mt-2">Background Templates</h3>
-            <p id="design-modal-subtitle" class="text-sm text-slate-400 mt-2">Apply professional page backgrounds without losing grid visibility.</p>
+            <p
+              class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400"
+            >
+              Page Design
+            </p>
+            <h3
+              id="design-modal-title"
+              class="text-2xl font-black text-white mt-2"
+            >
+              Background Templates
+            </h3>
+            <p id="design-modal-subtitle" class="text-sm text-slate-400 mt-2">
+              Apply professional page backgrounds without losing grid
+              visibility.
+            </p>
           </div>
-          <button onclick="closeDesignModal()" class="w-10 h-10 rounded-2xl border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 transition-all"><i class="fas fa-times"></i></button>
+          <button
+            onclick="closeDesignModal()"
+            class="w-10 h-10 rounded-2xl border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+          >
+            <i class="fas fa-times"></i>
+          </button>
         </div>
-        <div id="design-modal-body" class="space-y-4"></div>
-        <input type="file" id="canvas-bg-file-input" accept="image/*" class="hidden" onchange="handleCanvasBackgroundImageFile(this.files[0])">
+        <div
+          id="design-modal-body"
+          class="space-y-4 max-h-[60vh] overflow-y-auto pr-1"
+        ></div>
+        <input
+          type="file"
+          id="canvas-bg-file-input"
+          accept="image/*"
+          class="hidden"
+          onchange="handleCanvasBackgroundImageFile(this.files[0])"
+        />
       </div>
     </div>
     <footer class="bg-gray-950 border-t border-gray-900 py-4">
@@ -1703,6 +1950,8 @@
             if (currentUser.projects) {
               updateSidebarHistory(currentUser.projects);
             }
+            currentUser.builderDrafts = currentUser.builderDrafts || [];
+            renderBuilderDrafts();
             goToStudio();
           }
         } catch (e) {
@@ -2309,7 +2558,7 @@
         <div id="studio-workspace" class="hidden absolute inset-0 bg-[#06080d] flex flex-col">
             <div class="sticky top-0 z-[110] px-2 sm:px-4 pt-2 sm:pt-4">
                 <div id="builder-toolbar-shell" class="bg-gray-950/85 backdrop-blur-3xl border border-white/10 rounded-[1.2rem] sm:rounded-[1.6rem] px-2 py-2 sm:px-3 sm:py-2.5 flex flex-wrap items-center justify-between gap-2 shadow-[0_25px_80px_rgba(0,0,0,0.6)] ring-1 ring-white/5 relative">
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 min-w-0 flex-1">
                         <div class="relative">
                             <button id="studio-menu-toggle" onclick="toggleStudioMenu(event)" class="w-9 h-9 flex items-center justify-center text-gray-300 hover:text-white border border-white/5 rounded-xl bg-white/5 transition-colors">
                                 <i class="fas fa-bars text-sm"></i>
@@ -2317,7 +2566,7 @@
                             <div id="studio-menu-panel" class="studio-menu-panel hidden">
                                 <div class="space-y-3">
                                     <div class="grid grid-cols-2 gap-2">
-                                        <button onclick="newBuilderProject(); hideStudioMenu();" class="builder-cmd"><i class="fas fa-file-circle-plus text-cyan-400"></i><span>New Project<small>Clear canvas and start fresh</small></span></button>
+                                        <button onclick="requestNewBuilderProject(); hideStudioMenu();" class="builder-cmd"><i class="fas fa-file-circle-plus text-cyan-400"></i><span>New Project<small>Clear canvas and start fresh</small></span></button>
                                         <button onclick="saveBuilderDraft(); hideStudioMenu();" class="builder-cmd"><i class="fas fa-floppy-disk text-cyan-400"></i><span>Save Draft<small>Store current project locally</small></span></button>
                                     </div>
                                     <button onclick="switchTool('history'); exitStudio(); hideStudioMenu();" class="builder-cmd"><i class="fas fa-clock-rotate-left text-cyan-400"></i><span>Project History<small>Open MediaLab history library</small></span></button>
@@ -2338,7 +2587,6 @@
                         <button id="tab-templates" onclick="toggleBuilderTab('templates', event)" class="builder-tab">Templates</button>
                         <button id="tab-community" onclick="toggleBuilderTab('community', event)" class="builder-tab">Community</button>
                         <button id="builder-code-toggle" onclick="toggleBuilderCodeMode()" class="builder-tab">Code</button>
-                        <button onclick="downloadBuilderHtmlFile()" class="builder-tab">HTML</button>
                     </div>
                     </div>
                     <div class="flex items-center gap-2">
@@ -2349,14 +2597,14 @@
                     </div>
                     <div id="builder-panel-insert" class="builder-popover hidden">
                         <div class="builder-popover-grid">
-                            <button onclick="toggleElementPicker(); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-plus-circle text-cyan-400"></i><span>Elements<small>Open element library</small></span></button>
+                            <button id="insert-elements-trigger" onclick="toggleElementPicker(event); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-plus-circle text-cyan-400"></i><span>Elements<small>Open element library</small></span></button>
                             <button onclick="insertStarterBlock('hero'); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-wand-magic-sparkles text-cyan-400"></i><span>Hero Block<small>Premium landing hero</small></span></button>
                             <button onclick="insertStarterBlock('feature'); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-layer-group text-cyan-400"></i><span>Feature Row<small>Three-card section</small></span></button>
                         </div>
                     </div>
                     <div id="builder-panel-file" class="builder-popover hidden">
                         <div class="builder-popover-grid">
-                            <button onclick="newBuilderProject(); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-file-circle-plus text-cyan-400"></i><span>New Project<small>Reset current canvas</small></span></button>
+                            <button onclick="requestNewBuilderProject(); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-file-circle-plus text-cyan-400"></i><span>New Project<small>Reset current canvas</small></span></button>
                             <button onclick="saveBuilderDraft(); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-floppy-disk text-cyan-400"></i><span>Save Draft<small>Keep work locally</small></span></button>
                             <button onclick="document.getElementById('builder-file-input').click(); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-file-import text-cyan-400"></i><span>Import HTML<small>Open local project code</small></span></button>
                             <button onclick="downloadBuilderHtmlFile(); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-file-export text-cyan-400"></i><span>Export HTML<small>Download polished page file</small></span></button>
@@ -2413,6 +2661,7 @@
                             <p class="text-xs text-gray-400">Edit exact HTML and CSS in a focused mini editor. Valid changes sync back to the visual canvas.</p>
                         </div>
                         <div class="flex gap-2">
+                            <button onclick="copyBuilderCode()" class="px-4 py-2.5 rounded-xl bg-white/5 text-[10px] font-black uppercase tracking-[0.16em] text-gray-300 hover:bg-white/10 transition-all">Copy Code</button>
                             <button onclick="refreshBuilderCodeMode()" class="px-4 py-2.5 rounded-xl bg-white/5 text-[10px] font-black uppercase tracking-[0.16em] text-gray-300 hover:bg-white/10 transition-all">Refresh</button>
                             <button onclick="applyCodeModeToCanvas()" class="px-4 py-2.5 rounded-xl bg-cyan-600 text-[10px] font-black uppercase tracking-[0.16em] text-white hover:bg-cyan-500 transition-all">Apply to Canvas</button>
                             <button onclick="toggleBuilderCodeMode()" class="px-4 py-2.5 rounded-xl bg-white/5 text-[10px] font-black uppercase tracking-[0.16em] text-gray-300 hover:bg-white/10 transition-all">Visual Mode</button>
@@ -2451,7 +2700,7 @@
                     </div>
                 </div>
             </div>
-            <div id="element-picker" class="hidden fixed top-20 sm:top-24 left-1/2 -translate-x-1/2 z-[120] bg-gray-950/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] sm:rounded-[3rem] shadow-2xl p-4 sm:p-6 w-[92vw] max-w-[360px] animate-fadeIn ring-1 ring-cyan-500/20">
+            <div id="element-picker" class="hidden fixed z-[120] bg-gray-950/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] sm:rounded-[3rem] shadow-2xl p-4 sm:p-6 w-[92vw] max-w-[360px] max-h-[72vh] overflow-y-auto animate-fadeIn ring-1 ring-cyan-500/20">
                 <p class="text-[9px] font-black text-gray-500 uppercase tracking-[0.3em] mb-5 text-center">UI Component Library</p>
                 <div class="grid grid-cols-3 gap-3">
                     ${[
@@ -2493,21 +2742,22 @@
                       .join("")}
                 </div>
                 <input type="file" id="local-img-input" accept="image/*" class="hidden" onchange="handleLocalImage(this.files[0])">
+                <input type="file" id="inspector-bg-img-input" accept="image/*" class="hidden" onchange="handleInspectorBackgroundImage(this.files[0])">
                 <input type="file" id="builder-file-input" accept=".html,.htm,.txt" class="hidden" onchange="handleBuilderFileImport(this.files[0])">
             </div>
             <div id="smart-inspector" class="hidden fixed inset-0 bg-black/60 backdrop-blur-md z-[150] flex items-center justify-center p-4">
-                <div onclick="event.stopPropagation()" class="bg-[#0b0c10] border border-white/10 w-full max-w-[360px] sm:max-w-[380px] rounded-[2rem] sm:rounded-[2.4rem] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.9)] ring-1 ring-white/10 scale-in">
+                <div onclick="event.stopPropagation()" class="bg-[#0b0c10] border border-white/10 w-full max-w-[360px] sm:max-w-[392px] min-h-[560px] sm:min-h-[590px] max-h-[min(84vh,640px)] rounded-[2rem] sm:rounded-[2.4rem] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.9)] ring-1 ring-white/10 scale-in flex flex-col">
                    
-                    <div class="h-36 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.14),transparent_45%),linear-gradient(180deg,#020617_0%,#0b1120_100%)] flex items-center justify-center border-b border-white/5 relative overflow-hidden">
+                    <div class="h-[180px] sm:h-[190px] shrink-0 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.14),transparent_45%),linear-gradient(180deg,#020617_0%,#0b1120_100%)] flex items-center justify-center border-b border-white/5 relative overflow-hidden">
                          <div class="absolute inset-0 opacity-40" style="background-image:linear-gradient(rgba(148,163,184,0.12) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,0.12) 1px,transparent 1px);background-size:24px 24px;transform:perspective(700px) rotateX(68deg) scale(1.4);transform-origin:center top;"></div>
                          <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,transparent_42%,rgba(2,6,23,0.78)_100%)]"></div>
-                         <div id="inspector-preview" class="relative transition-all duration-500 shadow-[0_30px_60px_rgba(15,23,42,0.65)]"></div>
+                         <div id="inspector-preview" class="relative w-full h-full transition-all duration-300 px-5 py-4"></div>
                     </div>
-                    <div class="p-5 sm:p-6">
-                        <div id="inspector-controls" class="min-h-[210px] max-h-[48vh] overflow-y-auto pr-1 flex flex-col justify-center gap-3">
+                    <div class="p-5 sm:p-6 flex-1 min-h-0 flex flex-col">
+                        <div id="inspector-controls" class="flex-1 min-h-0 overflow-hidden pr-1 flex flex-col gap-3">
                             </div>
                        
-                        <div class="mt-6 pt-5 border-t border-white/5">
+                        <div class="mt-5 pt-4 border-t border-white/5 shrink-0">
                             <div class="flex justify-between items-center mb-5 px-1">
                                 <button onclick="changeInspectorPage(-1)" class="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center text-gray-500 hover:text-cyan-400 transition-colors"><i class="fas fa-chevron-left text-xs"></i></button>
                                 <span id="page-title" class="text-[8px] font-black text-cyan-500 uppercase tracking-[0.3em] flex-1 text-center">Content</span>
@@ -2520,6 +2770,9 @@
                         </div>
                     </div>
                 </div>
+            </div>
+            <div id="builder-snackbar" class="hidden fixed left-1/2 -translate-x-1/2 bottom-4 sm:bottom-6 z-[3400] px-4 py-3 rounded-2xl bg-slate-950/92 border border-cyan-400/20 text-sm font-bold text-cyan-100 shadow-[0_20px_50px_rgba(2,6,23,0.45)] backdrop-blur-xl">
+              Code copied to clipboard
             </div>
         </div>
     </div>
@@ -3642,11 +3895,15 @@
       // ====================== 1. GLOBAL STATE & DICTIONARIES ======================
       const inspectorPages = [
         "Content",
-        "Layout",
+        "Size",
+        "Spacing",
         "Background",
-        "Typography",
+        "Text",
+        "Type",
         "Border",
+        "Outline",
         "Effects",
+        "Transform",
         "Position",
         "Advanced",
       ];
@@ -3655,6 +3912,7 @@
       let historyIndex = -1;
       let selectedEl = null;
       let selectedElements = [];
+      let builderInitialized = false;
       let builderSnapEnabled = true;
       let multiSelectMode = false;
       let builderCodeMode = false;
@@ -3663,10 +3921,11 @@
       let builderPanelIdleTimer = null;
       let selectionBoxEl = null;
       let builderConfirmAction = null;
+      let builderConfirmSecondaryAction = null;
       let feedbackRating = 5;
       let activeDesignModalMode = "templates";
-      const BUILDER_DRAFTS_KEY = "medialab_builder_drafts_v1";
       const BUILDER_GRID_SIZE = 20;
+      let guestBuilderDrafts = [];
       let guideXEl = null;
       let guideYEl = null;
       let currentInspectorState = {
@@ -3682,35 +3941,75 @@
         document.body.classList.add("builder-mode");
         document.getElementById("editor-welcome").classList.add("hidden");
         document.getElementById("studio-workspace").classList.remove("hidden");
-        initCanvasLogic();
+        if (!builderInitialized) {
+          initCanvasLogic();
+        } else {
+          updateBuilderUI();
+          renderBuilderDrafts();
+        }
       }
-      function exitStudio() {
+      function performExitStudio() {
         if (document.fullscreenElement) document.exitFullscreen();
         document.body.classList.remove("builder-mode");
         document.getElementById("studio-workspace").classList.add("hidden");
         document.getElementById("editor-welcome").classList.remove("hidden");
       }
+      async function exitStudio() {
+        if (!builderHasCanvasContent()) {
+          performExitStudio();
+          return;
+        }
+        if (!loggedIn) {
+          openBuilderConfirmModal(
+            "Login to protect your project",
+            "Guest work disappears after refresh. Login so MediaLab can save your draft safely before you leave.",
+            "Exit Anyway",
+            () => {
+              saveBuilderDraft({ silent: true, isAutoSave: true });
+              performExitStudio();
+            },
+            "Login",
+            () => showLogin(),
+          );
+          return;
+        }
+        await saveBuilderDraft({ silent: true, isAutoSave: true });
+        performExitStudio();
+      }
+      function builderHasCanvasContent() {
+        const canvas = document.getElementById("web-canvas");
+        return Boolean(canvas?.querySelector(".canvas-element"));
+      }
       function initCanvasLogic() {
         const canvas = document.getElementById("web-canvas");
         if (canvas) {
-          canvas.innerHTML = "";
-          applyCanvasDesignPreset("clean", true);
+          if (!builderInitialized || !builderHasCanvasContent()) {
+            canvas.innerHTML = "";
+            applyCanvasDesignPreset("clean", true);
+          } else {
+            refreshCanvasBackground();
+          }
           ensureBuilderGuides(canvas);
           initCanvasSelection(canvas);
           canvas.onclick = (e) => {
             if (e.target.id === "web-canvas") deselectAll();
           };
         }
-        historyStack = [];
-        historyIndex = -1;
+        if (!builderInitialized) {
+          historyStack = [];
+          historyIndex = -1;
+        }
         selectedElements = [];
         selectedEl = null;
         builderCodeMode = false;
-        saveToHistory();
+        if (!builderInitialized) saveToHistory();
         updateBuilderUI();
         document.addEventListener("contextmenu", handleRightClick);
+        builderInitialized = true;
       }
-      function getCanvasPageStyleState(canvas = document.getElementById("web-canvas")) {
+      function getCanvasPageStyleState(
+        canvas = document.getElementById("web-canvas"),
+      ) {
         if (!canvas) {
           return {
             background: "#ffffff",
@@ -3732,6 +4031,7 @@
         const canvas = document.getElementById("web-canvas");
         if (!canvas) return;
         const pageBackground = canvas.dataset.pageBackground || "#ffffff";
+        const usesImageBackground = /url\(/i.test(pageBackground);
         const gridOverlay = builderSnapEnabled
           ? [
               "linear-gradient(to right, rgba(255,255,255,0.16) 1px, transparent 1px)",
@@ -3740,6 +4040,23 @@
               "linear-gradient(to bottom, rgba(15,23,42,0.08) 1px, transparent 1px)",
             ].join(", ")
           : "";
+        if (usesImageBackground) {
+          const imageUrl = parseBackgroundImageUrl(pageBackground);
+          canvas.style.backgroundImage = builderSnapEnabled
+            ? `${gridOverlay}, linear-gradient(rgba(15,23,42,0.12), rgba(15,23,42,0.12)), ${imageUrl ? `url("${imageUrl}")` : "none"}`
+            : `linear-gradient(rgba(15,23,42,0.12), rgba(15,23,42,0.12)), ${imageUrl ? `url("${imageUrl}")` : "none"}`;
+          canvas.style.backgroundSize = builderSnapEnabled
+            ? "20px 20px, 20px 20px, 20px 20px, 20px 20px, auto, cover"
+            : "auto, cover";
+          canvas.style.backgroundPosition = builderSnapEnabled
+            ? "0 0, 0 0, 0 0, 0 0, center, center"
+            : "center, center";
+          canvas.style.backgroundRepeat = builderSnapEnabled
+            ? "repeat, repeat, repeat, repeat, repeat, no-repeat"
+            : "repeat, no-repeat";
+          return;
+        }
+        canvas.style.backgroundImage = "";
         canvas.style.background = gridOverlay
           ? `${gridOverlay}, ${pageBackground}`
           : pageBackground;
@@ -3749,18 +4066,26 @@
         canvas.style.backgroundPosition = builderSnapEnabled
           ? "0 0, 0 0, 0 0, 0 0, center"
           : "center";
+        canvas.style.backgroundRepeat = builderSnapEnabled
+          ? "repeat, repeat, repeat, repeat, repeat"
+          : "repeat";
       }
       function applyCanvasDesignPreset(kind, silent = false) {
         const presets = {
           clean: "#ffffff",
           dark: "linear-gradient(160deg, #020617 0%, #111827 58%, #1f2937 100%)",
-          aurora: "radial-gradient(circle at top left, rgba(34,211,238,0.24), transparent 32%), radial-gradient(circle at top right, rgba(59,130,246,0.28), transparent 28%), linear-gradient(145deg, #f8fafc 0%, #dbeafe 48%, #eff6ff 100%)",
-          sunset: "radial-gradient(circle at top right, rgba(251,146,60,0.32), transparent 26%), radial-gradient(circle at bottom left, rgba(244,114,182,0.25), transparent 24%), linear-gradient(150deg, #fff7ed 0%, #fee2e2 52%, #faf5ff 100%)",
-          spotlight: "radial-gradient(circle at center, rgba(255,255,255,0.72), rgba(255,255,255,0.08) 34%, rgba(15,23,42,0.92) 100%), linear-gradient(180deg, #0f172a 0%, #111827 100%)",
-          ocean: "radial-gradient(circle at top right, rgba(14,165,233,0.32), transparent 26%), linear-gradient(145deg, #ecfeff 0%, #dbeafe 46%, #cffafe 100%)",
+          aurora:
+            "radial-gradient(circle at top left, rgba(34,211,238,0.24), transparent 32%), radial-gradient(circle at top right, rgba(59,130,246,0.28), transparent 28%), linear-gradient(145deg, #f8fafc 0%, #dbeafe 48%, #eff6ff 100%)",
+          sunset:
+            "radial-gradient(circle at top right, rgba(251,146,60,0.32), transparent 26%), radial-gradient(circle at bottom left, rgba(244,114,182,0.25), transparent 24%), linear-gradient(150deg, #fff7ed 0%, #fee2e2 52%, #faf5ff 100%)",
+          spotlight:
+            "radial-gradient(circle at center, rgba(255,255,255,0.72), rgba(255,255,255,0.08) 34%, rgba(15,23,42,0.92) 100%), linear-gradient(180deg, #0f172a 0%, #111827 100%)",
+          ocean:
+            "radial-gradient(circle at top right, rgba(14,165,233,0.32), transparent 26%), linear-gradient(145deg, #ecfeff 0%, #dbeafe 46%, #cffafe 100%)",
           mesh: "radial-gradient(circle at 20% 20%, rgba(99,102,241,0.28), transparent 24%), radial-gradient(circle at 80% 10%, rgba(34,211,238,0.22), transparent 22%), radial-gradient(circle at 60% 75%, rgba(244,114,182,0.18), transparent 20%), linear-gradient(160deg, #f8fafc 0%, #eef2ff 52%, #ecfeff 100%)",
           editorial: "linear-gradient(180deg, #fcfcfd 0%, #f8fafc 100%)",
-          graphite: "linear-gradient(145deg, #111827 0%, #0f172a 50%, #020617 100%)",
+          graphite:
+            "linear-gradient(145deg, #111827 0%, #0f172a 50%, #020617 100%)",
         };
         applyCanvasPageBackground(presets[kind] || presets.clean, silent);
       }
@@ -3773,7 +4098,9 @@
           applyCanvasDesignPreset("clean");
           return;
         }
-        applyCanvasPageBackground(`linear-gradient(rgba(15,23,42,0.12), rgba(15,23,42,0.12)), url("${trimmed}") center / cover no-repeat`);
+        applyCanvasPageBackground(
+          `linear-gradient(rgba(15,23,42,0.12), rgba(15,23,42,0.12)), url("${trimmed}") center / cover no-repeat`,
+        );
       }
       function openDesignModal(mode = "templates") {
         activeDesignModalMode = mode;
@@ -3791,31 +4118,40 @@
         if (!body) return;
         if (activeDesignModalMode === "color") {
           if (title) title.textContent = "Page Color";
-          if (subtitle) subtitle.textContent = "Pick a solid page color that still keeps the design grid visible.";
+          if (subtitle)
+            subtitle.textContent =
+              "Pick a solid page color that still keeps the design grid visible.";
           body.innerHTML = `
             <label class="block">
               <span class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Canvas Color</span>
               <input type="color" value="#ffffff" oninput="applyCanvasDesignColor(this.value)" class="mt-3 w-full h-14 rounded-2xl bg-transparent border border-white/10 p-1">
             </label>
+            <button onclick="applyCanvasDesignPreset('clean'); closeDesignModal();" class="w-full mt-4 py-3 rounded-2xl bg-white/5 text-sm font-black uppercase tracking-[0.16em] text-white hover:bg-white/10 transition-all">Reset to Default</button>
           `;
           return;
         }
         if (activeDesignModalMode === "image") {
           if (title) title.textContent = "Background Image";
-          if (subtitle) subtitle.textContent = "Upload a local image or paste a direct image URL for the page background.";
+          if (subtitle)
+            subtitle.textContent =
+              "Upload a local image or paste a direct image URL for the page background.";
           body.innerHTML = `
             <button onclick="document.getElementById('canvas-bg-file-input').click()" class="w-full py-4 rounded-2xl bg-white/5 text-sm font-black uppercase tracking-[0.16em] text-white hover:bg-white/10 transition-all">Upload Local Image</button>
             <label class="block">
               <span class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Image URL</span>
               <input type="text" placeholder="https://example.com/background.jpg" oninput="applyCanvasDesignImage(this.value)" class="mt-3 w-full bg-gray-800/90 p-3 rounded-2xl text-white text-sm border border-white/5 outline-none focus:border-cyan-500">
             </label>
+            <button onclick="applyCanvasDesignPreset('clean'); closeDesignModal();" class="w-full mt-4 py-3 rounded-2xl bg-white/5 text-sm font-black uppercase tracking-[0.16em] text-white hover:bg-white/10 transition-all">Reset to Default</button>
           `;
           return;
         }
         if (title) title.textContent = "Background Templates";
-        if (subtitle) subtitle.textContent = "Choose from polished studio-grade page backgrounds.";
+        if (subtitle)
+          subtitle.textContent =
+            "Choose from polished studio-grade page backgrounds.";
         body.innerHTML = `
           <div class="grid grid-cols-2 gap-3">
+            <button onclick="applyCanvasDesignPreset('clean'); closeDesignModal();" class="builder-cmd justify-center text-center"><span>Reset<small>Return to the clean default page</small></span></button>
             ${[
               ["clean", "Clean White"],
               ["editorial", "Editorial"],
@@ -3828,7 +4164,8 @@
               ["graphite", "Graphite"],
             ]
               .map(
-                ([id, label]) => `<button onclick="applyCanvasDesignPreset('${id}')" class="builder-cmd justify-center text-center"><span>${label}<small>Apply page look</small></span></button>`,
+                ([id, label]) =>
+                  `<button onclick="applyCanvasDesignPreset('${id}')" class="builder-cmd justify-center text-center"><span>${label}<small>Apply page look</small></span></button>`,
               )
               .join("")}
           </div>
@@ -3839,6 +4176,7 @@
         const reader = new FileReader();
         reader.onload = (e) => {
           applyCanvasDesignImage(e.target?.result || "");
+          preserveBuilderFullscreenAfterUpload();
         };
         reader.readAsDataURL(file);
       }
@@ -3890,7 +4228,9 @@
                 parseFloat(selectionBoxEl.style.height || "0"),
             };
             multiSelectMode = true;
-            Array.from(canvas.querySelectorAll(":scope > .canvas-element")).forEach((el) => {
+            Array.from(
+              canvas.querySelectorAll(":scope > .canvas-element"),
+            ).forEach((el) => {
               const elBox = {
                 left: el.offsetLeft,
                 top: el.offsetTop,
@@ -3945,7 +4285,15 @@
       function hideBuilderPanels() {
         activeBuilderPanel = null;
         clearTimeout(builderPanelIdleTimer);
-        ["insert", "file", "edit", "arrange", "design", "templates", "community"].forEach((name) => {
+        [
+          "insert",
+          "file",
+          "edit",
+          "arrange",
+          "design",
+          "templates",
+          "community",
+        ].forEach((name) => {
           document
             .getElementById(`builder-panel-${name}`)
             ?.classList.add("hidden");
@@ -4021,7 +4369,8 @@
             }),
           });
           const data = await res.json();
-          if (!data.success) throw new Error(data.message || "Feedback could not be saved.");
+          if (!data.success)
+            throw new Error(data.message || "Feedback could not be saved.");
           closeFeedbackModal();
           alert("Thank you. Your feedback has been saved.");
         } catch (error) {
@@ -4037,7 +4386,10 @@
         event?.stopPropagation();
         const panel = document.getElementById(`builder-panel-${name}`);
         const tab = document.getElementById(`tab-${name}`);
-        const isOpen = activeBuilderPanel === name && panel && !panel.classList.contains("hidden");
+        const isOpen =
+          activeBuilderPanel === name &&
+          panel &&
+          !panel.classList.contains("hidden");
         hideBuilderPanels();
         if (isOpen || !panel) return;
         panel.classList.remove("hidden");
@@ -4076,9 +4428,37 @@
         }
       });
       document.addEventListener("keydown", () => {
-        if (activeBuilderPanel || !document.getElementById("studio-menu-panel")?.classList.contains("hidden")) {
+        if (
+          activeBuilderPanel ||
+          !document
+            .getElementById("studio-menu-panel")
+            ?.classList.contains("hidden")
+        ) {
           queueBuilderPanelAutoHide();
         }
+      });
+      window.addEventListener("pagehide", () => {
+        if (
+          !document.body.classList.contains("builder-mode") ||
+          !builderHasCanvasContent()
+        )
+          return;
+        if (loggedIn) {
+          saveBuilderDraft({ silent: true, isAutoSave: true, keepalive: true });
+        }
+      });
+      window.addEventListener("beforeunload", (e) => {
+        if (
+          !document.body.classList.contains("builder-mode") ||
+          !builderHasCanvasContent()
+        )
+          return;
+        if (loggedIn) {
+          saveBuilderDraft({ silent: true, isAutoSave: true, keepalive: true });
+          return;
+        }
+        e.preventDefault();
+        e.returnValue = "";
       });
       // ====================== 3. COMPONENT INJECTION ======================
       function addCanvasElement(type) {
@@ -4097,11 +4477,16 @@
             { src: e.target.result, id: `img_${Date.now()}` },
           );
           document.getElementById("element-picker").classList.add("hidden");
+          preserveBuilderFullscreenAfterUpload();
         };
         reader.readAsDataURL(file);
       }
       function getDefaultElementAttributes(type) {
         switch (type) {
+          case "div":
+            return {
+              text: "Content Block",
+            };
           case "text":
             return {
               text: "Add Text",
@@ -4128,6 +4513,7 @@
         }
       }
       function populateElementBody(body, type, attrs) {
+        body.innerHTML = "";
         let component;
         switch (type) {
           case "img":
@@ -4163,8 +4549,11 @@
             component.className = "w-6 h-6 accent-cyan-500 pointer-events-none";
             body.appendChild(component);
             break;
+          case "div":
+            body.innerHTML = `<div contenteditable="true" class="w-full h-full flex items-center justify-center font-semibold outline-none">${attrs.text || "Content Block"}</div>`;
+            break;
           default:
-            body.classList.add("w-full", "h-full");
+            body.innerHTML = `<div class="w-full h-full block"></div>`;
         }
       }
       function addObject(type, styles, attrs) {
@@ -4216,14 +4605,14 @@
         selectElement(wrap);
       }
       function getBuilderDrafts() {
-        return JSON.parse(localStorage.getItem(BUILDER_DRAFTS_KEY) || "[]");
+        return loggedIn ? currentUser?.builderDrafts || [] : guestBuilderDrafts;
       }
       function renderBuilderDrafts() {
         const list = document.getElementById("builder-drafts-list");
         if (!list) return;
         const drafts = getBuilderDrafts();
         if (!drafts.length) {
-          list.innerHTML = `<div class="text-[11px] text-slate-500 px-2 py-3">No saved drafts yet.</div>`;
+          list.innerHTML = `<div class="text-[11px] text-slate-500 px-2 py-3">${loggedIn ? "No saved drafts yet." : "Guest drafts are temporary until you log in."}</div>`;
           return;
         }
         list.innerHTML = drafts
@@ -4243,19 +4632,59 @@
           )
           .join("");
       }
-      function saveBuilderDraft() {
+      async function saveBuilderDraft(options = {}) {
         const canvas = document.getElementById("web-canvas");
         if (!canvas) return;
+        const {
+          silent = false,
+          isAutoSave = false,
+          keepalive = false,
+        } = options;
         const drafts = getBuilderDrafts();
-        const draftName = `Builder Draft ${drafts.length + 1}`;
-        drafts.push({
+        const draftName =
+          options.name ||
+          (isAutoSave
+            ? "Auto Draft"
+            : `Builder Draft ${drafts.filter((draft) => !draft.isAutoSave).length + 1}`);
+        const payload = {
           name: draftName,
           savedAt: Date.now(),
           canvasHtml: canvas.innerHTML,
           pageBackground: getCanvasPageStyleState(canvas).background,
-        });
-        localStorage.setItem(BUILDER_DRAFTS_KEY, JSON.stringify(drafts.slice(-12)));
-        if (typeof saveProjectToHistory === "function") {
+          isAutoSave,
+        };
+        if (loggedIn) {
+          try {
+            const res = await fetch("/api/builder-drafts", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              keepalive,
+              body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!data.success)
+              throw new Error(data.message || "Could not save draft.");
+            if (currentUser) currentUser.builderDrafts = data.drafts || [];
+          } catch (error) {
+            if (!silent)
+              alert(error.message || "Could not save draft right now.");
+            return;
+          }
+        } else {
+          if (isAutoSave) {
+            const autosaveIndex = guestBuilderDrafts.findIndex(
+              (draft) => draft.isAutoSave,
+            );
+            if (autosaveIndex >= 0)
+              guestBuilderDrafts.splice(autosaveIndex, 1, payload);
+            else guestBuilderDrafts.push(payload);
+          } else {
+            guestBuilderDrafts.push(payload);
+          }
+          guestBuilderDrafts = guestBuilderDrafts.slice(-12);
+        }
+        if (!silent && typeof saveProjectToHistory === "function") {
           saveProjectToHistory({
             title: draftName,
             tool: "Web Builder",
@@ -4271,7 +4700,12 @@
         const canvas = document.getElementById("web-canvas");
         if (!draft || !canvas) return;
         canvas.innerHTML = draft.canvasHtml || draft.canvasState?.html || "";
-        applyCanvasPageBackground(draft.pageBackground || draft.canvasState?.pageBackground || "#ffffff", true);
+        applyCanvasPageBackground(
+          draft.pageBackground ||
+            draft.canvasState?.pageBackground ||
+            "#ffffff",
+          true,
+        );
         ensureBuilderGuides(canvas);
         initCanvasSelection(canvas);
         hydrateCanvasElements();
@@ -4288,7 +4722,22 @@
         deselectAll();
         saveToHistory();
       }
+      function requestNewBuilderProject() {
+        hideBuilderPanels();
+        openBuilderConfirmModal(
+          "Start a new project?",
+          "You can save the current canvas to Drafts first, or discard it and start fresh.",
+          "Discard",
+          () => newBuilderProject(),
+          "Save Draft",
+          async () => {
+            await saveBuilderDraft();
+            newBuilderProject();
+          },
+        );
+      }
       function requestCanvasClear() {
+        hideBuilderPanels();
         openBuilderConfirmModal(
           "Clear canvas?",
           "This will permanently remove all objects from the current builder canvas.",
@@ -4296,22 +4745,47 @@
           () => newBuilderProject(),
         );
       }
-      function openBuilderConfirmModal(title, message, actionLabel, action) {
+      function openBuilderConfirmModal(
+        title,
+        message,
+        actionLabel,
+        action,
+        secondaryLabel = "",
+        secondaryAction = null,
+      ) {
         builderConfirmAction = action;
+        builderConfirmSecondaryAction = secondaryAction;
         const titleNode = document.getElementById("builder-confirm-title");
         const messageNode = document.getElementById("builder-confirm-message");
         const actionNode = document.getElementById("builder-confirm-action");
+        const secondaryNode = document.getElementById(
+          "builder-confirm-secondary",
+        );
         if (titleNode) titleNode.textContent = title;
         if (messageNode) messageNode.textContent = message;
         if (actionNode) actionNode.textContent = actionLabel;
-        document.getElementById("builder-confirm-modal")?.classList.remove("hidden");
+        if (secondaryNode) {
+          secondaryNode.textContent = secondaryLabel || "Save Draft";
+          secondaryNode.classList.toggle("hidden", !secondaryAction);
+        }
+        document
+          .getElementById("builder-confirm-modal")
+          ?.classList.remove("hidden");
       }
       function closeBuilderConfirmModal() {
         builderConfirmAction = null;
-        document.getElementById("builder-confirm-modal")?.classList.add("hidden");
+        builderConfirmSecondaryAction = null;
+        document
+          .getElementById("builder-confirm-modal")
+          ?.classList.add("hidden");
       }
       function runBuilderConfirmAction() {
         if (typeof builderConfirmAction === "function") builderConfirmAction();
+        closeBuilderConfirmModal();
+      }
+      function runBuilderConfirmSecondaryAction() {
+        if (typeof builderConfirmSecondaryAction === "function")
+          builderConfirmSecondaryAction();
         closeBuilderConfirmModal();
       }
       function handleBuilderFileImport(file) {
@@ -4332,6 +4806,11 @@
       function insertStarterBlock(kind) {
         const canvas = document.getElementById("web-canvas");
         if (!canvas) return;
+        hideBuilderPanels();
+        document.getElementById("element-picker")?.classList.add("hidden");
+        const startCount = canvas.querySelectorAll(
+          ":scope > .canvas-element",
+        ).length;
         if (kind === "hero") {
           addObject(
             "div",
@@ -4375,7 +4854,9 @@
               fontWeight: "500",
               lineHeight: "1.45",
             },
-            { text: "A sharper visual builder with cleaner defaults, stronger export, and more professional layout control." },
+            {
+              text: "A sharper visual builder with cleaner defaults, stronger export, and more professional layout control.",
+            },
           );
           addObject(
             "button",
@@ -4387,10 +4868,12 @@
             },
             { text: "Start Building" },
           );
+          autoGroupStarterElements(startCount);
           return;
         }
         if (kind === "feature") {
-          const top = 80 + canvas.querySelectorAll(".canvas-element").length * 18;
+          const top =
+            80 + canvas.querySelectorAll(".canvas-element").length * 18;
           [
             { left: 60, title: "Reliable" },
             { left: 360, title: "Responsive" },
@@ -4441,36 +4924,146 @@
                 fontWeight: "500",
                 lineHeight: "1.5",
               },
-              { text: "Clean defaults, excellent spacing, and export that developers can actually work with." },
+              {
+                text: "Clean defaults, excellent spacing, and export that developers can actually work with.",
+              },
             );
           });
+          autoGroupStarterElements(startCount);
           return;
         }
         if (kind === "login") {
           addObject(
             "div",
             {
-              width: "440px",
-              height: "470px",
-              left: "80px",
-              top: "80px",
+              width: "420px",
+              height: "438px",
+              left: "96px",
+              top: "86px",
               backgroundMode: "gradient",
-              backgroundColor: "#ffffff",
-              backgroundColorSecondary: "#eff6ff",
-              borderRadius: "34px",
-              padding: "34px",
+              backgroundColor: "rgba(255,255,255,0.98)",
+              backgroundColorSecondary: "rgba(241,245,249,0.92)",
+              borderRadius: "24px",
+              padding: "28px",
               borderWidth: "1px",
-              borderColor: "#e2e8f0",
-              boxShadow: "0 40px 100px rgba(15, 23, 42, 0.16)",
+              borderColor: "rgba(255,255,255,0.7)",
+              boxShadow: "0 32px 86px rgba(15, 23, 42, 0.18)",
+              backdropFilterBlur: "14px",
             },
             { id: `login_${Date.now()}` },
           );
-          addObject("text", { width: "300px", height: "56px", left: "120px", top: "118px", fontSize: "34px", fontWeight: "800" }, { text: "Welcome back" });
-          addObject("text", { width: "300px", height: "44px", left: "122px", top: "176px", fontSize: "15px", color: "#64748b", fontWeight: "500" }, { text: "Sign in to continue to your workspace." });
-          addObject("input", { width: "320px", height: "56px", left: "118px", top: "246px", borderRadius: "18px", backgroundColor: "#ffffff" }, { placeholder: "Username" });
-          addObject("input", { width: "320px", height: "56px", left: "118px", top: "320px", borderRadius: "18px", backgroundColor: "#ffffff" }, { placeholder: "Password" });
-          addObject("button", { width: "320px", height: "58px", left: "118px", top: "398px" }, { text: "Log In" });
-          addObject("a", { width: "160px", height: "36px", left: "198px", top: "462px", backgroundMode: "solid", backgroundColor: "transparent", backgroundColorSecondary: "transparent", boxShadow: "none", color: "#2563eb" }, { text: "Forgot password?", href: "#" });
+          addObject(
+            "text",
+            {
+              width: "220px",
+              height: "42px",
+              left: "132px",
+              top: "124px",
+              fontSize: "22px",
+              fontWeight: "800",
+              color: "#111827",
+            },
+            { text: "Login" },
+          );
+          addObject(
+            "text",
+            {
+              width: "110px",
+              height: "20px",
+              left: "132px",
+              top: "184px",
+              fontSize: "12px",
+              color: "#111827",
+              fontWeight: "600",
+            },
+            { text: "Username" },
+          );
+          addObject(
+            "input",
+            {
+              width: "330px",
+              height: "50px",
+              left: "132px",
+              top: "208px",
+              borderRadius: "999px",
+              backgroundMode: "solid",
+              backgroundColor: "#ffffff",
+              backgroundColorSecondary: "#ffffff",
+              borderWidth: "1px",
+              borderColor: "#cfd8e3",
+              boxShadow: "0 10px 22px rgba(15, 23, 42, 0.05)",
+              padding: "0 20px",
+              color: "#111827",
+            },
+            { placeholder: "Username" },
+          );
+          addObject(
+            "text",
+            {
+              width: "110px",
+              height: "20px",
+              left: "132px",
+              top: "278px",
+              fontSize: "12px",
+              color: "#111827",
+              fontWeight: "600",
+            },
+            { text: "Password" },
+          );
+          addObject(
+            "input",
+            {
+              width: "330px",
+              height: "50px",
+              left: "132px",
+              top: "302px",
+              borderRadius: "999px",
+              backgroundMode: "solid",
+              backgroundColor: "#ffffff",
+              backgroundColorSecondary: "#ffffff",
+              borderWidth: "1px",
+              borderColor: "#cfd8e3",
+              boxShadow: "0 10px 22px rgba(15, 23, 42, 0.05)",
+              padding: "0 20px",
+              color: "#111827",
+            },
+            { placeholder: "Password" },
+          );
+          addObject(
+            "button",
+            {
+              width: "330px",
+              height: "48px",
+              left: "132px",
+              top: "380px",
+              borderRadius: "999px",
+              backgroundMode: "gradient",
+              backgroundColor: "#343e63",
+              backgroundColorSecondary: "#1f2744",
+              color: "#ffffff",
+              boxShadow: "0 18px 32px rgba(31, 39, 68, 0.22)",
+              fontWeight: "700",
+            },
+            { text: "Login" },
+          );
+          addObject(
+            "a",
+            {
+              width: "160px",
+              height: "28px",
+              left: "217px",
+              top: "438px",
+              backgroundMode: "solid",
+              backgroundColor: "transparent",
+              backgroundColorSecondary: "transparent",
+              color: "#475569",
+              fontSize: "12px",
+              fontWeight: "600",
+              boxShadow: "none",
+            },
+            { text: "Forgot password?", href: "#" },
+          );
+          autoGroupStarterElements(startCount);
           return;
         }
         if (kind === "contact") {
@@ -4492,12 +5085,52 @@
             },
             { id: `contact_${Date.now()}` },
           );
-          addObject("text", { width: "320px", height: "52px", left: "120px", top: "130px", fontSize: "34px", fontWeight: "800" }, { text: "Let’s work together" });
-          addObject("text", { width: "320px", height: "42px", left: "122px", top: "184px", fontSize: "15px", color: "#64748b", fontWeight: "500" }, { text: "Tell us about your project and we’ll reply quickly." });
-          addObject("input", { width: "360px", height: "54px", left: "118px", top: "246px" }, { placeholder: "Your name" });
-          addObject("input", { width: "360px", height: "54px", left: "118px", top: "314px" }, { placeholder: "Your email" });
-          addObject("textarea", { width: "360px", height: "96px", left: "118px", top: "382px" }, { placeholder: "Project details" });
-          addObject("button", { width: "180px", height: "54px", left: "298px", top: "494px" }, { text: "Send Inquiry" });
+          addObject(
+            "text",
+            {
+              width: "320px",
+              height: "52px",
+              left: "120px",
+              top: "130px",
+              fontSize: "34px",
+              fontWeight: "800",
+            },
+            { text: "Let’s work together" },
+          );
+          addObject(
+            "text",
+            {
+              width: "320px",
+              height: "42px",
+              left: "122px",
+              top: "184px",
+              fontSize: "15px",
+              color: "#64748b",
+              fontWeight: "500",
+            },
+            { text: "Tell us about your project and we’ll reply quickly." },
+          );
+          addObject(
+            "input",
+            { width: "360px", height: "54px", left: "118px", top: "246px" },
+            { placeholder: "Your name" },
+          );
+          addObject(
+            "input",
+            { width: "360px", height: "54px", left: "118px", top: "314px" },
+            { placeholder: "Your email" },
+          );
+          addObject(
+            "textarea",
+            { width: "360px", height: "96px", left: "118px", top: "382px" },
+            { placeholder: "Project details" },
+          );
+          addObject(
+            "button",
+            { width: "180px", height: "54px", left: "298px", top: "494px" },
+            { text: "Send Inquiry" },
+          );
+          autoGroupStarterElements(startCount);
           return;
         }
         if (kind === "pricing") {
@@ -4506,57 +5139,148 @@
             { left: 380, title: "Growth", price: "$49" },
             { left: 690, title: "Scale", price: "$99" },
           ].forEach((plan, index) => {
-            addObject("div", {
-              width: "260px",
-              height: "320px",
-              left: `${plan.left}px`,
-              top: "110px",
-              backgroundMode: index === 1 ? "gradient" : "solid",
-              backgroundColor: index === 1 ? "#0f172a" : "#ffffff",
-              backgroundColorSecondary: index === 1 ? "#1d4ed8" : "#ffffff",
-              color: index === 1 ? "#ffffff" : "#0f172a",
-              borderRadius: "30px",
-              padding: "28px",
-              borderWidth: "1px",
-              borderColor: index === 1 ? "rgba(255,255,255,0.08)" : "#e2e8f0",
-              boxShadow: "0 26px 70px rgba(15, 23, 42, 0.12)",
-            }, { id: `pricing_${index}_${Date.now()}` });
-            addObject("text", { width: "180px", height: "40px", left: `${plan.left + 36}px`, top: "142px", color: index === 1 ? "#ffffff" : "#0f172a", fontSize: "24px", fontWeight: "700" }, { text: plan.title });
-            addObject("text", { width: "140px", height: "60px", left: `${plan.left + 36}px`, top: "194px", color: index === 1 ? "#67e8f9" : "#2563eb", fontSize: "42px", fontWeight: "800" }, { text: plan.price });
-            addObject("text", { width: "180px", height: "72px", left: `${plan.left + 36}px`, top: "258px", color: index === 1 ? "#cbd5e1" : "#64748b", fontSize: "15px", fontWeight: "500", lineHeight: "1.5" }, { text: "Professional product-ready essentials with reliable export and clean editing." });
-            addObject("button", { width: "180px", height: "52px", left: `${plan.left + 36}px`, top: "348px", backgroundMode: index === 1 ? "solid" : "gradient", backgroundColor: index === 1 ? "#ffffff" : "#06b6d4", backgroundColorSecondary: index === 1 ? "#ffffff" : "#2563eb", color: index === 1 ? "#0f172a" : "#ffffff" }, { text: "Choose Plan" });
+            addObject(
+              "div",
+              {
+                width: "260px",
+                height: "320px",
+                left: `${plan.left}px`,
+                top: "110px",
+                backgroundMode: index === 1 ? "gradient" : "solid",
+                backgroundColor: index === 1 ? "#0f172a" : "#ffffff",
+                backgroundColorSecondary: index === 1 ? "#1d4ed8" : "#ffffff",
+                color: index === 1 ? "#ffffff" : "#0f172a",
+                borderRadius: "30px",
+                padding: "28px",
+                borderWidth: "1px",
+                borderColor: index === 1 ? "rgba(255,255,255,0.08)" : "#e2e8f0",
+                boxShadow: "0 26px 70px rgba(15, 23, 42, 0.12)",
+              },
+              { id: `pricing_${index}_${Date.now()}` },
+            );
+            addObject(
+              "text",
+              {
+                width: "180px",
+                height: "40px",
+                left: `${plan.left + 36}px`,
+                top: "142px",
+                color: index === 1 ? "#ffffff" : "#0f172a",
+                fontSize: "24px",
+                fontWeight: "700",
+              },
+              { text: plan.title },
+            );
+            addObject(
+              "text",
+              {
+                width: "140px",
+                height: "60px",
+                left: `${plan.left + 36}px`,
+                top: "194px",
+                color: index === 1 ? "#67e8f9" : "#2563eb",
+                fontSize: "42px",
+                fontWeight: "800",
+              },
+              { text: plan.price },
+            );
+            addObject(
+              "text",
+              {
+                width: "180px",
+                height: "72px",
+                left: `${plan.left + 36}px`,
+                top: "258px",
+                color: index === 1 ? "#cbd5e1" : "#64748b",
+                fontSize: "15px",
+                fontWeight: "500",
+                lineHeight: "1.5",
+              },
+              {
+                text: "Professional product-ready essentials with reliable export and clean editing.",
+              },
+            );
+            addObject(
+              "button",
+              {
+                width: "180px",
+                height: "52px",
+                left: `${plan.left + 36}px`,
+                top: "348px",
+                backgroundMode: index === 1 ? "solid" : "gradient",
+                backgroundColor: index === 1 ? "#ffffff" : "#06b6d4",
+                backgroundColorSecondary: index === 1 ? "#ffffff" : "#2563eb",
+                color: index === 1 ? "#0f172a" : "#ffffff",
+              },
+              { text: "Choose Plan" },
+            );
           });
+          autoGroupStarterElements(startCount);
           return;
         }
         if (kind === "dashboard") {
-          addObject("div", {
-            width: "960px",
-            height: "520px",
-            left: "60px",
-            top: "80px",
-            backgroundMode: "solid",
-            backgroundColor: "#0f172a",
-            backgroundColorSecondary: "#0f172a",
-            borderRadius: "36px",
-            padding: "28px",
-            boxShadow: "0 40px 120px rgba(15, 23, 42, 0.28)",
-          }, { id: `dashboard_${Date.now()}` });
-          addObject("text", { width: "320px", height: "54px", left: "98px", top: "118px", color: "#ffffff", fontSize: "34px", fontWeight: "800" }, { text: "Revenue Dashboard" });
-          addObject("text", { width: "280px", height: "36px", left: "100px", top: "170px", color: "#94a3b8", fontSize: "15px", fontWeight: "500" }, { text: "Track product growth in real time." });
-          [0,1,2].forEach((i) => {
-            addObject("div", {
-              width: "250px",
-              height: "150px",
-              left: `${100 + i * 274}px`,
-              top: "234px",
-              backgroundMode: "gradient",
-              backgroundColor: i === 0 ? "#0ea5e9" : i === 1 ? "#8b5cf6" : "#10b981",
+          addObject(
+            "div",
+            {
+              width: "960px",
+              height: "520px",
+              left: "60px",
+              top: "80px",
+              backgroundMode: "solid",
+              backgroundColor: "#0f172a",
               backgroundColorSecondary: "#0f172a",
-              borderRadius: "26px",
-              padding: "24px",
-              boxShadow: "0 22px 60px rgba(15, 23, 42, 0.24)",
-            }, { id: `dashboard_card_${i}_${Date.now()}` });
+              borderRadius: "36px",
+              padding: "28px",
+              boxShadow: "0 40px 120px rgba(15, 23, 42, 0.28)",
+            },
+            { id: `dashboard_${Date.now()}` },
+          );
+          addObject(
+            "text",
+            {
+              width: "320px",
+              height: "54px",
+              left: "98px",
+              top: "118px",
+              color: "#ffffff",
+              fontSize: "34px",
+              fontWeight: "800",
+            },
+            { text: "Revenue Dashboard" },
+          );
+          addObject(
+            "text",
+            {
+              width: "280px",
+              height: "36px",
+              left: "100px",
+              top: "170px",
+              color: "#94a3b8",
+              fontSize: "15px",
+              fontWeight: "500",
+            },
+            { text: "Track product growth in real time." },
+          );
+          [0, 1, 2].forEach((i) => {
+            addObject(
+              "div",
+              {
+                width: "250px",
+                height: "150px",
+                left: `${100 + i * 274}px`,
+                top: "234px",
+                backgroundMode: "gradient",
+                backgroundColor:
+                  i === 0 ? "#0ea5e9" : i === 1 ? "#8b5cf6" : "#10b981",
+                backgroundColorSecondary: "#0f172a",
+                borderRadius: "26px",
+                padding: "24px",
+                boxShadow: "0 22px 60px rgba(15, 23, 42, 0.24)",
+              },
+              { id: `dashboard_card_${i}_${Date.now()}` },
+            );
           });
+          autoGroupStarterElements(startCount);
           return;
         }
       }
@@ -4565,39 +5289,60 @@
         inspectorPageIndex = 0; // Surgical Reset
         const modal = document.getElementById("smart-inspector");
         modal.classList.remove("hidden");
+        const editableDivText =
+          type === "div" && !elementHasNestedCanvasChildren(existingEl);
         currentInspectorState = {
           type: type,
           targetEl: existingEl,
           styles: existingEl
-            ? extractStyles(existingEl)
+            ? normalizeBuilderStyles(extractStyles(existingEl), type)
             : normalizeBuilderStyles({}, type),
           attributes: existingEl
             ? {
                 id: existingEl.id,
                 text:
-                  existingEl.querySelector(".element-body")?.innerText?.trim() ||
+                  (editableDivText
+                    ? existingEl
+                        .querySelector(".element-body > :not(.canvas-element)")
+                        ?.innerText?.trim()
+                    : existingEl
+                        .querySelector(".element-body")
+                        ?.innerText?.trim()) ||
                   getDefaultElementAttributes(type).text ||
                   "New Element",
                 placeholder:
-                  existingEl.querySelector("input, textarea")?.placeholder || "",
-                href: existingEl.querySelector("a")?.getAttribute("href") || "#",
+                  existingEl.querySelector("input, textarea")?.placeholder ||
+                  "",
+                href:
+                  existingEl.querySelector("a")?.getAttribute("href") || "#",
                 src: existingEl.querySelector("img")?.getAttribute("src") || "",
                 className: Array.from(existingEl.classList)
-                  .filter((cls) => !["canvas-element", "absolute", "group", "transition-shadow", "active:cursor-grabbing", "ring-4", "ring-cyan-400"].includes(cls))
+                  .filter(
+                    (cls) =>
+                      ![
+                        "canvas-element",
+                        "absolute",
+                        "group",
+                        "transition-shadow",
+                        "active:cursor-grabbing",
+                        "ring-4",
+                        "ring-cyan-400",
+                      ].includes(cls),
+                  )
                   .join(" "),
               }
             : {
                 id: `el_${Date.now()}`,
                 text: getDefaultElementAttributes(type).text || "New Element",
                 placeholder:
-                  getDefaultElementAttributes(type).placeholder || "Type here...",
+                  getDefaultElementAttributes(type).placeholder ||
+                  "Type here...",
                 href: "#",
                 src: "",
                 className: "",
               },
         };
-        renderInspectorControls(type);
-        updateInspectorPreview();
+        syncInspectorUI();
         document.getElementById("inspector-confirm-btn").onclick = () => {
           if (existingEl) applyStylesToExisting();
           else
@@ -4608,34 +5353,43 @@
             );
           closeSmartInspector();
         };
-        if (window.innerWidth <= 640) {
-          const picker = document.getElementById("element-picker");
-          const inspectorCard = modal.querySelector("div[onclick='event.stopPropagation()']");
-          if (picker && !picker.classList.contains("hidden") && inspectorCard) {
-            const rect = picker.getBoundingClientRect();
-            modal.style.alignItems = "flex-start";
-            modal.style.justifyContent = "center";
-            modal.style.paddingTop = `${rect.bottom + 12}px`;
-          } else {
-            modal.style.removeProperty("padding-top");
-          }
-        } else {
-          modal.style.removeProperty("padding-top");
-          modal.style.removeProperty("align-items");
-          modal.style.removeProperty("justify-content");
+        modal.style.removeProperty("padding-top");
+        modal.style.removeProperty("align-items");
+        modal.style.removeProperty("justify-content");
+      }
+      function syncInspectorUI(refreshControls = true) {
+        if (!currentInspectorState?.type) return;
+        currentInspectorState.styles = normalizeBuilderStyles(
+          currentInspectorState.styles,
+          currentInspectorState.type,
+        );
+        if (refreshControls) {
+          renderInspectorControls(currentInspectorState.type);
         }
+        updateInspectorPreview();
       }
       function renderInspectorControls(type) {
         const container = document.getElementById("inspector-controls");
-        const s = currentInspectorState.styles;
+        const s = normalizeBuilderStyles(currentInspectorState.styles, type);
         const a = currentInspectorState.attributes;
+        const isGradientMode = s.backgroundMode === "gradient";
+        const isImageMode = s.backgroundMode === "image";
         document.getElementById("page-title").innerText =
           inspectorPages[inspectorPageIndex];
         let h = `<div class="space-y-3">`;
         switch (inspectorPageIndex) {
           case 0:
-            h += renderBuilderInput("System ID", "text", a.id, "updateAttr('id', this.value)");
-            if (["text", "button", "a"].includes(type)) {
+            h += renderBuilderInput(
+              "System ID",
+              "text",
+              a.id,
+              "updateAttr('id', this.value)",
+            );
+            if (
+              ["text", "button", "a"].includes(type) ||
+              (type === "div" &&
+                !elementHasNestedCanvasChildren(currentInspectorState.targetEl))
+            ) {
               h += renderBuilderInput(
                 "Display Text",
                 "text",
@@ -4665,6 +5419,8 @@
               ${renderBuilderInput("Width", "text", s.width, "updateStyle('width', normalizeCssSize(this.value, '260px'))")}
               ${renderBuilderInput("Height", "text", s.height, "updateStyle('height', normalizeCssSize(this.value, '100px'))")}
             </div>`;
+            break;
+          case 2:
             h += renderBuilderInput(
               "Padding",
               "text",
@@ -4678,7 +5434,7 @@
               "updateStyle('borderRadius', normalizeCssSize(this.value, '18px'))",
             );
             break;
-          case 2:
+          case 3:
             h += renderBuilderSelect(
               "Background Type",
               "backgroundMode",
@@ -4690,44 +5446,81 @@
               ],
               "updateStyle('backgroundMode', this.value)",
             );
-            h += `<div class="grid grid-cols-2 gap-3">
-              ${renderBuilderInput("Primary Color", "color", s.backgroundColor, "updateStyle('backgroundColor', this.value)")}
-              ${renderBuilderInput("Secondary Color", "color", s.backgroundColorSecondary, "updateStyle('backgroundColorSecondary', this.value)")}
-            </div>`;
+            h += isGradientMode
+              ? `<div class="grid grid-cols-2 gap-3">
+                  ${renderBuilderInput("Primary Color", "color", s.backgroundColor, "updateStyle('backgroundColor', this.value)")}
+                  ${renderBuilderInput("Secondary Color", "color", s.backgroundColorSecondary, "updateStyle('backgroundColorSecondary', this.value)")}
+                </div>
+                ${renderBuilderInput(
+                  "Gradient Angle",
+                  "range",
+                  String(parseInt(s.gradientAngle || "135", 10)),
+                  "updateStyle('gradientAngle', this.value + 'deg')",
+                  `min="0" max="360"`,
+                )}`
+              : renderBuilderInput(
+                  "Primary Color",
+                  "color",
+                  s.backgroundColor,
+                  "updateStyle('backgroundColor', this.value)",
+                );
+            if (isImageMode) {
+              h += renderBuilderSelect(
+                "Image Fit",
+                "backgroundSize",
+                s.backgroundSize,
+                [
+                  ["cover", "Cover"],
+                  ["contain", "Contain"],
+                  ["auto", "Auto"],
+                ],
+                "updateStyle('backgroundSize', this.value)",
+              );
+              h += `<div class="rounded-[1.2rem] border border-white/5 bg-white/[0.03] px-3 py-2.5">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="min-w-0">
+                    <div class="text-[7px] font-black text-gray-500 uppercase tracking-[0.2em]">Background Image</div>
+                    <div class="text-[10px] text-slate-400 mt-1 truncate">${s.backgroundImageUrl ? "Uploaded image ready" : "No uploaded image yet"}</div>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" onclick="document.getElementById('inspector-bg-img-input').click()" class="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-[0.16em] text-slate-200 hover:bg-white/10 transition-all">Upload</button>
+                    ${s.backgroundImageUrl ? `<button type="button" onclick="updateStyle('backgroundImageUrl', ''); updateStyle('backgroundMode', 'solid')" class="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400 hover:bg-white/10 transition-all">Clear</button>` : ""}
+                  </div>
+                </div>
+              </div>`;
+            }
+            break;
+          case 4:
             h += renderBuilderInput(
-              "Gradient Angle",
-              "range",
-              String(parseInt(s.gradientAngle || "135", 10)),
-              "updateStyle('gradientAngle', this.value + 'deg')",
-              `min="0" max="360"`,
+              "Text Color",
+              "color",
+              s.color,
+              "updateStyle('color', this.value)",
             );
             h += renderBuilderSelect(
-              "Image Fit",
-              "backgroundSize",
-              s.backgroundSize,
+              "Text Align",
+              "textAlign",
+              s.textAlign,
               [
-                ["cover", "Cover"],
-                ["contain", "Contain"],
-                ["auto", "Auto"],
+                ["left", "Left"],
+                ["center", "Center"],
+                ["right", "Right"],
               ],
-              "updateStyle('backgroundSize', this.value)",
-            );
-            h += renderBuilderInput(
-              "Background Image URL",
-              "text",
-              s.backgroundImageUrl || "",
-              "updateStyle('backgroundImageUrl', this.value)",
+              "updateStyle('textAlign', this.value)",
             );
             break;
-          case 3:
+          case 5:
             h += `<div class="grid grid-cols-2 gap-3">
-              ${renderBuilderInput("Text Color", "color", s.color, "updateStyle('color', this.value)")}
               ${renderBuilderInput("Font Size", "text", s.fontSize, "updateStyle('fontSize', normalizeCssSize(this.value, '18px'))")}
-            </div>`;
-            h += `<div class="grid grid-cols-2 gap-3">
               ${renderBuilderInput("Line Height", "text", s.lineHeight, "updateStyle('lineHeight', this.value || '1.4')")}
-              ${renderBuilderInput("Letter Spacing", "text", s.letterSpacing, "updateStyle('letterSpacing', normalizeCssSize(this.value, '0px'))")}
             </div>`;
+            h += renderBuilderInput(
+              "Font Weight",
+              "range",
+              String(parseInt(s.fontWeight || "600", 10)),
+              "updateStyle('fontWeight', this.value)",
+              `min="100" max="900" step="100"`,
+            );
             h += renderBuilderSelect(
               "Font Family",
               "fontFamily",
@@ -4741,26 +5534,8 @@
               ],
               "updateStyle('fontFamily', this.value)",
             );
-            h += renderBuilderSelect(
-              "Text Align",
-              "textAlign",
-              s.textAlign,
-              [
-                ["left", "Left"],
-                ["center", "Center"],
-                ["right", "Right"],
-              ],
-              "updateStyle('textAlign', this.value)",
-            );
-            h += renderBuilderInput(
-              "Font Weight",
-              "range",
-              String(parseInt(s.fontWeight || "600", 10)),
-              "updateStyle('fontWeight', this.value)",
-              `min="100" max="900" step="100"`,
-            );
             break;
-          case 4:
+          case 6:
             h += `<div class="grid grid-cols-2 gap-3">
               ${renderBuilderInput("Border Width", "text", s.borderWidth, "updateStyle('borderWidth', normalizeCssSize(this.value, '1px'))")}
               ${renderBuilderInput("Border Color", "color", s.borderColor, "updateStyle('borderColor', this.value)")}
@@ -4777,6 +5552,8 @@
               ],
               "updateStyle('borderStyle', this.value)",
             );
+            break;
+          case 7:
             h += `<div class="grid grid-cols-2 gap-3">
               ${renderBuilderInput("Outline Width", "text", s.outlineWidth, "updateStyle('outlineWidth', normalizeCssSize(this.value, '0px'))")}
               ${renderBuilderInput("Outline Color", "color", s.outlineColor, "updateStyle('outlineColor', this.value)")}
@@ -4788,7 +5565,7 @@
               "updateStyle('outlineOffset', normalizeCssSize(this.value, '0px'))",
             );
             break;
-          case 5:
+          case 8:
             h += renderBuilderInput(
               "Opacity",
               "range",
@@ -4802,6 +5579,8 @@
               s.boxShadow,
               "updateStyle('boxShadow', this.value)",
             );
+            break;
+          case 9:
             h += renderBuilderInput(
               "Blur",
               "text",
@@ -4815,7 +5594,7 @@
               "updateStyle('rotate', normalizeCssSize(this.value, '0deg'))",
             );
             break;
-          case 6:
+          case 10:
             h += `<div class="grid grid-cols-2 gap-3">
               ${renderBuilderInput("Top", "text", s.top, "updateStyle('top', normalizeCssSize(this.value, '150px'))")}
               ${renderBuilderInput("Left", "text", s.left, "updateStyle('left', normalizeCssSize(this.value, '150px'))")}
@@ -4825,7 +5604,7 @@
               ${renderBuilderInput("Mix Blend", "text", s.mixBlendMode, "updateStyle('mixBlendMode', this.value || 'normal')")}
             </div>`;
             break;
-          case 7:
+          case 11:
             h += renderBuilderInput(
               "Custom CSS Class",
               "text",
@@ -4852,7 +5631,11 @@
             return;
           }
         }
-        if (!multiSelectMode || selectedElements.length <= 1 || !selectedElements.includes(el)) {
+        if (
+          !multiSelectMode ||
+          selectedElements.length <= 1 ||
+          !selectedElements.includes(el)
+        ) {
           selectElement(el);
         }
         if (!isResizer && !isDragHandle) return;
@@ -4903,16 +5686,14 @@
                 startL + startW - 30,
               );
               el.style.left = nextLeft + "px";
-              el.style.width = Math.max(30, startW + (startL - nextLeft)) + "px";
+              el.style.width =
+                Math.max(30, startW + (startL - nextLeft)) + "px";
             }
             if (rType.includes("t")) {
-              const nextTop = clamp(
-                snap(startT + dy),
-                0,
-                startT + startH - 30,
-              );
+              const nextTop = clamp(snap(startT + dy), 0, startT + startH - 30);
               el.style.top = nextTop + "px";
-              el.style.height = Math.max(30, startH + (startT - nextTop)) + "px";
+              el.style.height =
+                Math.max(30, startH + (startT - nextTop)) + "px";
             }
           } else {
             if (movingSelection) {
@@ -4982,25 +5763,32 @@
         if (/^-?\d+(\.\d+)?$/.test(trimmed)) return `${trimmed}px`;
         return trimmed;
       }
+      function elementHasNestedCanvasChildren(el) {
+        const body = el?.querySelector(".element-body");
+        if (!body) return false;
+        return Array.from(body.children).some((child) =>
+          child.classList?.contains("canvas-element"),
+        );
+      }
       function normalizeBuilderStyles(styles = {}, type = "div") {
         const defaults = {
           div: {
-            width: "320px",
-            height: "180px",
-            padding: "24px",
-            borderRadius: "28px",
+            width: "380px",
+            height: "220px",
+            padding: "30px",
+            borderRadius: "26px",
             backgroundMode: "gradient",
-            backgroundColor: "#0f172a",
-            backgroundColorSecondary: "#1d4ed8",
-            color: "#f8fafc",
-            borderWidth: "0px",
+            backgroundColor: "#ffffff",
+            backgroundColorSecondary: "#dbeafe",
+            color: "#0f172a",
+            borderWidth: "1px",
             borderStyle: "solid",
-            borderColor: "transparent",
-            boxShadow: "0 28px 80px rgba(15, 23, 42, 0.22)",
+            borderColor: "#bfdbfe",
+            boxShadow: "0 28px 72px rgba(15, 23, 42, 0.12)",
           },
           text: {
             width: "340px",
-            height: "120px",
+            height: "96px",
             padding: "0px",
             borderRadius: "0px",
             backgroundMode: "solid",
@@ -5008,76 +5796,76 @@
             backgroundColorSecondary: "transparent",
             color: "#0f172a",
             fontSize: "32px",
-            fontWeight: "700",
-            lineHeight: "1.15",
-            letterSpacing: "-0.03em",
+            fontWeight: "800",
+            lineHeight: "1.08",
+            letterSpacing: "-0.035em",
             borderWidth: "0px",
             borderColor: "transparent",
             outlineWidth: "0px",
             boxShadow: "none",
           },
           button: {
-            width: "220px",
-            height: "64px",
-            padding: "18px 24px",
+            width: "210px",
+            height: "54px",
+            padding: "15px 24px",
             borderRadius: "999px",
             backgroundMode: "gradient",
-            backgroundColor: "#06b6d4",
-            backgroundColorSecondary: "#2563eb",
+            backgroundColor: "#2563eb",
+            backgroundColorSecondary: "#1d4ed8",
             color: "#ffffff",
-            fontSize: "16px",
+            fontSize: "15px",
             fontWeight: "700",
             borderWidth: "0px",
             borderColor: "transparent",
-            boxShadow: "0 20px 50px rgba(37, 99, 235, 0.35)",
+            boxShadow: "0 18px 36px rgba(37, 99, 235, 0.24)",
             textAlign: "center",
           },
           a: {
-            width: "220px",
-            height: "56px",
-            padding: "16px 22px",
-            borderRadius: "999px",
+            width: "190px",
+            height: "40px",
+            padding: "8px 10px",
+            borderRadius: "12px",
             backgroundMode: "solid",
-            backgroundColor: "#eff6ff",
-            backgroundColorSecondary: "#eff6ff",
-            color: "#1d4ed8",
+            backgroundColor: "transparent",
+            backgroundColorSecondary: "transparent",
+            color: "#2563eb",
             fontSize: "15px",
             fontWeight: "700",
             borderWidth: "0px",
             borderStyle: "solid",
             borderColor: "transparent",
-            boxShadow: "0 18px 40px rgba(59, 130, 246, 0.16)",
-            textAlign: "center",
+            boxShadow: "none",
+            textAlign: "left",
           },
           input: {
             width: "320px",
-            height: "56px",
-            padding: "16px 18px",
+            height: "54px",
+            padding: "15px 18px",
             borderRadius: "18px",
             backgroundMode: "solid",
-            backgroundColor: "#ffffff",
-            backgroundColorSecondary: "#ffffff",
+            backgroundColor: "#f8fafc",
+            backgroundColorSecondary: "#f8fafc",
             color: "#0f172a",
             fontSize: "15px",
             borderWidth: "1px",
             borderStyle: "solid",
-            borderColor: "#cbd5e1",
-            boxShadow: "0 14px 30px rgba(15, 23, 42, 0.08)",
+            borderColor: "#dbe2ea",
+            boxShadow: "0 14px 34px rgba(15, 23, 42, 0.06)",
           },
           textarea: {
             width: "340px",
-            height: "140px",
+            height: "128px",
             padding: "18px",
             borderRadius: "20px",
             backgroundMode: "solid",
-            backgroundColor: "#ffffff",
-            backgroundColorSecondary: "#ffffff",
+            backgroundColor: "#f8fafc",
+            backgroundColorSecondary: "#f8fafc",
             color: "#0f172a",
             fontSize: "15px",
             borderWidth: "1px",
             borderStyle: "solid",
-            borderColor: "#cbd5e1",
-            boxShadow: "0 16px 34px rgba(15, 23, 42, 0.08)",
+            borderColor: "#dbe2ea",
+            boxShadow: "0 14px 36px rgba(15, 23, 42, 0.06)",
           },
         };
         const typeDefaults = defaults[type] || defaults.div;
@@ -5088,7 +5876,8 @@
           left: styles.left || "150px",
           zIndex: styles.zIndex || "10",
           padding: styles.padding || typeDefaults.padding || "16px",
-          borderRadius: styles.borderRadius || typeDefaults.borderRadius || "18px",
+          borderRadius:
+            styles.borderRadius || typeDefaults.borderRadius || "18px",
           backgroundMode:
             styles.backgroundMode || typeDefaults.backgroundMode || "gradient",
           backgroundColor:
@@ -5109,8 +5898,10 @@
           letterSpacing:
             styles.letterSpacing || typeDefaults.letterSpacing || "0px",
           borderWidth: styles.borderWidth || typeDefaults.borderWidth || "1px",
-          borderStyle: styles.borderStyle || typeDefaults.borderStyle || "solid",
-          borderColor: styles.borderColor || typeDefaults.borderColor || "#cbd5e1",
+          borderStyle:
+            styles.borderStyle || typeDefaults.borderStyle || "solid",
+          borderColor:
+            styles.borderColor || typeDefaults.borderColor || "#cbd5e1",
           outlineWidth: styles.outlineWidth || "0px",
           outlineColor: styles.outlineColor || "#38bdf8",
           outlineOffset: styles.outlineOffset || "0px",
@@ -5124,12 +5915,21 @@
           mixBlendMode: styles.mixBlendMode || "normal",
         };
       }
+      function parseBackgroundImageUrl(backgroundImage = "") {
+        const match = String(backgroundImage || "").match(
+          /url\((['"]?)(.*?)\1\)/i,
+        );
+        return match?.[2] || "";
+      }
       function getElementInnerNode(el) {
-        return el.querySelector(".element-body > *") || el.querySelector(".element-body");
+        const body = el.querySelector(".element-body");
+        if (!body) return null;
+        if (elementHasNestedCanvasChildren(el)) return body;
+        return body.querySelector(":scope > *") || body;
       }
       function computeBackground(styles) {
         if (styles.backgroundMode === "image" && styles.backgroundImageUrl) {
-          return `url("${styles.backgroundImageUrl}") center / ${styles.backgroundSize} no-repeat`;
+          return `url("${styles.backgroundImageUrl}")`;
         }
         if (styles.backgroundMode === "gradient") {
           return `linear-gradient(${styles.gradientAngle}, ${styles.backgroundColor}, ${styles.backgroundColorSecondary})`;
@@ -5139,6 +5939,7 @@
       function applyElementContentStyles(el, type, styles, attrs = {}) {
         const inner = getElementInnerNode(el);
         if (!inner) return;
+        inner.style.cssText = "";
         Object.assign(el.style, {
           background: "transparent",
           borderRadius: "0px",
@@ -5160,8 +5961,24 @@
           lineHeight: styles.lineHeight,
           letterSpacing: styles.letterSpacing,
         };
+        const backgroundLayerStyles =
+          styles.backgroundMode === "image" && styles.backgroundImageUrl
+            ? {
+                background: "transparent",
+                backgroundImage: `url("${styles.backgroundImageUrl}")`,
+                backgroundSize: styles.backgroundSize,
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+              }
+            : {
+                background: computeBackground(styles),
+                backgroundSize: "auto",
+                backgroundPosition: "center",
+                backgroundRepeat: "repeat",
+              };
         const sharedBoxStyles = {
-          background: computeBackground(styles),
+          ...backgroundLayerStyles,
+          display: "block",
           borderRadius: styles.borderRadius,
           border: `${styles.borderWidth} ${styles.borderStyle} ${styles.borderColor}`,
           outline:
@@ -5173,6 +5990,7 @@
           padding: styles.padding,
           width: "100%",
           height: "100%",
+          minHeight: "100%",
           boxSizing: "border-box",
           boxShadow: styles.boxShadow,
         };
@@ -5182,7 +6000,7 @@
             height: "100%",
             display: "block",
             padding: styles.padding,
-            background: computeBackground(styles),
+            ...backgroundLayerStyles,
             border:
               styles.borderWidth === "0px"
                 ? "none"
@@ -5200,8 +6018,17 @@
           Object.assign(inner.style, {
             width: "100%",
             height: "100%",
+            objectFit:
+              styles.backgroundSize === "contain" ? "contain" : "cover",
+            objectPosition: "center",
             borderRadius: styles.borderRadius,
             display: "block",
+            border: `${styles.borderWidth} ${styles.borderStyle} ${styles.borderColor}`,
+            outline:
+              styles.outlineWidth === "0px"
+                ? "none"
+                : `${styles.outlineWidth} solid ${styles.outlineColor}`,
+            outlineOffset: styles.outlineOffset,
             boxShadow: styles.boxShadow,
           });
         } else {
@@ -5218,17 +6045,40 @@
         if (type === "a") {
           inner.setAttribute("href", attrs.href || "#");
         }
+        if (type === "img") {
+          inner.setAttribute("src", attrs.src || "");
+        }
         if (type === "input" || type === "textarea") {
           inner.placeholder = attrs.placeholder || "Enter text...";
           Object.assign(inner.style, {
+            width: "100%",
+            height: "100%",
+            ...backgroundLayerStyles,
             padding: styles.padding,
             borderRadius: styles.borderRadius,
             color: styles.color,
             fontSize: styles.fontSize,
+            fontWeight: styles.fontWeight,
             fontFamily: styles.fontFamily,
-            border: "none",
-            outline: "none",
+            lineHeight: styles.lineHeight,
+            letterSpacing: styles.letterSpacing,
+            border:
+              styles.borderWidth === "0px"
+                ? "none"
+                : `${styles.borderWidth} ${styles.borderStyle} ${styles.borderColor}`,
+            outline:
+              styles.outlineWidth === "0px"
+                ? "none"
+                : `${styles.outlineWidth} solid ${styles.outlineColor}`,
+            outlineOffset: styles.outlineOffset,
             boxSizing: "border-box",
+            boxShadow: styles.boxShadow,
+          });
+        }
+        if (type === "range" || type === "checkbox" || type === "radio") {
+          Object.assign(inner.style, {
+            accentColor: styles.backgroundColor,
+            boxShadow: styles.boxShadow,
           });
         }
         if (type === "text") inner.textContent = attrs.text || "Add Text";
@@ -5237,7 +6087,8 @@
         if (el.dataset.preview === "true") {
           el.className = "relative";
         } else {
-          el.className = `canvas-element absolute group transition-shadow active:cursor-grabbing ${attrs.className || ""}`.trim();
+          el.className =
+            `canvas-element absolute group transition-shadow active:cursor-grabbing ${attrs.className || ""}`.trim();
         }
       }
       function hydrateCanvasElement(el) {
@@ -5259,7 +6110,9 @@
         const snapButton = document.getElementById("builder-snap-toggle");
         const status = document.getElementById("builder-status");
         const canvas = document.getElementById("web-canvas");
-        const multiSelectButton = document.getElementById("multi-select-toggle");
+        const multiSelectButton = document.getElementById(
+          "multi-select-toggle",
+        );
         const codeToggleButton = document.getElementById("builder-code-toggle");
         const canvasContainer = document.getElementById("canvas-container");
         const codePanel = document.getElementById("code-mode-panel");
@@ -5267,12 +6120,16 @@
           snapButton.textContent = builderSnapEnabled ? "Snap On" : "Snap Off";
         }
         if (multiSelectButton) {
-          multiSelectButton.textContent = multiSelectMode ? "Multi On" : "Multi";
+          multiSelectButton.textContent = multiSelectMode
+            ? "Multi On"
+            : "Multi";
           multiSelectButton.classList.toggle("bg-cyan-500/20", multiSelectMode);
           multiSelectButton.classList.toggle("text-cyan-300", multiSelectMode);
         }
         if (codeToggleButton) {
-          codeToggleButton.textContent = builderCodeMode ? "Visual Mode" : "Code Mode";
+          codeToggleButton.textContent = builderCodeMode
+            ? "Visual Mode"
+            : "Code Mode";
         }
         if (status) {
           status.textContent = builderCodeMode
@@ -5285,7 +6142,8 @@
           canvas.classList.toggle("builder-grid", builderSnapEnabled);
           refreshCanvasBackground();
         }
-        if (canvasContainer) canvasContainer.classList.toggle("hidden", builderCodeMode);
+        if (canvasContainer)
+          canvasContainer.classList.toggle("hidden", builderCodeMode);
         if (codePanel) codePanel.classList.toggle("hidden", !builderCodeMode);
       }
       function restoreCanvasSnapshot(index) {
@@ -5329,14 +6187,22 @@
       }
       function toggleSelectedLock() {
         const targets =
-          selectedElements.length > 0 ? selectedElements : selectedEl ? [selectedEl] : [];
+          selectedElements.length > 0
+            ? selectedElements
+            : selectedEl
+              ? [selectedEl]
+              : [];
         if (!targets.length) return;
         targets.forEach((el) => el.classList.toggle("locked"));
         saveToHistory();
       }
       function duplicateSelectedElement() {
         const targets =
-          selectedElements.length > 0 ? selectedElements : selectedEl ? [selectedEl] : [];
+          selectedElements.length > 0
+            ? selectedElements
+            : selectedEl
+              ? [selectedEl]
+              : [];
         if (!targets.length) return;
         const canvas = document.getElementById("web-canvas");
         const clones = targets.map((target, index) => {
@@ -5365,9 +6231,11 @@
         updateBuilderUI();
       }
       function syncSelectedElementState() {
-        document.querySelectorAll("#web-canvas .canvas-element").forEach((item) => {
-          item.classList.remove("selected-premium", "selected-secondary");
-        });
+        document
+          .querySelectorAll("#web-canvas .canvas-element")
+          .forEach((item) => {
+            item.classList.remove("selected-premium", "selected-secondary");
+          });
         selectedEl = selectedElements[selectedElements.length - 1] || null;
         selectedElements.forEach((item, index) => {
           item.classList.add(
@@ -5404,12 +6272,17 @@
         }));
         const minLeft = Math.min(...bounds.map((item) => item.left));
         const minTop = Math.min(...bounds.map((item) => item.top));
-        const maxRight = Math.max(...bounds.map((item) => item.left + item.width));
-        const maxBottom = Math.max(...bounds.map((item) => item.top + item.height));
+        const maxRight = Math.max(
+          ...bounds.map((item) => item.left + item.width),
+        );
+        const maxBottom = Math.max(
+          ...bounds.map((item) => item.top + item.height),
+        );
         const group = document.createElement("div");
         group.id = `group_${Date.now()}`;
         group.setAttribute("data-type", "div");
-        group.className = "canvas-element absolute group transition-shadow active:cursor-grabbing";
+        group.className =
+          "canvas-element absolute group transition-shadow active:cursor-grabbing";
         const handles = ["tl", "tr", "bl", "br", "mt", "mb", "ml", "mr"]
           .map(
             (h) =>
@@ -5494,6 +6367,12 @@
         const workspace = document.getElementById("studio-workspace");
         return workspace && !workspace.classList.contains("hidden");
       }
+      function preserveBuilderFullscreenAfterUpload() {
+        if (!isBuilderActive()) return;
+        document.body.classList.add("builder-mode");
+        document.getElementById("studio-workspace")?.classList.remove("hidden");
+        document.getElementById("editor-welcome")?.classList.add("hidden");
+      }
       function formatCssDeclarationBlock(styleText = "", indent = "  ") {
         return String(styleText)
           .split(";")
@@ -5507,28 +6386,56 @@
         return `${indent}${selector} {\n${body}\n${indent}}`;
       }
       function formatHtmlFragment(fragment = "", baseIndent = "    ") {
-        const normalized = fragment
-          .replace(/>\s+</g, ">\n<")
-          .replace(/\n{2,}/g, "\n")
-          .trim();
-        if (!normalized) return "";
-        let depth = 0;
-        return normalized
-          .split("\n")
-          .map((line) => line.trim())
+        const template = document.createElement("template");
+        template.innerHTML = String(fragment || "").trim();
+        const voidTags = new Set([
+          "area",
+          "base",
+          "br",
+          "col",
+          "embed",
+          "hr",
+          "img",
+          "input",
+          "link",
+          "meta",
+          "param",
+          "source",
+          "track",
+          "wbr",
+        ]);
+        const formatNode = (node, depth) => {
+          const indent = `${baseIndent}${"  ".repeat(depth)}`;
+          if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent.replace(/\s+/g, " ").trim();
+            return text ? `${indent}${text}` : "";
+          }
+          if (node.nodeType !== Node.ELEMENT_NODE) return "";
+          const tag = node.tagName.toLowerCase();
+          const attrs = Array.from(node.attributes)
+            .map((attr) => `${attr.name}="${escapeAttr(attr.value)}"`)
+            .join(" ");
+          const openTag = attrs ? `<${tag} ${attrs}>` : `<${tag}>`;
+          if (voidTags.has(tag)) return `${indent}${openTag}`;
+          const children = Array.from(node.childNodes)
+            .map((child) => formatNode(child, depth + 1))
+            .filter(Boolean);
+          if (!children.length) {
+            return `${indent}${openTag}</${tag}>`;
+          }
+          if (
+            children.length === 1 &&
+            node.childNodes.length === 1 &&
+            node.childNodes[0].nodeType === Node.TEXT_NODE
+          ) {
+            const text = node.textContent.replace(/\s+/g, " ").trim();
+            return `${indent}${openTag}${text}</${tag}>`;
+          }
+          return `${indent}${openTag}\n${children.join("\n")}\n${indent}</${tag}>`;
+        };
+        return Array.from(template.content.childNodes)
+          .map((node) => formatNode(node, 0))
           .filter(Boolean)
-          .map((line) => {
-            if (/^<\//.test(line)) depth = Math.max(depth - 1, 0);
-            const output = `${baseIndent}${"  ".repeat(depth)}${line}`;
-            if (
-              /^<[^!/][^>]*[^/]?>$/.test(line) &&
-              !/^<(meta|link|img|input|br|hr)\b/i.test(line) &&
-              !line.includes("</")
-            ) {
-              depth += 1;
-            }
-            return output;
-          })
           .join("\n");
       }
       function extractBodyBackgroundFromDocument(doc) {
@@ -5538,85 +6445,154 @@
           .map((style) => style.textContent || "")
           .join("\n");
         const bodyMatch = styleText.match(/body\s*\{([\s\S]*?)\}/i);
-        const backgroundMatch = bodyMatch?.[1]?.match(/background\s*:\s*([^;]+);?/i);
+        const backgroundMatch = bodyMatch?.[1]?.match(
+          /background\s*:\s*([^;]+);?/i,
+        );
         return backgroundMatch?.[1]?.trim() || "#ffffff";
+      }
+      function buildCleanExportNode(sourceNode, index) {
+        const cleanNode = sourceNode.cloneNode(true);
+        cleanNode
+          .querySelectorAll(".resizer, .absolute.-top-10")
+          .forEach((ui) => ui.remove());
+        cleanNode
+          .querySelectorAll("[contenteditable]")
+          .forEach((editable) => editable.removeAttribute("contenteditable"));
+        if (!cleanNode.id) cleanNode.id = `element-${index + 1}`;
+        const wrapperClasses = Array.from(cleanNode.classList).filter(
+          (cls) =>
+            ![
+              "canvas-element",
+              "absolute",
+              "group",
+              "transition-shadow",
+              "active:cursor-grabbing",
+              "selected-premium",
+              "selected-secondary",
+            ].includes(cls),
+        );
+        const type = sourceNode.getAttribute("data-type") || "div";
+        const body = cleanNode.querySelector(".element-body");
+        const primaryNode =
+          body?.firstElementChild ||
+          (() => {
+            const fallback = document.createElement("div");
+            fallback.textContent = body?.textContent?.trim() || "";
+            return fallback;
+          })();
+        const contentNode = primaryNode.cloneNode(true);
+        const contentClasses = Array.from(contentNode.classList).filter(
+          (cls) =>
+            ![
+              "w-full",
+              "h-full",
+              "pointer-events-none",
+              "outline-none",
+            ].includes(cls),
+        );
+        const semanticClasses = [
+          "ml-content",
+          type === "text" ? "ml-text" : "",
+          type === "button" ? "ml-button" : "",
+          type === "a" ? "ml-link" : "",
+          type === "input" ? "ml-input" : "",
+          type === "textarea" ? "ml-textarea" : "",
+          type === "img" ? "ml-image" : "",
+        ].filter(Boolean);
+        contentNode.className = [
+          ...new Set([...contentClasses, ...semanticClasses]),
+        ]
+          .join(" ")
+          .trim();
+        const contentStyle = contentNode.getAttribute("style") || "";
+        contentNode.removeAttribute("style");
+
+        const exportNode = document.createElement("div");
+        exportNode.id = cleanNode.id;
+        exportNode.className = ["ml-container", ...wrapperClasses]
+          .join(" ")
+          .trim();
+        exportNode.innerHTML = contentNode.outerHTML;
+
+        return {
+          node: exportNode,
+          type,
+          wrapperStyle: cleanNode.getAttribute("style") || "",
+          contentStyle,
+        };
       }
       function buildExportPayload(baseName = "medialab-page") {
         const canvas = document.getElementById("web-canvas");
         if (!canvas) return null;
         const pageBackground = getCanvasPageStyleState(canvas).background;
         const cssBlocks = [
-          formatCssRule("body", `margin: 0; min-height: 100vh; background: ${pageBackground}; font-family: Inter, system-ui, sans-serif; position: relative; overflow-x: hidden;`),
-          formatCssRule(".medialab-layer", "position: absolute; box-sizing: border-box;"),
-          formatCssRule(".medialab-layer .medialab-content", "box-sizing: border-box;"),
+          formatCssRule(
+            "body",
+            `margin: 0; min-height: 100vh; background: ${pageBackground}; font-family: Inter, system-ui, sans-serif; position: relative; overflow-x: hidden;`,
+          ),
+          formatCssRule(
+            ".ml-container",
+            "position: absolute; box-sizing: border-box;",
+          ),
+          formatCssRule(
+            ".ml-content",
+            "box-sizing: border-box; width: 100%; height: 100%;",
+          ),
         ];
         const exportNodes = [];
-        canvas.querySelectorAll(":scope > .canvas-element").forEach((sourceNode, index) => {
-          const node = sourceNode.cloneNode(true);
-          node.querySelectorAll(".resizer").forEach((resizer) => resizer.remove());
-          const toolbar = node.querySelector("div.absolute");
-          if (toolbar) toolbar.remove();
-          const type = node.getAttribute("data-type");
-          if (!node.id) node.id = `medialab-layer-${index + 1}`;
-          const inner = node.querySelector(".element-body > *");
-          if (inner) inner.classList.add("medialab-content");
-          node.querySelectorAll("[contenteditable='true']").forEach((editable) =>
-            editable.setAttribute("contenteditable", "false"),
-          );
-          if (type === "text" && inner) {
-            inner.classList.add("medialab-text");
-          }
-          if (type === "button" && inner) {
-            inner.classList.add("medialab-button");
-          }
-          if (type === "a" && inner) {
-            inner.classList.add("medialab-link");
-          }
-          node.className = "medialab-layer";
-          cssBlocks.push(formatCssRule(`#${node.id}`, node.getAttribute("style") || ""));
-          if (inner?.getAttribute("style")) {
-            cssBlocks.push(formatCssRule(`#${node.id} .medialab-content`, inner.getAttribute("style")));
-          }
-          exportNodes.push(formatHtmlFragment(node.outerHTML, "    "));
-        });
+        canvas
+          .querySelectorAll(":scope > .canvas-element")
+          .forEach((sourceNode, index) => {
+            const clean = buildCleanExportNode(sourceNode, index);
+            cssBlocks.push(
+              formatCssRule(`#${clean.node.id}`, clean.wrapperStyle),
+            );
+            if (clean.contentStyle) {
+              cssBlocks.push(
+                formatCssRule(
+                  `#${clean.node.id} .ml-content`,
+                  clean.contentStyle,
+                ),
+              );
+            }
+            exportNodes.push(clean.node.outerHTML);
+          });
         const css = cssBlocks.join("\n\n");
-        const html = `<!doctype html>
+        const body = exportNodes
+          .map((markup) => formatHtmlFragment(markup, "  "))
+          .join("\n\n");
+        const html = `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MediaLab Export</title>
+    <title>Document</title>
     <link rel="stylesheet" href="${baseName}.css" />
   </head>
   <body>
-${exportNodes.join("\n")}
+${body}
   </body>
 </html>`;
-        return { html, css };
+        return { html, css, body };
       }
       function buildCodeModeDocument() {
         const payload = buildExportPayload("medialab-page");
         if (!payload) return "";
-        return `<!doctype html>
+        return `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MediaLab Page</title>
+    <title>MediaLab Creative Export</title>
     <style>
 ${payload.css
   .split("\n")
-  .map((line) => (line ? `      ${line}` : ""))
+  .map((line) => (line ? `    ${line}` : ""))
   .join("\n")}
     </style>
   </head>
   <body>
-${payload.html
-  .match(/<body>([\s\S]*)<\/body>/)?.[1]
-  ?.trim()
-  ?.split("\n")
-  .map((line) => line)
-  .join("\n") || ""}
+${payload.body || "  "}
   </body>
 </html>`;
       }
@@ -5627,12 +6603,15 @@ ${payload.html
         if (!editor) return;
         editor.value = buildCodeModeDocument();
         if (highlight) highlight.innerHTML = highlightBuilderCode(editor.value);
-        if (lineGutter) lineGutter.textContent = buildCodeLineNumbers(editor.value);
+        if (lineGutter)
+          lineGutter.textContent = buildCodeLineNumbers(editor.value);
         syncCodeEditorScroll();
       }
       function buildCodeLineNumbers(code = "") {
         const lineCount = Math.max(1, code.split("\n").length);
-        return Array.from({ length: lineCount }, (_, index) => String(index + 1)).join("\n");
+        return Array.from({ length: lineCount }, (_, index) =>
+          String(index + 1),
+        ).join("\n");
       }
       function escapeCodeHtml(value = "") {
         return value
@@ -5642,14 +6621,38 @@ ${payload.html
       }
       function highlightBuilderCode(code = "") {
         let html = escapeCodeHtml(code);
-        html = html.replace(/(&lt;!--[\s\S]*?--&gt;)/g, '<span class="code-token-comment">$1</span>');
-        html = html.replace(/(&lt;!doctype)(.*?&gt;)/gi, '<span class="code-token-doctype">$1$2</span>');
-        html = html.replace(/(&lt;\/?)([a-zA-Z0-9-]+)/g, '$1<span class="code-token-tag">$2</span>');
-        html = html.replace(/([a-zA-Z-:]+)=(&quot;.*?&quot;)/g, '<span class="code-token-attr">$1</span>=<span class="code-token-string">$2</span>');
-        html = html.replace(/(&lt;|&gt;|\/&gt;)/g, '<span class="code-token-bracket">$1</span>');
-        html = html.replace(/(^|\n)([.#]?[a-zA-Z0-9_:\-\s>,]+)(\s*\{)/g, '$1<span class="code-token-selector">$2</span><span class="code-token-bracket">$3</span>');
-        html = html.replace(/([a-zA-Z-]+)(:\s*)([^;\n]+)(;)/g, '<span class="code-token-property">$1</span>$2<span class="code-token-value">$3</span><span class="code-token-bracket">$4</span>');
-        html = html.replace(/\b(html|body|head|style|class|id)\b/g, '<span class="code-token-keyword">$1</span>');
+        html = html.replace(
+          /(&lt;!--[\s\S]*?--&gt;)/g,
+          '<span class="code-token-comment">$1</span>',
+        );
+        html = html.replace(
+          /(&lt;!doctype)(.*?&gt;)/gi,
+          '<span class="code-token-doctype">$1$2</span>',
+        );
+        html = html.replace(
+          /(&lt;\/?)([a-zA-Z0-9-]+)/g,
+          '$1<span class="code-token-tag">$2</span>',
+        );
+        html = html.replace(
+          /([a-zA-Z-:]+)=(&quot;.*?&quot;)/g,
+          '<span class="code-token-attr">$1</span>=<span class="code-token-string">$2</span>',
+        );
+        html = html.replace(
+          /(&lt;|&gt;|\/&gt;)/g,
+          '<span class="code-token-bracket">$1</span>',
+        );
+        html = html.replace(
+          /(^|\n)([.#]?[a-zA-Z0-9_:\-\s>,]+)(\s*\{)/g,
+          '$1<span class="code-token-selector">$2</span><span class="code-token-bracket">$3</span>',
+        );
+        html = html.replace(
+          /([a-zA-Z-]+)(:\s*)([^;\n]+)(;)/g,
+          '<span class="code-token-property">$1</span>$2<span class="code-token-value">$3</span><span class="code-token-bracket">$4</span>',
+        );
+        html = html.replace(
+          /\b(html|body|head|style|class|id)\b/g,
+          '<span class="code-token-keyword">$1</span>',
+        );
         return html;
       }
       function handleBuilderCodeInput() {
@@ -5658,7 +6661,8 @@ ${payload.html
         const lineGutter = document.getElementById("builder-code-lines");
         if (!editor || !highlight) return;
         highlight.innerHTML = highlightBuilderCode(editor.value);
-        if (lineGutter) lineGutter.textContent = buildCodeLineNumbers(editor.value);
+        if (lineGutter)
+          lineGutter.textContent = buildCodeLineNumbers(editor.value);
         highlight.scrollTop = editor.scrollTop;
         highlight.scrollLeft = editor.scrollLeft;
         if (lineGutter) lineGutter.scrollTop = editor.scrollTop;
@@ -5695,6 +6699,45 @@ ${payload.html
             <button onclick="this.closest('.canvas-element').remove(); saveToHistory();" class="w-7 h-7 bg-gray-950 text-red-500 rounded-lg border border-white/10 flex items-center justify-center pointer-events-auto"><i class="fas fa-trash-alt text-[10px]"></i></button>
         </div>`;
       }
+      function autoGroupStarterElements(startCount) {
+        const canvas = document.getElementById("web-canvas");
+        if (!canvas) return;
+        const newElements = Array.from(
+          canvas.querySelectorAll(":scope > .canvas-element"),
+        ).slice(startCount);
+        if (!newElements.length) return;
+        deselectAll();
+        if (newElements.length === 1) {
+          selectElement(newElements[0]);
+          return;
+        }
+        multiSelectMode = true;
+        newElements.forEach((el) => addElementToSelection(el));
+        groupSelectedElements();
+        multiSelectMode = false;
+        updateBuilderUI();
+      }
+      function detectImportedCanvasType(node) {
+        const content =
+          node.querySelector(".ml-content") || node.firstElementChild;
+        if (!content) return "div";
+        if (content.classList.contains("ml-text")) return "text";
+        if (content.classList.contains("ml-button")) return "button";
+        if (content.classList.contains("ml-link")) return "a";
+        if (content.classList.contains("ml-input")) return "input";
+        if (content.classList.contains("ml-textarea")) return "textarea";
+        if (content.classList.contains("ml-image")) return "img";
+        const tag = content.tagName.toLowerCase();
+        if (
+          tag === "button" ||
+          tag === "a" ||
+          tag === "textarea" ||
+          tag === "img"
+        )
+          return tag;
+        if (tag === "input") return content.getAttribute("type") || "input";
+        return content.textContent?.trim() ? "text" : "div";
+      }
       function importCodeNodesToCanvas(nodes) {
         const canvas = document.getElementById("web-canvas");
         if (!canvas) return;
@@ -5703,20 +6746,23 @@ ${payload.html
         initCanvasSelection(canvas);
         nodes.forEach((node, index) => {
           if (!(node instanceof HTMLElement)) return;
-          const type = node.getAttribute("data-type") || "div";
+          const type = detectImportedCanvasType(node);
           const wrapper = document.createElement("div");
           wrapper.id = node.id || `imported_${Date.now()}_${index}`;
           wrapper.setAttribute("data-type", type);
-          wrapper.className = "canvas-element absolute group transition-shadow active:cursor-grabbing";
+          wrapper.className =
+            "canvas-element absolute group transition-shadow active:cursor-grabbing";
           wrapper.setAttribute("style", node.getAttribute("style") || "");
           wrapper.innerHTML = `${buildEditorHandles(type)}<div class="element-body w-full h-full overflow-visible"></div>`;
           const body = wrapper.querySelector(".element-body");
-          const importedBody = node.querySelector(".element-body");
-          if (importedBody) {
-            body.innerHTML = importedBody.innerHTML;
-          } else {
-            body.innerHTML = node.innerHTML;
-          }
+          const importedContent =
+            node.querySelector(".ml-content") || node.firstElementChild;
+          body.innerHTML = importedContent
+            ? importedContent.outerHTML
+            : node.innerHTML;
+          body
+            .querySelectorAll("[contenteditable]")
+            .forEach((editable) => editable.removeAttribute("contenteditable"));
           hydrateCanvasElement(wrapper);
           canvas.appendChild(wrapper);
         });
@@ -5732,7 +6778,7 @@ ${payload.html
         applyCanvasPageBackground(extractBodyBackgroundFromDocument(doc), true);
         const bodyChildren = Array.from(doc.body.children).filter(
           (node) =>
-            node.classList.contains("medialab-layer") ||
+            node.classList.contains("ml-container") ||
             node.classList.contains("canvas-element"),
         );
         if (!bodyChildren.length) {
@@ -5740,8 +6786,9 @@ ${payload.html
           throw new Error("No builder nodes found");
         }
         bodyChildren.forEach((node) => {
-          if (node.classList.contains("medialab-layer")) {
-            node.className = "canvas-element absolute group transition-shadow active:cursor-grabbing";
+          if (node.classList.contains("ml-container")) {
+            node.className =
+              "canvas-element absolute group transition-shadow active:cursor-grabbing";
           }
         });
         importCodeNodesToCanvas(bodyChildren);
@@ -5774,6 +6821,26 @@ ${payload.html
         codeLink.click();
         URL.revokeObjectURL(codeUrl);
       }
+      let builderSnackbarTimer = null;
+      function showBuilderSnackbar(message = "Done") {
+        const bar = document.getElementById("builder-snackbar");
+        if (!bar) return;
+        bar.textContent = message;
+        bar.classList.remove("hidden");
+        clearTimeout(builderSnackbarTimer);
+        builderSnackbarTimer = setTimeout(() => {
+          bar.classList.add("hidden");
+        }, 2200);
+      }
+      async function copyBuilderCode() {
+        const code = buildCodeModeDocument();
+        try {
+          await navigator.clipboard.writeText(code);
+          showBuilderSnackbar("Code copied to clipboard");
+        } catch (error) {
+          showBuilderSnackbar("Could not copy code");
+        }
+      }
       document.addEventListener("keydown", (e) => {
         if (!isBuilderActive()) return;
         if (
@@ -5805,7 +6872,11 @@ ${payload.html
           else groupSelectedElements();
           return;
         }
-        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "m") {
+        if (
+          (e.ctrlKey || e.metaKey) &&
+          e.shiftKey &&
+          e.key.toLowerCase() === "m"
+        ) {
           e.preventDefault();
           toggleMultiSelectMode();
           return;
@@ -5828,11 +6899,28 @@ ${payload.html
       });
       function updateStyle(p, v) {
         currentInspectorState.styles[p] = v;
-        updateInspectorPreview();
+        const needsControlRefresh =
+          p === "backgroundMode" ||
+          p === "backgroundImageUrl" ||
+          p === "backgroundSize";
+        syncInspectorUI(needsControlRefresh);
       }
       function updateAttr(p, v) {
         currentInspectorState.attributes[p] = v;
         updateInspectorPreview();
+      }
+      function handleInspectorBackgroundImage(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          currentInspectorState.styles.backgroundMode = "image";
+          currentInspectorState.styles.backgroundImageUrl =
+            e.target?.result || "";
+          currentInspectorState.styles.backgroundSize =
+            currentInspectorState.styles.backgroundSize || "cover";
+          syncInspectorUI(true);
+        };
+        reader.readAsDataURL(file);
       }
       function updateInspectorPreview() {
         const preview = document.getElementById("inspector-preview");
@@ -5843,57 +6931,97 @@ ${payload.html
         const type = currentInspectorState.type;
         const a = currentInspectorState.attributes;
         preview.innerHTML = "";
+        const stageWidth = Math.max(
+          220,
+          Math.min((preview.clientWidth || 320) - 24, 340),
+        );
+        const stageHeight = Math.max(
+          150,
+          Math.min((preview.clientHeight || 190) - 18, 210),
+        );
         Object.assign(preview.style, {
-          width: "220px",
-          minHeight: "110px",
+          width: "100%",
+          height: "100%",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          padding: "18px",
-          background:
-            type === "text"
-              ? "#ffffff"
-              : "rgba(15,23,42,0.18)",
+          padding: "0",
+          background: type === "text" ? "#ffffff" : "rgba(15,23,42,0.18)",
           borderRadius: "28px",
         });
-        const previewShell = currentInspectorState.targetEl
-          ? currentInspectorState.targetEl.cloneNode(true)
-          : document.createElement("div");
-        previewShell.dataset.preview = "true";
-        previewShell.className = "relative";
+        const previewStage = document.createElement("div");
+        Object.assign(previewStage.style, {
+          width: `${stageWidth}px`,
+          height: `${stageHeight}px`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+          position: "relative",
+          borderRadius: "22px",
+          padding: "8px",
+        });
+        let previewShell;
+        if (currentInspectorState.targetEl) {
+          previewShell = currentInspectorState.targetEl.cloneNode(true);
+          previewShell
+            .querySelectorAll(".resizer")
+            .forEach((node) => node.remove());
+          const toolbar = previewShell.querySelector(".absolute.-top-10");
+          if (toolbar) toolbar.remove();
+          previewShell.dataset.preview = "true";
+          previewShell.className = "relative";
+        } else {
+          previewShell = document.createElement("div");
+          previewShell.dataset.preview = "true";
+          previewShell.innerHTML =
+            '<div class="element-body w-full h-full overflow-visible"></div>';
+        }
+        const rawWidth =
+          parseFloat(s.width) ||
+          currentInspectorState.targetEl?.offsetWidth ||
+          (type === "text" ? 240 : 220);
+        const rawHeight =
+          parseFloat(s.height) ||
+          currentInspectorState.targetEl?.offsetHeight ||
+          (type === "textarea" ? 128 : type === "div" ? 160 : 96);
+        const scale = Math.min(
+          (stageWidth - 16) / rawWidth,
+          (stageHeight - 16) / rawHeight,
+          1,
+        );
         Object.assign(previewShell.style, {
-          width:
-            currentInspectorState.targetEl?.style.width ||
-            (type === "text" ? "220px" : "200px"),
-          height:
-            currentInspectorState.targetEl?.style.height ||
-            (type === "textarea" ? "120px" : "88px"),
+          position: "relative",
+          width: `${rawWidth}px`,
+          height: `${rawHeight}px`,
           left: "0px",
           top: "0px",
           zIndex: "1",
-          transform: "none",
+          transform: `scale(${scale})`,
+          transformOrigin: "center center",
+          margin: "0 auto",
+          overflow: "visible",
         });
         if (type === "text" && !currentInspectorState.targetEl) {
-          currentInspectorState.styles.color = currentInspectorState.styles.color || "#0f172a";
+          currentInspectorState.styles.color =
+            currentInspectorState.styles.color || "#0f172a";
         }
-        previewShell.querySelectorAll(".resizer").forEach((node) => node.remove());
-        const previewToolbar = previewShell.querySelector("div.absolute");
-        if (previewToolbar) previewToolbar.remove();
-        if (!currentInspectorState.targetEl) {
-          previewShell.innerHTML =
-            '<div class="element-body w-full h-full overflow-visible"></div>';
-          const previewBody = previewShell.querySelector(".element-body");
-          populateElementBody(previewBody, type, {
-            ...getDefaultElementAttributes(type),
-            ...a,
+        const previewBody = previewShell.querySelector(".element-body");
+        populateElementBody(previewBody, type, {
+          ...getDefaultElementAttributes(type),
+          ...a,
+        });
+        previewShell
+          .querySelectorAll("[contenteditable='true']")
+          .forEach((editable) => {
+            editable.setAttribute("contenteditable", "false");
           });
-        }
         applyElementContentStyles(previewShell, type, s, {
           ...getDefaultElementAttributes(type),
           ...a,
         });
-        previewShell.className = "relative";
-        preview.appendChild(previewShell);
+        previewStage.appendChild(previewShell);
+        preview.appendChild(previewStage);
       }
       function resetSmartInspectorState() {
         inspectorPageIndex = 0;
@@ -5931,6 +7059,19 @@ ${payload.html
             mixBlendMode: normalizedStyles.mixBlendMode,
             transform: `rotate(${normalizedStyles.rotate})`,
           });
+          const body = el.querySelector(".element-body");
+          if (
+            body &&
+            !(
+              currentInspectorState.type === "div" &&
+              elementHasNestedCanvasChildren(el)
+            )
+          ) {
+            populateElementBody(body, currentInspectorState.type, {
+              ...getDefaultElementAttributes(currentInspectorState.type),
+              ...currentInspectorState.attributes,
+            });
+          }
           applyElementContentStyles(
             el,
             currentInspectorState.type,
@@ -5949,7 +7090,8 @@ ${payload.html
         if (!canvas) return;
         if (
           historyStack[historyIndex] &&
-          JSON.stringify(historyStack[historyIndex]) === JSON.stringify(snapshot)
+          JSON.stringify(historyStack[historyIndex]) ===
+            JSON.stringify(snapshot)
         ) {
           return;
         }
@@ -5963,10 +7105,39 @@ ${payload.html
         inspectorPageIndex =
           (inspectorPageIndex + dir + inspectorPages.length) %
           inspectorPages.length;
-        renderInspectorControls(currentInspectorState.type);
+        syncInspectorUI();
       }
-      function toggleElementPicker() {
-        document.getElementById("element-picker")?.classList.toggle("hidden");
+      function toggleElementPicker(event) {
+        const picker = document.getElementById("element-picker");
+        const trigger =
+          event?.currentTarget ||
+          document.getElementById("insert-elements-trigger") ||
+          document.getElementById("tab-insert");
+        if (!picker || !trigger) return;
+        const willOpen = picker.classList.contains("hidden");
+        picker.classList.toggle("hidden");
+        if (!willOpen) return;
+        const rect = trigger.getBoundingClientRect();
+        const pickerWidth = Math.min(window.innerWidth - 16, 360);
+        const top = rect.bottom + 10;
+        let left = rect.left;
+        if (window.innerWidth <= 640) {
+          left = Math.max(
+            8,
+            Math.min(
+              (window.innerWidth - pickerWidth) / 2,
+              window.innerWidth - pickerWidth - 8,
+            ),
+          );
+        } else {
+          left = Math.max(
+            12,
+            Math.min(left, window.innerWidth - pickerWidth - 12),
+          );
+        }
+        picker.style.top = `${top}px`;
+        picker.style.left = `${left}px`;
+        picker.style.transform = "none";
       }
       function closeSmartInspector() {
         const modal = document.getElementById("smart-inspector");
@@ -6017,29 +7188,78 @@ ${payload.html
                 .join("")
           : "#22d3ee";
       }
+      function splitGradientArguments(value = "") {
+        const args = [];
+        let current = "";
+        let depth = 0;
+        for (const char of String(value)) {
+          if (char === "(") depth += 1;
+          if (char === ")") depth = Math.max(0, depth - 1);
+          if (char === "," && depth === 0) {
+            args.push(current.trim());
+            current = "";
+            continue;
+          }
+          current += char;
+        }
+        if (current.trim()) args.push(current.trim());
+        return args;
+      }
+      function parseGradientStyle(backgroundImage = "") {
+        const match = String(backgroundImage || "").match(
+          /linear-gradient\((.*)\)/i,
+        );
+        if (!match) {
+          return {
+            angle: "135deg",
+            primary: "#22d3ee",
+            secondary: "#0f172a",
+          };
+        }
+        const parts = splitGradientArguments(match[1]);
+        const hasAngle = /deg|turn|rad/.test(parts[0] || "");
+        const colorParts = hasAngle ? parts.slice(1) : parts;
+        return {
+          angle: hasAngle ? parts[0] : "135deg",
+          primary: rgbToHex(colorParts[0] || "#22d3ee"),
+          secondary: rgbToHex(colorParts[1] || colorParts[0] || "#0f172a"),
+        };
+      }
       function extractStyles(el) {
         const inner = getElementInnerNode(el);
         const computed = inner ? window.getComputedStyle(inner) : null;
+        const computedBackgroundImage = computed?.backgroundImage || "";
+        const computedBackgroundSize = computed?.backgroundSize || "cover";
+        const parsedGradient = parseGradientStyle(computedBackgroundImage);
         return {
           width: el.style.width || "260px",
           height: el.style.height || "100px",
           top: el.style.top || "150px",
           left: el.style.left || "150px",
           zIndex: el.style.zIndex || "10",
-          backgroundMode: el.style.backgroundImage && el.style.backgroundImage.includes("linear-gradient")
+          backgroundMode: computedBackgroundImage.includes("linear-gradient")
             ? "gradient"
-            : el.style.backgroundImage && el.style.backgroundImage.includes("url(")
+            : computedBackgroundImage.includes("url(")
               ? "image"
               : "solid",
           backgroundColor: rgbToHex(
-            computed?.backgroundColor || el.style.backgroundColor,
+            computedBackgroundImage.includes("linear-gradient")
+              ? parsedGradient.primary
+              : computed?.backgroundColor || el.style.backgroundColor,
           ),
-          backgroundColorSecondary: "#0f172a",
-          backgroundImageUrl: "",
-          backgroundSize: computed?.backgroundSize || "cover",
-          gradientAngle: "135deg",
+          backgroundColorSecondary: computedBackgroundImage.includes(
+            "linear-gradient",
+          )
+            ? parsedGradient.secondary
+            : "#0f172a",
+          backgroundImageUrl: parseBackgroundImageUrl(computedBackgroundImage),
+          backgroundSize: computedBackgroundSize,
+          gradientAngle: computedBackgroundImage.includes("linear-gradient")
+            ? parsedGradient.angle
+            : "135deg",
           opacity: el.style.opacity || "1",
-          borderRadius: computed?.borderRadius || el.style.borderRadius || "18px",
+          borderRadius:
+            computed?.borderRadius || el.style.borderRadius || "18px",
           color: rgbToHex(computed?.color || el.style.color),
           fontSize: computed?.fontSize || "18px",
           fontWeight: computed?.fontWeight || "600",
@@ -6053,7 +7273,8 @@ ${payload.html
           outlineWidth: computed?.outlineWidth || "0px",
           outlineColor: rgbToHex(computed?.outlineColor || "#38bdf8"),
           outlineOffset: computed?.outlineOffset || "0px",
-          boxShadow: computed?.boxShadow || "0 24px 60px rgba(15, 23, 42, 0.16)",
+          boxShadow:
+            computed?.boxShadow || "0 24px 60px rgba(15, 23, 42, 0.16)",
           backdropFilterBlur: "0px",
           rotate: "0deg",
           mixBlendMode: el.style.mixBlendMode || "normal",
