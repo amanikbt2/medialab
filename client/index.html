@@ -157,6 +157,15 @@
       #web-canvas div[contenteditable="true"] {
         user-select: text;
       }
+      #web-canvas.builder-grid {
+        background-image:
+          linear-gradient(to right, rgba(15, 23, 42, 0.08) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(15, 23, 42, 0.08) 1px, transparent 1px);
+        background-size: 20px 20px;
+      }
+      .canvas-element {
+        touch-action: none;
+      }
     </style>
   </head>
   <body class="bg-gray-950 text-gray-100 min-h-screen">
@@ -1719,32 +1728,35 @@
             <button onclick="launchBossMode()" class="px-14 py-5 bg-white text-black rounded-3xl font-black text-[10px] uppercase tracking-[0.3em] shadow-[0_20px_40px_rgba(255,255,255,0.1)] hover:scale-105 active:scale-95 transition-all">Initialize Workspace</button>
         </div>
         <div id="studio-workspace" class="hidden absolute inset-0 bg-[#080808] flex flex-col">
-           
-            <div class="absolute top-8 left-1/2 -translate-x-1/2 w-[92%] max-w-5xl z-[110]">
-                <div class="bg-gray-900/40 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] p-3 flex items-center justify-between shadow-[0_25px_80px_rgba(0,0,0,0.6)] ring-1 ring-white/5">
-                    <div class="flex items-center gap-2">
+            <div class="sticky top-0 z-[110] px-4 pt-4">
+                <div class="bg-gray-900/75 backdrop-blur-3xl border border-white/10 rounded-[2rem] p-3 flex flex-wrap items-center justify-between gap-4 shadow-[0_25px_80px_rgba(0,0,0,0.6)] ring-1 ring-white/5">
+                    <div class="flex flex-wrap items-center gap-2">
                         <button onclick="toggleElementPicker()" class="flex items-center gap-2 px-6 py-3 bg-cyan-600 hover:bg-cyan-500 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white transition-all shadow-lg shadow-cyan-900/40">
                             <i class="fas fa-plus-circle"></i><span>Insert Element</span>
                         </button>
                         <div class="w-px h-6 bg-white/10 mx-2"></div>
-                        <button onclick="undo()" class="p-3 text-gray-500 hover:text-cyan-400 transition-colors" title="Undo"><i class="fas fa-undo"></i></button>
-                        <button onclick="redo()" class="p-3 text-gray-500 hover:text-cyan-400 transition-colors" title="Redo"><i class="fas fa-redo"></i></button>
+                        <button onclick="builderUndo()" class="p-3 text-gray-500 hover:text-cyan-400 transition-colors" title="Undo"><i class="fas fa-undo"></i></button>
+                        <button onclick="builderRedo()" class="p-3 text-gray-500 hover:text-cyan-400 transition-colors" title="Redo"><i class="fas fa-redo"></i></button>
+                        <button id="builder-snap-toggle" onclick="toggleBuilderSnap()" class="px-4 py-3 rounded-2xl bg-white/5 text-[10px] font-black uppercase tracking-[0.25em] text-gray-300 hover:bg-white/10 transition-all" title="Toggle grid snap">Snap On</button>
                     </div>
-                    <div class="flex items-center gap-6">
+                    <div class="flex flex-wrap items-center gap-4">
                         <div class="hidden md:flex flex-col items-end">
                             <span class="text-[8px] font-black text-cyan-500 uppercase tracking-widest">Studio Engine v3.0</span>
-                            <span class="text-[7px] text-gray-500 font-bold uppercase tracking-widest">Auto-Sync Enabled</span>
+                            <span id="builder-status" class="text-[7px] text-gray-500 font-bold uppercase tracking-widest">Freeform Builder Ready</span>
                         </div>
+                        <button onclick="duplicateSelectedElement()" class="px-5 py-3 rounded-2xl bg-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-300 hover:bg-white/10 transition-all">Duplicate</button>
+                        <button onclick="removeSelectedElement()" class="px-5 py-3 rounded-2xl bg-red-500/10 text-[10px] font-black uppercase tracking-[0.2em] text-red-300 hover:bg-red-500/20 transition-all">Delete</button>
+                        <button onclick="downloadBuilderCode()" class="px-5 py-3 rounded-2xl bg-emerald-500/10 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300 hover:bg-emerald-500/20 transition-all">Code Pack</button>
                         <button onclick="exportCanvasToHTML()" class="bg-white text-black px-8 py-3 rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-cyan-400 transition-all active:scale-95">Publish</button>
                         <button onclick="exitStudio()" class="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-red-500 transition-colors"><i class="fas fa-times text-lg"></i></button>
                     </div>
                 </div>
             </div>
-            <div id="canvas-container" onclick="deselectAll(event)" class="flex-1 overflow-auto flex justify-center items-start pt-40 pb-20 cursor-crosshair custom-scrollbar">
-                <div id="web-canvas" class="bg-white w-[900px] min-h-[1300px] relative shadow-[0_120px_200px_rgba(0,0,0,0.8)] rounded-sm overflow-hidden origin-top scale-95 sm:scale-100 transition-transform duration-500">
+            <div id="canvas-container" onclick="deselectAll(event)" class="flex-1 overflow-auto flex justify-center items-start px-4 pt-4 pb-4 cursor-crosshair custom-scrollbar">
+                <div id="web-canvas" class="builder-grid bg-white w-[calc(100vw-2rem)] min-h-[calc(100vh-7.5rem)] relative shadow-[0_60px_150px_rgba(0,0,0,0.55)] rounded-[2rem] overflow-hidden transition-transform duration-500">
                     </div>
             </div>
-            <div id="element-picker" class="hidden absolute top-28 left-1/2 -translate-x-1/2 z-[120] bg-gray-950/90 backdrop-blur-2xl border border-white/10 rounded-[3rem] shadow-2xl p-6 w-[360px] animate-fadeIn ring-1 ring-cyan-500/20">
+            <div id="element-picker" class="hidden fixed top-24 left-1/2 -translate-x-1/2 z-[120] bg-gray-950/90 backdrop-blur-2xl border border-white/10 rounded-[3rem] shadow-2xl p-6 w-[360px] animate-fadeIn ring-1 ring-cyan-500/20">
                 <p class="text-[9px] font-black text-gray-500 uppercase tracking-[0.3em] mb-5 text-center">UI Component Library</p>
                 <div class="grid grid-cols-3 gap-3">
                     ${[
@@ -1788,13 +1800,13 @@
                 <input type="file" id="local-img-input" accept="image/*" class="hidden" onchange="handleLocalImage(this.files[0])">
             </div>
             <div id="smart-inspector" class="hidden fixed inset-0 bg-black/60 backdrop-blur-md z-[150] flex items-center justify-center p-4">
-                <div onclick="event.stopPropagation()" class="bg-[#0b0c10] border border-white/10 w-full max-w-[320px] rounded-[3rem] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.9)] ring-1 ring-white/10 scale-in">
+                <div onclick="event.stopPropagation()" class="bg-[#0b0c10] border border-white/10 w-full max-w-[420px] rounded-[3rem] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.9)] ring-1 ring-white/10 scale-in">
                    
                     <div class="h-32 bg-black flex items-center justify-center border-b border-white/5 relative overflow-hidden pattern-grid">
                          <div id="inspector-preview" class="transition-all duration-500 shadow-2xl"></div>
                     </div>
                     <div class="p-7">
-                        <div id="inspector-controls" class="min-h-[160px] flex flex-col justify-center gap-4">
+                        <div id="inspector-controls" class="min-h-[320px] max-h-[58vh] overflow-y-auto pr-1 flex flex-col justify-center gap-4">
                             </div>
                        
                         <div class="mt-6 pt-5 border-t border-white/5">
@@ -2931,23 +2943,19 @@
       // ====================== WEB BUILDER CORE ======================
       // ====================== 1. GLOBAL STATE & DICTIONARIES ======================
       const inspectorPages = [
-        "Identity",
-        "Appearance",
-        "Geometry",
-        "Effects",
+        "Content",
+        "Background",
         "Typography",
-        "Border",
-        "Shadow",
-        "Transform",
-        "Filters",
-        "Layers",
+        "Box Model",
+        "Effects",
+        "Advanced",
       ];
       let inspectorPageIndex = 0;
       let historyStack = [];
       let historyIndex = -1;
       let selectedEl = null;
-      let isDragging = false;
-      let dragOffset = { x: 0, y: 0 };
+      let builderSnapEnabled = true;
+      const BUILDER_GRID_SIZE = 20;
       let currentInspectorState = {
         type: null,
         targetEl: null,
@@ -2978,6 +2986,7 @@
         historyStack = [];
         historyIndex = -1;
         saveToHistory();
+        updateBuilderUI();
         document.addEventListener("contextmenu", handleRightClick);
       }
       // Global UI: Close Picker on outside click
@@ -3037,16 +3046,20 @@
     `;
         const body = wrap.querySelector(".element-body");
         let component;
+        const normalizedStyles = normalizeBuilderStyles(styles, type);
         // Component Factory
         switch (type) {
           case "img":
             body.innerHTML = `<img src="${attrs.src}" class="w-full h-full object-cover pointer-events-none">`;
             break;
           case "text":
-            body.innerHTML = `<div contenteditable="true" class="outline-none w-full h-full font-medium" style="color:${styles.color || "#000"}; font-size:${styles.fontSize || "16px"}">${attrs.text || "Typography"}</div>`;
+            body.innerHTML = `<div contenteditable="true" class="outline-none w-full h-full font-medium">${attrs.text || "Typography"}</div>`;
             break;
           case "button":
-            body.innerHTML = `<button class="w-full h-full font-bold pointer-events-none" style="background:${styles.backgroundColor}; border-radius:${styles.borderRadius}">${attrs.text || "Action"}</button>`;
+            body.innerHTML = `<button class="w-full h-full font-bold pointer-events-none">${attrs.text || "Action"}</button>`;
+            break;
+          case "a":
+            body.innerHTML = `<a href="${attrs.href || "#"}" class="w-full h-full flex items-center justify-center font-semibold no-underline pointer-events-none">${attrs.text || "Visit Link"}</a>`;
             break;
           case "input":
           case "textarea":
@@ -3071,22 +3084,17 @@
             break;
           default: // Div
             body.classList.add("w-full", "h-full");
-            Object.assign(body.style, {
-              background: styles.backgroundColor,
-              borderRadius: styles.borderRadius,
-              clipPath: styles.clipPath,
-            });
-            styles.backgroundColor = "transparent";
         }
         Object.assign(wrap.style, {
-          width: "200px",
-          height: "80px",
+          width: normalizedStyles.width || "260px",
+          height: normalizedStyles.height || "100px",
           left: "150px",
           top: "150px",
           zIndex: "10",
-          ...styles,
+          ...normalizedStyles,
         });
-        wrap.onmousedown = (e) => handleObjectInteraction(e, wrap);
+        applyElementContentStyles(wrap, type, normalizedStyles, attrs);
+        hydrateCanvasElement(wrap);
         canvas.appendChild(wrap);
         saveToHistory();
         selectElement(wrap);
@@ -3101,23 +3109,24 @@
           targetEl: existingEl,
           styles: existingEl
             ? extractStyles(existingEl)
-            : {
-                backgroundColor: "#22d3ee",
-                borderRadius: "12px",
-                color: "#000000",
-                fontSize: "16px",
-                opacity: 1,
-              },
+            : normalizeBuilderStyles({}, type),
           attributes: existingEl
             ? {
                 id: existingEl.id,
-                text: existingEl.innerText,
-                placeholder: existingEl.placeholder,
+                text:
+                  existingEl.querySelector(".element-body")?.innerText?.trim() ||
+                  "New Element",
+                placeholder:
+                  existingEl.querySelector("input, textarea")?.placeholder || "",
+                href: existingEl.querySelector("a")?.getAttribute("href") || "#",
+                src: existingEl.querySelector("img")?.getAttribute("src") || "",
               }
             : {
                 id: `el_${Date.now()}`,
                 text: "New Element",
                 placeholder: "Type here...",
+                href: "#",
+                src: "",
               },
         };
         renderInspectorControls(type);
@@ -3139,33 +3148,206 @@
         const a = currentInspectorState.attributes;
         document.getElementById("page-title").innerText =
           inspectorPages[inspectorPageIndex];
-        let h = `<div class="mb-2"><label class="text-[7px] font-black text-gray-500 uppercase">System ID</label>
-             <input type="text" value="${a.id}" oninput="updateAttr('id', this.value)" class="w-full bg-gray-800 p-2 rounded-lg text-white text-[10px] mt-1 border border-white/5"></div>`;
-        if (["text", "button", "a"].includes(type)) {
-          h += `<div class="mb-2"><label class="text-[7px] font-black text-gray-500 uppercase">Display Text</label>
-              <input type="text" value="${a.text || ""}" oninput="updateAttr('text', this.value)" class="w-full bg-gray-800 p-2 rounded-lg text-white text-[10px] mt-1"></div>`;
-        }
-        // Logic-based Page Rendering
+        let h = `<div class="space-y-3">`;
         switch (inspectorPageIndex) {
           case 0:
-            h += `<div class="grid grid-cols-2 gap-2 mt-2">
-                        <div><label class="text-[7px] font-bold text-gray-500 uppercase">Fill</label><input type="color" value="${s.backgroundColor}" oninput="updateStyle('backgroundColor', this.value)" class="w-full h-8 rounded-lg bg-gray-800 cursor-pointer border-none"></div>
-                        <div><label class="text-[7px] font-bold text-gray-500 uppercase">Tint</label><input type="color" value="${s.color || "#000000"}" oninput="updateStyle('color', this.value)" class="w-full h-8 rounded-lg bg-gray-800 cursor-pointer border-none"></div>
-                      </div>`;
+            h += renderBuilderInput("System ID", "text", a.id, "updateAttr('id', this.value)");
+            if (["text", "button", "a"].includes(type)) {
+              h += renderBuilderInput(
+                "Display Text",
+                "text",
+                a.text || "",
+                "updateAttr('text', this.value)",
+              );
+            }
+            if (["input", "textarea"].includes(type)) {
+              h += renderBuilderInput(
+                "Placeholder",
+                "text",
+                a.placeholder || "",
+                "updateAttr('placeholder', this.value)",
+              );
+            }
+            if (type === "a") {
+              h += renderBuilderInput(
+                "Link URL",
+                "text",
+                a.href || "#",
+                "updateAttr('href', this.value)",
+              );
+            }
+            h += `<div class="grid grid-cols-2 gap-3">
+              ${renderBuilderInput("Width", "text", s.width, "updateStyle('width', normalizeCssSize(this.value, '260px'))")}
+              ${renderBuilderInput("Height", "text", s.height, "updateStyle('height', normalizeCssSize(this.value, '100px'))")}
+            </div>`;
             break;
           case 1:
-            h += `<label class="text-[7px] font-bold text-gray-500 uppercase">Rounding</label><input type="range" min="0" max="100" value="${parseInt(s.borderRadius)}" oninput="updateStyle('borderRadius', this.value+'px')" class="w-full accent-cyan-500">`;
+            h += renderBuilderSelect(
+              "Background Type",
+              "backgroundMode",
+              s.backgroundMode,
+              [
+                ["solid", "Solid"],
+                ["gradient", "Gradient"],
+                ["image", "Image"],
+              ],
+              "updateStyle('backgroundMode', this.value)",
+            );
+            h += `<div class="grid grid-cols-2 gap-3">
+              ${renderBuilderInput("Primary Color", "color", s.backgroundColor, "updateStyle('backgroundColor', this.value)")}
+              ${renderBuilderInput("Secondary Color", "color", s.backgroundColorSecondary, "updateStyle('backgroundColorSecondary', this.value)")}
+            </div>`;
+            h += renderBuilderInput(
+              "Gradient Angle",
+              "range",
+              String(parseInt(s.gradientAngle || "135", 10)),
+              "updateStyle('gradientAngle', this.value + 'deg')",
+              `min="0" max="360"`,
+            );
+            h += renderBuilderSelect(
+              "Image Fit",
+              "backgroundSize",
+              s.backgroundSize,
+              [
+                ["cover", "Cover"],
+                ["contain", "Contain"],
+                ["auto", "Auto"],
+              ],
+              "updateStyle('backgroundSize', this.value)",
+            );
+            h += renderBuilderInput(
+              "Background Image URL",
+              "text",
+              s.backgroundImageUrl || "",
+              "updateStyle('backgroundImageUrl', this.value)",
+            );
             break;
           case 2:
-            h += `<label class="text-[7px] font-bold text-gray-500 uppercase">Glow Strength</label><input type="range" min="0" max="80" oninput="updateStyle('boxShadow', '0 0 '+this.value+'px '+currentInspectorState.styles.backgroundColor)" class="w-full accent-cyan-500">`;
+            h += `<div class="grid grid-cols-2 gap-3">
+              ${renderBuilderInput("Text Color", "color", s.color, "updateStyle('color', this.value)")}
+              ${renderBuilderInput("Font Size", "text", s.fontSize, "updateStyle('fontSize', normalizeCssSize(this.value, '18px'))")}
+            </div>`;
+            h += `<div class="grid grid-cols-2 gap-3">
+              ${renderBuilderInput("Line Height", "text", s.lineHeight, "updateStyle('lineHeight', this.value || '1.4')")}
+              ${renderBuilderInput("Letter Spacing", "text", s.letterSpacing, "updateStyle('letterSpacing', normalizeCssSize(this.value, '0px'))")}
+            </div>`;
+            h += renderBuilderSelect(
+              "Font Family",
+              "fontFamily",
+              s.fontFamily,
+              [
+                ["Inter, system-ui, sans-serif", "Inter"],
+                ["Georgia, serif", "Georgia"],
+                ["'Trebuchet MS', sans-serif", "Trebuchet"],
+                ["'Courier New', monospace", "Courier"],
+                ["'Brush Script MT', cursive", "Brush Script"],
+              ],
+              "updateStyle('fontFamily', this.value)",
+            );
+            h += renderBuilderSelect(
+              "Text Align",
+              "textAlign",
+              s.textAlign,
+              [
+                ["left", "Left"],
+                ["center", "Center"],
+                ["right", "Right"],
+              ],
+              "updateStyle('textAlign', this.value)",
+            );
+            h += renderBuilderInput(
+              "Font Weight",
+              "range",
+              String(parseInt(s.fontWeight || "600", 10)),
+              "updateStyle('fontWeight', this.value)",
+              `min="100" max="900" step="100"`,
+            );
+            break;
+          case 3:
+            h += `<div class="grid grid-cols-2 gap-3">
+              ${renderBuilderInput("Padding", "text", s.padding, "updateStyle('padding', this.value || '16px')")}
+              ${renderBuilderInput("Border Radius", "text", s.borderRadius, "updateStyle('borderRadius', normalizeCssSize(this.value, '18px'))")}
+            </div>`;
+            h += `<div class="grid grid-cols-2 gap-3">
+              ${renderBuilderInput("Border Width", "text", s.borderWidth, "updateStyle('borderWidth', normalizeCssSize(this.value, '1px'))")}
+              ${renderBuilderInput("Border Color", "color", s.borderColor, "updateStyle('borderColor', this.value)")}
+            </div>`;
+            h += renderBuilderSelect(
+              "Border Style",
+              "borderStyle",
+              s.borderStyle,
+              [
+                ["solid", "Solid"],
+                ["dashed", "Dashed"],
+                ["dotted", "Dotted"],
+                ["double", "Double"],
+              ],
+              "updateStyle('borderStyle', this.value)",
+            );
+            h += `<div class="grid grid-cols-2 gap-3">
+              ${renderBuilderInput("Outline Width", "text", s.outlineWidth, "updateStyle('outlineWidth', normalizeCssSize(this.value, '0px'))")}
+              ${renderBuilderInput("Outline Color", "color", s.outlineColor, "updateStyle('outlineColor', this.value)")}
+            </div>`;
+            h += renderBuilderInput(
+              "Outline Offset",
+              "text",
+              s.outlineOffset,
+              "updateStyle('outlineOffset', normalizeCssSize(this.value, '0px'))",
+            );
+            break;
+          case 4:
+            h += renderBuilderInput(
+              "Opacity",
+              "range",
+              String(parseFloat(s.opacity ?? 1) * 100),
+              "updateStyle('opacity', String(Number(this.value) / 100))",
+              `min="0" max="100"`,
+            );
+            h += renderBuilderInput(
+              "Shadow",
+              "text",
+              s.boxShadow,
+              "updateStyle('boxShadow', this.value)",
+            );
+            h += renderBuilderInput(
+              "Blur",
+              "text",
+              s.backdropFilterBlur,
+              "updateStyle('backdropFilterBlur', normalizeCssSize(this.value, '0px'))",
+            );
+            h += renderBuilderInput(
+              "Rotation",
+              "text",
+              s.rotate,
+              "updateStyle('rotate', normalizeCssSize(this.value, '0deg'))",
+            );
+            break;
+          case 5:
+            h += `<div class="grid grid-cols-2 gap-3">
+              ${renderBuilderInput("Top", "text", s.top, "updateStyle('top', normalizeCssSize(this.value, '150px'))")}
+              ${renderBuilderInput("Left", "text", s.left, "updateStyle('left', normalizeCssSize(this.value, '150px'))")}
+            </div>`;
+            h += `<div class="grid grid-cols-2 gap-3">
+              ${renderBuilderInput("Z-Index", "number", String(parseInt(s.zIndex || "10", 10)), "updateStyle('zIndex', this.value || '10')")}
+              ${renderBuilderInput("Mix Blend", "text", s.mixBlendMode, "updateStyle('mixBlendMode', this.value || 'normal')")}
+            </div>`;
+            h += renderBuilderInput(
+              "Custom CSS Class",
+              "text",
+              a.className || "",
+              "updateAttr('className', this.value)",
+            );
             break;
         }
-        container.innerHTML = `<div class="animate-fadeIn space-y-2">${h}</div>`;
+        h += `</div>`;
+        container.innerHTML = `<div class="animate-fadeIn space-y-3">${h}</div>`;
       }
       // ====================== 5. INTERACTION ENGINE ======================
       function handleObjectInteraction(e, el) {
+        if (e.button !== undefined && e.button !== 0) return;
         if (e.target.isContentEditable) return;
         e.stopPropagation();
+        e.preventDefault();
         selectElement(el);
         const isResizer = e.target.classList.contains("resizer");
         const isDragHandle = e.target.closest(".drag-handle");
@@ -3177,36 +3359,399 @@
         const startL = el.offsetLeft,
           startT = el.offsetTop;
         const rType = e.target.classList[1];
-        const onMouseMove = (ev) => {
+        const canvas = document.getElementById("web-canvas");
+        const snap = (value) =>
+          builderSnapEnabled
+            ? Math.round(value / BUILDER_GRID_SIZE) * BUILDER_GRID_SIZE
+            : value;
+        const clamp = (value, min, max) =>
+          Math.min(Math.max(value, min), Math.max(min, max));
+        const onPointerMove = (ev) => {
           const dx = ev.clientX - startX,
             dy = ev.clientY - startY;
           if (isResizer) {
-            if (rType.includes("r"))
-              el.style.width = Math.max(30, startW + dx) + "px";
-            if (rType.includes("b"))
-              el.style.height = Math.max(30, startH + dy) + "px";
+            if (rType.includes("r")) {
+              const maxWidth = canvas.clientWidth - startL;
+              el.style.width =
+                clamp(snap(startW + dx), 30, Math.max(30, maxWidth)) + "px";
+            }
+            if (rType.includes("b")) {
+              const maxHeight = canvas.scrollHeight - startT;
+              el.style.height =
+                clamp(snap(startH + dy), 30, Math.max(30, maxHeight)) + "px";
+            }
             if (rType.includes("l")) {
-              el.style.width = Math.max(30, startW - dx) + "px";
-              el.style.left = startL + dx + "px";
+              const nextLeft = clamp(
+                snap(startL + dx),
+                0,
+                startL + startW - 30,
+              );
+              el.style.left = nextLeft + "px";
+              el.style.width = Math.max(30, startW + (startL - nextLeft)) + "px";
             }
             if (rType.includes("t")) {
-              el.style.height = Math.max(30, startH - dy) + "px";
-              el.style.top = startT + dy + "px";
+              const nextTop = clamp(
+                snap(startT + dy),
+                0,
+                startT + startH - 30,
+              );
+              el.style.top = nextTop + "px";
+              el.style.height = Math.max(30, startH + (startT - nextTop)) + "px";
             }
           } else {
-            el.style.left = startL + dx + "px";
-            el.style.top = startT + dy + "px";
+            const nextLeft = clamp(
+              snap(startL + dx),
+              0,
+              canvas.clientWidth - el.offsetWidth,
+            );
+            const nextTop = clamp(
+              snap(startT + dy),
+              0,
+              canvas.scrollHeight - el.offsetHeight,
+            );
+            el.style.left = nextLeft + "px";
+            el.style.top = nextTop + "px";
           }
         };
-        const onMouseUp = () => {
+        const onPointerUp = () => {
           saveToHistory();
-          document.removeEventListener("mousemove", onMouseMove);
-          document.removeEventListener("mouseup", onMouseUp);
+          document.removeEventListener("pointermove", onPointerMove);
+          document.removeEventListener("pointerup", onPointerUp);
         };
-        document.addEventListener("mousemove", onMouseMove);
-        document.addEventListener("mouseup", onMouseUp);
+        document.addEventListener("pointermove", onPointerMove);
+        document.addEventListener("pointerup", onPointerUp);
       }
       // ====================== 6. UTILS & SYNC ======================
+      function escapeAttr(value = "") {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/"/g, "&quot;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+      function renderBuilderInput(label, type, value, oninput, extra = "") {
+        return `<label class="block"><span class="text-[7px] font-black text-gray-500 uppercase tracking-[0.2em]">${label}</span><input type="${type}" value="${escapeAttr(value ?? "")}" oninput="${oninput}" ${extra} class="w-full mt-1 bg-gray-800/90 p-2.5 rounded-xl text-white text-[11px] border border-white/5 outline-none focus:border-cyan-500" /></label>`;
+      }
+      function renderBuilderSelect(label, key, value, options, onchange) {
+        return `<label class="block"><span class="text-[7px] font-black text-gray-500 uppercase tracking-[0.2em]">${label}</span><select data-key="${key}" onchange="${onchange}" class="w-full mt-1 bg-gray-800/90 p-2.5 rounded-xl text-white text-[11px] border border-white/5 outline-none focus:border-cyan-500">${options
+          .map(
+            ([optionValue, optionLabel]) =>
+              `<option value="${escapeAttr(optionValue)}" ${optionValue === value ? "selected" : ""}>${optionLabel}</option>`,
+          )
+          .join("")}</select></label>`;
+      }
+      function normalizeCssSize(value, fallback = "0px") {
+        if (value == null) return fallback;
+        const trimmed = String(value).trim();
+        if (!trimmed) return fallback;
+        if (/^-?\d+(\.\d+)?$/.test(trimmed)) return `${trimmed}px`;
+        return trimmed;
+      }
+      function normalizeBuilderStyles(styles = {}, type = "div") {
+        return {
+          width: styles.width || (type === "text" ? "320px" : "260px"),
+          height: styles.height || (type === "text" ? "120px" : "100px"),
+          top: styles.top || "150px",
+          left: styles.left || "150px",
+          zIndex: styles.zIndex || "10",
+          padding: styles.padding || "16px",
+          borderRadius: styles.borderRadius || "18px",
+          backgroundMode: styles.backgroundMode || (type === "text" ? "solid" : "gradient"),
+          backgroundColor: styles.backgroundColor || "#22d3ee",
+          backgroundColorSecondary: styles.backgroundColorSecondary || "#0f172a",
+          backgroundImageUrl: styles.backgroundImageUrl || "",
+          backgroundSize: styles.backgroundSize || "cover",
+          gradientAngle: styles.gradientAngle || "135deg",
+          color: styles.color || (type === "button" ? "#020617" : "#0f172a"),
+          fontSize: styles.fontSize || "18px",
+          fontWeight: styles.fontWeight || (type === "text" ? "500" : "700"),
+          fontFamily: styles.fontFamily || "Inter, system-ui, sans-serif",
+          textAlign: styles.textAlign || "left",
+          lineHeight: styles.lineHeight || "1.4",
+          letterSpacing: styles.letterSpacing || "0px",
+          borderWidth: styles.borderWidth || "1px",
+          borderStyle: styles.borderStyle || "solid",
+          borderColor: styles.borderColor || "#cbd5e1",
+          outlineWidth: styles.outlineWidth || "0px",
+          outlineColor: styles.outlineColor || "#38bdf8",
+          outlineOffset: styles.outlineOffset || "0px",
+          boxShadow:
+            styles.boxShadow ||
+            "0 24px 60px rgba(15, 23, 42, 0.16)",
+          opacity: styles.opacity ?? "1",
+          backdropFilterBlur: styles.backdropFilterBlur || "0px",
+          rotate: styles.rotate || "0deg",
+          mixBlendMode: styles.mixBlendMode || "normal",
+        };
+      }
+      function getElementInnerNode(el) {
+        return el.querySelector(".element-body > *") || el.querySelector(".element-body");
+      }
+      function computeBackground(styles) {
+        if (styles.backgroundMode === "image" && styles.backgroundImageUrl) {
+          return `url("${styles.backgroundImageUrl}") center / ${styles.backgroundSize} no-repeat`;
+        }
+        if (styles.backgroundMode === "gradient") {
+          return `linear-gradient(${styles.gradientAngle}, ${styles.backgroundColor}, ${styles.backgroundColorSecondary})`;
+        }
+        return styles.backgroundColor;
+      }
+      function applyElementContentStyles(el, type, styles, attrs = {}) {
+        const inner = getElementInnerNode(el);
+        if (!inner) return;
+        const sharedTextStyles = {
+          color: styles.color,
+          fontSize: styles.fontSize,
+          fontWeight: styles.fontWeight,
+          fontFamily: styles.fontFamily,
+          textAlign: styles.textAlign,
+          lineHeight: styles.lineHeight,
+          letterSpacing: styles.letterSpacing,
+        };
+        const sharedBoxStyles = {
+          background: computeBackground(styles),
+          borderRadius: styles.borderRadius,
+          border: `${styles.borderWidth} ${styles.borderStyle} ${styles.borderColor}`,
+          outline:
+            styles.outlineWidth === "0px"
+              ? "none"
+              : `${styles.outlineWidth} solid ${styles.outlineColor}`,
+          outlineOffset: styles.outlineOffset,
+          boxShadow: styles.boxShadow,
+          backdropFilter: `blur(${styles.backdropFilterBlur})`,
+          padding: styles.padding,
+        };
+        if (type === "text") {
+          Object.assign(inner.style, sharedTextStyles, {
+            width: "100%",
+            height: "100%",
+            display: "block",
+          });
+          el.style.background = computeBackground(styles);
+        } else if (type === "img") {
+          inner.style.borderRadius = styles.borderRadius;
+          el.style.background = computeBackground(styles);
+        } else {
+          Object.assign(inner.style, sharedTextStyles, sharedBoxStyles);
+        }
+        if (type === "button" || type === "a") {
+          Object.assign(inner.style, {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          });
+        }
+        if (type === "a") {
+          inner.setAttribute("href", attrs.href || "#");
+        }
+        if (type === "input" || type === "textarea") {
+          inner.placeholder = attrs.placeholder || "Enter text...";
+        }
+        if (type === "text") inner.textContent = attrs.text || "Typography";
+        if (type === "button" || type === "a") inner.textContent = attrs.text || "Action";
+        el.className = `canvas-element absolute group transition-shadow active:cursor-grabbing ${attrs.className || ""}`.trim();
+      }
+      function hydrateCanvasElement(el) {
+        el.onpointerdown = (e) => handleObjectInteraction(e, el);
+      }
+      function hydrateCanvasElements() {
+        document
+          .querySelectorAll("#web-canvas .canvas-element")
+          .forEach((el) => hydrateCanvasElement(el));
+      }
+      function toggleBuilderSnap() {
+        builderSnapEnabled = !builderSnapEnabled;
+        updateBuilderUI();
+      }
+      function updateBuilderUI() {
+        const snapButton = document.getElementById("builder-snap-toggle");
+        const status = document.getElementById("builder-status");
+        const canvas = document.getElementById("web-canvas");
+        if (snapButton) {
+          snapButton.textContent = builderSnapEnabled ? "Snap On" : "Snap Off";
+        }
+        if (status) {
+          status.textContent = builderSnapEnabled
+            ? "Grid Snap Enabled"
+            : "Freeform Builder Ready";
+        }
+        if (canvas) {
+          canvas.classList.toggle("builder-grid", builderSnapEnabled);
+        }
+      }
+      function restoreCanvasSnapshot(index) {
+        const canvas = document.getElementById("web-canvas");
+        if (!canvas || !historyStack[index]) return;
+        canvas.innerHTML = historyStack[index];
+        hydrateCanvasElements();
+        deselectAll();
+        updateBuilderUI();
+      }
+      function builderUndo() {
+        if (historyIndex <= 0) return;
+        historyIndex--;
+        restoreCanvasSnapshot(historyIndex);
+      }
+      function builderRedo() {
+        if (historyIndex >= historyStack.length - 1) return;
+        historyIndex++;
+        restoreCanvasSnapshot(historyIndex);
+      }
+      function removeSelectedElement() {
+        if (!selectedEl) return;
+        selectedEl.remove();
+        selectedEl = null;
+        saveToHistory();
+      }
+      function duplicateSelectedElement() {
+        if (!selectedEl) return;
+        const canvas = document.getElementById("web-canvas");
+        const clone = selectedEl.cloneNode(true);
+        clone.id = `${selectedEl.id || "element"}_${Date.now()}`;
+        clone.style.left = selectedEl.offsetLeft + BUILDER_GRID_SIZE + "px";
+        clone.style.top = selectedEl.offsetTop + BUILDER_GRID_SIZE + "px";
+        hydrateCanvasElement(clone);
+        canvas.appendChild(clone);
+        selectElement(clone);
+        saveToHistory();
+      }
+      function nudgeSelectedElement(dx, dy) {
+        if (!selectedEl) return;
+        const canvas = document.getElementById("web-canvas");
+        const clamp = (value, min, max) =>
+          Math.min(Math.max(value, min), Math.max(min, max));
+        const nextLeft = clamp(
+          selectedEl.offsetLeft + dx,
+          0,
+          canvas.clientWidth - selectedEl.offsetWidth,
+        );
+        const nextTop = clamp(
+          selectedEl.offsetTop + dy,
+          0,
+          canvas.scrollHeight - selectedEl.offsetHeight,
+        );
+        selectedEl.style.left = nextLeft + "px";
+        selectedEl.style.top = nextTop + "px";
+        saveToHistory();
+      }
+      function isBuilderActive() {
+        const workspace = document.getElementById("studio-workspace");
+        return workspace && !workspace.classList.contains("hidden");
+      }
+      function buildExportPayload(baseName = "medialab-page") {
+        const canvas = document.getElementById("web-canvas");
+        if (!canvas) return null;
+        const clone = canvas.cloneNode(true);
+        clone.classList.remove("builder-grid");
+        clone.querySelectorAll(".resizer").forEach((node) => node.remove());
+        clone.querySelectorAll(".drag-handle").forEach((node) => {
+          const toolbar = node.closest("div.absolute");
+          if (toolbar) toolbar.remove();
+        });
+        const cssBlocks = [
+          `body { margin: 0; min-height: 100vh; background: #0f172a; font-family: Inter, system-ui, sans-serif; }`,
+          `.medialab-export-canvas { position: relative; width: 100vw; min-height: 100vh; overflow: hidden; background: #ffffff; }`,
+        ];
+        clone.querySelectorAll(".canvas-element").forEach((node, index) => {
+          node.className = "medialab-layer";
+          if (!node.id) node.id = `medialab-layer-${index + 1}`;
+          const inner = node.querySelector(".element-body > *");
+          if (inner) inner.classList.add("medialab-content");
+          node.querySelectorAll("[contenteditable='true']").forEach((editable) => {
+            editable.setAttribute("contenteditable", "false");
+          });
+          cssBlocks.push(
+            `#${node.id} { ${node.getAttribute("style") || ""} }`,
+          );
+          if (inner?.getAttribute("style")) {
+            cssBlocks.push(
+              `#${node.id} .medialab-content { ${inner.getAttribute("style")} }`,
+            );
+          }
+          const toolbar = node.querySelector("div.absolute");
+          if (toolbar) toolbar.remove();
+        });
+        clone.className = "medialab-export-canvas";
+        const css = cssBlocks.join("\n");
+        const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MediaLab Export</title>
+    <link rel="stylesheet" href="${baseName}.css" />
+  </head>
+  <body>
+    ${clone.outerHTML}
+  </body>
+</html>`;
+        return { html, css };
+      }
+      function exportCanvasToHTML() {
+        const payload = buildExportPayload("medialab-page");
+        if (!payload) return;
+        const standaloneHtml = payload.html.replace(
+          '<link rel="stylesheet" href="medialab-page.css" />',
+          `<style>\n${payload.css}\n</style>`,
+        );
+        const blob = new Blob([standaloneHtml], { type: "text/html" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `medialab-page.html`;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+      function downloadBuilderCode() {
+        const stamp = `medialab-page-${Date.now()}`;
+        const payload = buildExportPayload(stamp);
+        if (!payload) return;
+        const htmlBlob = new Blob([payload.html], { type: "text/html" });
+        const cssBlob = new Blob([payload.css], { type: "text/css" });
+        const htmlUrl = URL.createObjectURL(htmlBlob);
+        const cssUrl = URL.createObjectURL(cssBlob);
+        const htmlLink = document.createElement("a");
+        htmlLink.href = htmlUrl;
+        htmlLink.download = `${stamp}.html`;
+        htmlLink.click();
+        const cssLink = document.createElement("a");
+        cssLink.href = cssUrl;
+        cssLink.download = `${stamp}.css`;
+        cssLink.click();
+        URL.revokeObjectURL(htmlUrl);
+        URL.revokeObjectURL(cssUrl);
+      }
+      document.addEventListener("keydown", (e) => {
+        if (!isBuilderActive()) return;
+        if (
+          e.target.tagName === "INPUT" ||
+          e.target.tagName === "TEXTAREA" ||
+          e.target.isContentEditable
+        ) {
+          return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+          e.preventDefault();
+          if (e.shiftKey) builderRedo();
+          else builderUndo();
+          return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") {
+          e.preventDefault();
+          duplicateSelectedElement();
+          return;
+        }
+        if (e.key === "Delete" || e.key === "Backspace") {
+          e.preventDefault();
+          removeSelectedElement();
+          return;
+        }
+        const step = e.shiftKey ? BUILDER_GRID_SIZE : 1;
+        if (e.key === "ArrowLeft") nudgeSelectedElement(-step, 0);
+        if (e.key === "ArrowRight") nudgeSelectedElement(step, 0);
+        if (e.key === "ArrowUp") nudgeSelectedElement(0, -step);
+        if (e.key === "ArrowDown") nudgeSelectedElement(0, step);
+      });
       function updateStyle(p, v) {
         currentInspectorState.styles[p] = v;
         updateInspectorPreview();
@@ -3217,45 +3762,56 @@
       }
       function updateInspectorPreview() {
         const preview = document.getElementById("inspector-preview");
-        const s = currentInspectorState.styles;
+        const s = normalizeBuilderStyles(
+          currentInspectorState.styles,
+          currentInspectorState.type,
+        );
         const type = currentInspectorState.type;
         const a = currentInspectorState.attributes;
         preview.innerHTML = "";
         Object.assign(preview.style, {
-          background: s.backgroundColor,
+          background: computeBackground(s),
           borderRadius: s.borderRadius,
           boxShadow: s.boxShadow,
           opacity: s.opacity,
-          border: `${s.borderWidth || "0px"} solid ${s.borderColor || "transparent"}`,
-          width: "100px",
-          height: "60px",
+          border: `${s.borderWidth || "0px"} ${s.borderStyle || "solid"} ${s.borderColor || "transparent"}`,
+          outline:
+            s.outlineWidth === "0px"
+              ? "none"
+              : `${s.outlineWidth} solid ${s.outlineColor}`,
+          outlineOffset: s.outlineOffset,
+          width: "180px",
+          height: "90px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          transform: `rotate(${s.rotate})`,
         });
         if (["text", "button", "a"].includes(type)) {
-          preview.innerHTML = `<span style="color:${s.color}; font-size:10px; font-weight:bold;">${a.text || "Preview"}</span>`;
-          preview.style.background =
-            type === "text" ? "transparent" : s.backgroundColor;
+          preview.innerHTML = `<span style="color:${s.color}; font-size:12px; font-weight:${s.fontWeight}; font-family:${s.fontFamily}; text-align:${s.textAlign};">${escapeAttr(
+            a.text || "Preview",
+          )}</span>`;
         } else if (type === "range") {
           preview.innerHTML = `<div class="w-16 h-1 bg-cyan-500 rounded-full"></div>`;
+        } else if (type === "img") {
+          preview.innerHTML = `<span style="color:#fff;font-size:11px;font-weight:700;">Image Block</span>`;
         }
       }
       function applyStylesToExisting() {
         const el = currentInspectorState.targetEl;
         if (el) {
+          const normalizedStyles = normalizeBuilderStyles(
+            currentInspectorState.styles,
+            currentInspectorState.type,
+          );
           el.id = currentInspectorState.attributes.id;
-          Object.assign(el.style, currentInspectorState.styles);
-          const inner = el.querySelector(".element-body > *");
-          if (
-            inner &&
-            ["text", "button", "a"].includes(currentInspectorState.type)
-          ) {
-            if (currentInspectorState.type === "text")
-              inner.innerText = currentInspectorState.attributes.text;
-            inner.style.color = currentInspectorState.styles.color;
-            inner.style.fontSize = currentInspectorState.styles.fontSize;
-          }
+          Object.assign(el.style, normalizedStyles);
+          applyElementContentStyles(
+            el,
+            currentInspectorState.type,
+            normalizedStyles,
+            currentInspectorState.attributes,
+          );
           saveToHistory();
         }
       }
@@ -3265,6 +3821,7 @@
         historyStack = historyStack.slice(0, historyIndex + 1);
         historyStack.push(canvas.innerHTML);
         historyIndex++;
+        updateBuilderUI();
       }
       function changeInspectorPage(dir) {
         inspectorPageIndex = (inspectorPageIndex + dir + 10) % 10;
@@ -3303,12 +3860,46 @@
           : "#22d3ee";
       }
       function extractStyles(el) {
+        const inner = getElementInnerNode(el);
+        const computed = inner ? window.getComputedStyle(inner) : null;
         return {
-          backgroundColor: rgbToHex(el.style.backgroundColor),
-          opacity: el.style.opacity || 1,
-          borderRadius: el.style.borderRadius,
-          color: rgbToHex(el.style.color),
-          fontSize: el.style.fontSize,
+          width: el.style.width || "260px",
+          height: el.style.height || "100px",
+          top: el.style.top || "150px",
+          left: el.style.left || "150px",
+          zIndex: el.style.zIndex || "10",
+          backgroundMode: el.style.backgroundImage && el.style.backgroundImage.includes("linear-gradient")
+            ? "gradient"
+            : el.style.backgroundImage && el.style.backgroundImage.includes("url(")
+              ? "image"
+              : "solid",
+          backgroundColor: rgbToHex(
+            computed?.backgroundColor || el.style.backgroundColor,
+          ),
+          backgroundColorSecondary: "#0f172a",
+          backgroundImageUrl: "",
+          backgroundSize: computed?.backgroundSize || "cover",
+          gradientAngle: "135deg",
+          opacity: el.style.opacity || "1",
+          borderRadius: computed?.borderRadius || el.style.borderRadius || "18px",
+          color: rgbToHex(computed?.color || el.style.color),
+          fontSize: computed?.fontSize || "18px",
+          fontWeight: computed?.fontWeight || "600",
+          fontFamily: computed?.fontFamily || "Inter, system-ui, sans-serif",
+          textAlign: computed?.textAlign || "left",
+          lineHeight: computed?.lineHeight || "1.4",
+          letterSpacing: computed?.letterSpacing || "0px",
+          borderWidth: computed?.borderWidth || "1px",
+          borderStyle: computed?.borderStyle || "solid",
+          borderColor: rgbToHex(computed?.borderColor || "#cbd5e1"),
+          outlineWidth: computed?.outlineWidth || "0px",
+          outlineColor: rgbToHex(computed?.outlineColor || "#38bdf8"),
+          outlineOffset: computed?.outlineOffset || "0px",
+          boxShadow: computed?.boxShadow || "0 24px 60px rgba(15, 23, 42, 0.16)",
+          backdropFilterBlur: "0px",
+          rotate: "0deg",
+          mixBlendMode: el.style.mixBlendMode || "normal",
+          padding: computed?.padding || "16px",
         };
       }
     </script>

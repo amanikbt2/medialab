@@ -1,14 +1,7 @@
 const CACHE_NAME = "medialab-studio-v2"; // Increment version to force refresh
 
 // 1. Assets (REMOVED manifest.json for PWA stability)
-const ASSETS = [
-  "/",
-  "/favicon.jpg", // Ensure this matches your index.html extension
-  "https://cdn.tailwindcss.com",
-  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css",
-  "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
-];
+const ASSETS = [];
 
 // Install: Resilient Caching
 self.addEventListener("install", (event) => {
