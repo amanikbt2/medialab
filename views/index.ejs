@@ -4784,7 +4784,6 @@
     `;
           // Force immediate logic bind
           setTimeout(initCanvasLogic, 100);
-          setTimeout(scheduleBuilderTutorial, 180);
         }
         // 3. VIDEO → AUDIO CONVERTER
         // =============================================================
@@ -7327,9 +7326,11 @@
         const startCount = canvas.querySelectorAll(
           ":scope > .canvas-element",
         ).length;
-        const finishStarterInsert = () => {
+        const finishStarterInsert = (options = {}) => {
           autoGroupStarterElements(startCount);
-          handleBuilderTutorialEvent("starter-inserted", { kind });
+          if (!options.skipTutorialEvent) {
+            handleBuilderTutorialEvent("starter-inserted", { kind });
+          }
         };
         if (kind === "hero") {
           addObject(
@@ -7449,7 +7450,18 @@
               },
             );
           });
-          finishStarterInsert();
+          finishStarterInsert({ skipTutorialEvent: true });
+          setTimeout(() => {
+            const step = builderTourState.steps[builderTourState.stepIndex];
+            if (
+              builderTourState.active &&
+              step?.title === "Insert Login Form"
+            ) {
+              advanceBuilderTutorial();
+              return;
+            }
+            handleBuilderTutorialEvent("starter-inserted", { kind: "login" });
+          }, 120);
           return;
         }
         if (kind === "login") {
@@ -9005,6 +9017,12 @@
               if (!builderTourState.active) return;
               const step = builderTourState.steps[builderTourState.stepIndex];
               if (!step?.waitFor) return;
+              if (
+                event.target?.id === "builder-template-login" ||
+                event.target?.closest?.("#builder-template-login")
+              ) {
+                return;
+              }
               const card = document.getElementById("builder-tour-card");
               if (card?.contains(event.target)) return;
               const target = getBuilderTutorialTarget(step);
@@ -9054,10 +9072,18 @@
           const handled = step.onEvent(payload);
           if (handled === false) return;
         }
+        if (eventName === "starter-inserted" && payload.kind === "login") {
+          setTimeout(() => {
+            if (!builderTourState.active) return;
+            advanceBuilderTutorial();
+          }, 500);
+          return;
+        }
         advanceBuilderTutorial();
       }
       function shouldOfferBuilderTutorial() {
         if (currentStudioToolId !== "web-builder") return false;
+        if (!isBuilderActive()) return false;
         if (builderTourState.active || builderTourState.dismissedThisSession)
           return false;
         if (loggedIn) return !currentUser?.builderTutorialSeen;
@@ -9258,6 +9284,21 @@
               return true;
             },
           },
+          {
+            title: "Project Ready!",
+            message:
+              "Workflow AI has successfully structured your landing page. Click Complete Guide to enter full Studio mode.",
+            targetSelector: "#web-canvas",
+            primaryLabel: "Complete Guide",
+            primaryAction: () => {
+              showBuilderCelebration(
+                "Congratulations! You built your first website in MediaLab.",
+              );
+              finishBuilderTutorial();
+            },
+            secondaryLabel: "Dismiss",
+            secondaryAction: () => dismissBuilderTutorial(true),
+          },
         ];
       }
       function openBuilderTutorialPrompt() {
@@ -9305,7 +9346,7 @@
         const nextIndex = builderTourState.stepIndex + 1;
         if (nextIndex >= builderTourState.steps.length) {
           showBuilderCelebration(
-            "Congratulation, you built your first website using MediaLab.",
+            "Congratulations! You built your first website in MediaLab.",
           );
           finishBuilderTutorial();
           return;
