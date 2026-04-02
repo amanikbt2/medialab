@@ -1519,7 +1519,7 @@
             id="dropdown-pic"
             src="https://via.placeholder.com/48"
             alt="Profile"
-            class="w-10 h-10 rounded-2xl object-cover"
+            class="w-10 h-10 rounded-full object-cover border-2 border-white/10"
           />
           <div>
             <p id="dropdown-name" class="font-semibold">User</p>
@@ -2483,7 +2483,12 @@
         else showLogin();
       }
       function hasPremiumAccess() {
-        return Boolean(loggedIn && currentUser?.isPro);
+        return Boolean(
+          loggedIn &&
+            (currentUser?.isPro ||
+              String(currentPremiumRequest?.status || "").toLowerCase() ===
+                "granted"),
+        );
       }
       function hasPendingPremiumRequest() {
         return Boolean(
@@ -2491,6 +2496,11 @@
             ["pending", "reviewing", "received"].includes(
               String(currentPremiumRequest.status || "").toLowerCase(),
             ),
+        );
+      }
+      function hasDeniedPremiumRequest() {
+        return (
+          String(currentPremiumRequest?.status || "").toLowerCase() === "denied"
         );
       }
       function updateStudioToolSwitches() {
@@ -2532,6 +2542,20 @@
         const pendingMessage = hasPendingPremiumRequest()
           ? `<div class="feature-gate-status feature-gate-status--pending">Pending. Your premium request is being processed. You'll get feedback within 48 hours.</div>`
           : "";
+        const deniedMessage = hasDeniedPremiumRequest()
+          ? `<div class="feature-gate-status">You're not eligible for premium features.</div>`
+          : "";
+        const actionButton = hasPendingPremiumRequest()
+          ? ""
+          : hasDeniedPremiumRequest()
+            ? `<button onclick="requestPremiumReview()" class="feature-gate-button feature-gate-button--premium relative hover:scale-[1.03] transition-all">
+                <span>Request Review</span>
+                <i class="fas fa-arrow-right"></i>
+              </button>`
+          : `<button onclick="${loggedIn ? "upgradePlan()" : "showLogin()"}" class="feature-gate-button feature-gate-button--premium relative hover:scale-[1.03] transition-all">
+                <span>${loggedIn ? "Request Premium" : "Sign in to Unlock"}</span>
+                <i class="fas fa-arrow-right"></i>
+              </button>`;
         return `
           <div class="feature-gate-shell max-w-3xl">
             <div class="feature-gate-card feature-gate-card--premium">
@@ -2545,10 +2569,8 @@
                 ${loggedIn ? config.descLoggedIn : config.descLoggedOut}
               </p>
               ${pendingMessage}
-              <button onclick="${loggedIn ? "upgradePlan()" : "showLogin()"}" class="feature-gate-button feature-gate-button--premium relative hover:scale-[1.03] transition-all" ${hasPendingPremiumRequest() ? "disabled" : ""}>
-                <span>${loggedIn ? hasPendingPremiumRequest() ? "Request Pending" : "Request Premium" : "Sign in to Unlock"}</span>
-                <i class="fas fa-arrow-right"></i>
-              </button>
+              ${deniedMessage}
+              ${actionButton}
             </div>
           </div>`;
       }
@@ -2651,6 +2673,9 @@
               action,
               summary,
               source,
+              email: currentUser?.email || "",
+              name: currentUser?.name || "",
+              isPro: Boolean(currentUser?.isPro),
               metadata,
             }),
           });
@@ -2810,11 +2835,52 @@
           });
           const data = await res.json();
           currentPremiumRequest = data.success ? data.request || null : null;
+          if (currentUser) {
+            currentUser.isPro =
+              String(currentPremiumRequest?.status || "").toLowerCase() ===
+                "granted" || Boolean(currentUser.isPro);
+          }
           return currentPremiumRequest;
         } catch (error) {
           console.warn("Premium request status check skipped:", error);
           return null;
         }
+      }
+      function updateUserProfileUi() {
+        const userSection = document.getElementById("user-section");
+        const startBtn = document.getElementById("start-btn");
+        const profilePic = document.getElementById("profile-pic");
+        const dropdownPic = document.getElementById("dropdown-pic");
+        const username = document.getElementById("username");
+        const dropdownName = document.getElementById("dropdown-name");
+        const dropdownEmail = document.getElementById("dropdown-email");
+        if (!loggedIn || !currentUser) {
+          userSection?.classList.add("hidden");
+          startBtn?.classList.remove("hidden");
+          return;
+        }
+        userSection?.classList.remove("hidden");
+        startBtn?.classList.add("hidden");
+        const picSrc =
+          currentUser.profilePicture ||
+          "https://via.placeholder.com/32/22d3ee/ffffff?text=U";
+        if (profilePic) {
+          profilePic.src = picSrc;
+          profilePic.classList.toggle("ring-2", Boolean(currentUser.isPro));
+          profilePic.classList.toggle("ring-yellow-400", Boolean(currentUser.isPro));
+          profilePic.classList.toggle("ring-offset-2", Boolean(currentUser.isPro));
+          profilePic.classList.toggle("ring-offset-gray-900", Boolean(currentUser.isPro));
+        }
+        if (dropdownPic) {
+          dropdownPic.src = picSrc;
+          dropdownPic.classList.toggle("ring-2", Boolean(currentUser.isPro));
+          dropdownPic.classList.toggle("ring-yellow-400", Boolean(currentUser.isPro));
+          dropdownPic.classList.toggle("ring-offset-2", Boolean(currentUser.isPro));
+          dropdownPic.classList.toggle("ring-offset-gray-900", Boolean(currentUser.isPro));
+        }
+        if (username) username.textContent = currentUser.name || "User";
+        if (dropdownName) dropdownName.textContent = currentUser.name || "User";
+        if (dropdownEmail) dropdownEmail.textContent = currentUser.email || "";
       }
       async function upgradePlan() {
         logUsageActivity("upgrade-click", "clicked upgrade", "profile");
@@ -2837,6 +2903,17 @@
           name: currentUser.name,
           email: currentUser.email,
           message: "Request premium join.",
+        });
+      }
+      async function requestPremiumReview() {
+        if (!loggedIn || !currentUser?.email) {
+          showLogin();
+          return;
+        }
+        await submitUpgradeRequest({
+          name: currentUser.name,
+          email: currentUser.email,
+          message: "Request premium review.",
         });
       }
       function getUpgradeFeatureLabel() {
@@ -2953,8 +3030,7 @@
           loggedIn = false;
           currentUser = null;
           currentPremiumRequest = null;
-          document.getElementById("user-section").classList.add("hidden");
-          document.getElementById("start-btn").classList.remove("hidden");
+          updateUserProfileUi();
           document.getElementById("profile-menu").classList.add("hidden");
           document.getElementById("studio").classList.add("hidden");
           document.getElementById("landing").classList.remove("hidden");
@@ -2999,6 +3075,7 @@
             loggedIn = true;
             currentUser = devData.user || null;
             await fetchPremiumRequestStatus();
+            updateUserProfileUi();
             await logUsageActivity(
               "developer-login",
               "logged in with developer login",
@@ -3030,8 +3107,7 @@
         alert(`✅ Logged in with ${provider}`);
         hideLogin();
         loggedIn = true;
-        document.getElementById("start-btn").classList.add("hidden");
-        document.getElementById("user-section").classList.remove("hidden");
+        updateUserProfileUi();
         goToStudio();
       }
       async function checkAuth() {
@@ -3042,10 +3118,7 @@
             loggedIn = true;
             currentUser = data.user;
             await fetchPremiumRequestStatus();
-            // UI: Toggle Login Buttons
-            document.getElementById("start-btn").classList.add("hidden");
-            document.getElementById("user-section").classList.remove("hidden");
-            // UI: Set Profile Details
+            updateUserProfileUi();
             const picSrc =
               currentUser.profilePicture ||
               "https://via.placeholder.com/32/22d3ee/ffffff?text=👤";
@@ -5791,15 +5864,52 @@
           let guestHistory = JSON.parse(
             localStorage.getItem("medialab_guest_history") || "[]",
           );
+          guestHistory = guestHistory.filter(
+            (item) => item.fileUrl !== project?.fileUrl,
+          );
           guestHistory.push({
             ...project,
             createdAt: new Date().toISOString(),
             isGuest: true,
           });
+          guestHistory = guestHistory
+            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+            .slice(-10);
           localStorage.setItem(
             "medialab_guest_history",
             JSON.stringify(guestHistory),
           );
+        } else {
+          currentUser = currentUser || {};
+          currentUser.projects = Array.isArray(currentUser.projects)
+            ? currentUser.projects
+            : [];
+          currentUser.projects = currentUser.projects.filter(
+            (item) => item.fileUrl !== project?.fileUrl,
+          );
+          currentUser.projects.push({
+            ...project,
+            createdAt: new Date().toISOString(),
+          });
+          currentUser.projects = currentUser.projects
+            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+            .slice(-10);
+          fetch("/api/history-projects", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ project }),
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.success && Array.isArray(data.projects)) {
+                currentUser.projects = data.projects;
+                updateSidebarHistory(currentUser.projects);
+              }
+            })
+            .catch((error) => {
+              console.warn("Project history sync skipped:", error);
+            });
         }
         // Refresh the sidebar automatically
         updateSidebarHistory(currentUser ? currentUser.projects : null);

@@ -22,7 +22,7 @@ UsageLogSchema.virtual("displayLine").get(function usageDisplayLine() {
   const identity =
     this.isAnonymous || !this.email
       ? "anonymous"
-      : `${this.email}: ${this.name || "Unknown"}`;
+      : `${this.name || "Unknown"}#${this.email}`;
   return `[${identity}]-- ${this.summary}: ${new Date(this.createdAt).toISOString()}`;
 });
 

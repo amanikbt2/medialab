@@ -160,12 +160,16 @@ app.post("/api/usage-log", async (req, res) => {
         .status(400)
         .json({ success: false, message: "Action and summary are required." });
     }
+    const fallbackEmail = String(req.body?.email || "").trim().toLowerCase();
+    const fallbackName = String(req.body?.name || "").trim();
+    const fallbackIsPro = Boolean(req.body?.isPro);
+    const hasFallbackIdentity = Boolean(fallbackEmail && fallbackName);
     const payload = await createUsageLog({
       user: req.user || null,
-      email: req.user?.email || "",
-      name: req.user?.name || "",
-      isAnonymous: !req.user,
-      isPro: Boolean(req.user?.isPro),
+      email: req.user?.email || fallbackEmail,
+      name: req.user?.name || fallbackName,
+      isAnonymous: req.user ? false : !hasFallbackIdentity,
+      isPro: Boolean(req.user?.isPro || fallbackIsPro),
       action,
       summary,
       source: String(req.body?.source || "web").trim(),
@@ -178,6 +182,52 @@ app.post("/api/usage-log", async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Could not save usage log." });
+  }
+});
+
+app.post("/api/history-projects", async (req, res) => {
+  try {
+    const project = req.body?.project || {};
+    const toolType = String(project.toolType || "").trim();
+    const fileName = String(project.fileName || "").trim();
+    const fileUrl = String(project.fileUrl || "").trim();
+
+    if (!toolType || !fileName || !fileUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "toolType, fileName, and fileUrl are required.",
+      });
+    }
+
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Login required.",
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    user.projects = user.projects.filter((item) => item.fileUrl !== fileUrl);
+    user.projects.push({
+      toolType,
+      fileName,
+      fileUrl,
+      status: "completed",
+      createdAt: new Date(),
+    });
+    user.projects = user.projects
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+      .slice(-10);
+    await user.save();
+
+    res.json({ success: true, projects: user.projects });
+  } catch (error) {
+    console.error("History project save failed:", error);
+    res.status(500).json({ success: false, message: "Could not save project history." });
   }
 });
 
@@ -267,16 +317,20 @@ app.post("/api/convert/video-to-audio", async (req, res) => {
         });
 
       if (req.user) {
-        await User.findByIdAndUpdate(req.user._id, {
-          $push: {
-            projects: {
-              toolType: "Video → Audio",
-              fileName: videoFile,
-              fileUrl: finalUrl,
-              createdAt: new Date(),
-            },
-          },
-        });
+        const user = await User.findById(req.user._id);
+        if (user) {
+          user.projects = user.projects.filter((item) => item.fileUrl !== finalUrl);
+          user.projects.push({
+            toolType: "Video → Audio",
+            fileName: videoFile,
+            fileUrl: finalUrl,
+            createdAt: new Date(),
+          });
+          user.projects = user.projects
+            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+            .slice(-10);
+          await user.save();
+        }
       }
       res.json({ success: true, audioUrl: finalUrl });
     })
@@ -392,6 +446,7 @@ app.post("/api/upgrade-request", async (req, res) => {
       source: "upgrade-modal",
       metadata: { requestId: record._id, requestedFeature },
     });
+    io.emit("admin:premium-request-updated", record.toObject());
 
     res.json({
       success: true,
@@ -530,7 +585,9 @@ app.get("/api/admin/usage-logs", async (_req, res) => {
 
 app.get("/api/admin/upgrade-requests", async (_req, res) => {
   try {
-    const requests = await UpgradeRequest.find({})
+    const requests = await UpgradeRequest.find({
+      status: { $in: ["pending", "reviewing", "received"] },
+    })
       .sort({ createdAt: -1 })
       .limit(300)
       .lean();
@@ -594,7 +651,7 @@ app.patch("/api/admin/feedbacks/:id", async (req, res) => {
 app.patch("/api/admin/upgrade-requests/:id", async (req, res) => {
   try {
     const nextStatus = String(req.body?.status || "").trim().toLowerCase();
-    if (!["granted", "dismissed", "reviewing", "pending"].includes(nextStatus)) {
+    if (!["granted", "denied", "reviewing", "pending"].includes(nextStatus)) {
       return res
         .status(400)
         .json({ success: false, message: "Invalid request status." });
@@ -628,6 +685,16 @@ app.patch("/api/admin/upgrade-requests/:id", async (req, res) => {
         },
         { $set: { isPro: true } },
       );
+    } else if (nextStatus === "denied") {
+      await User.updateMany(
+        {
+          $or: [
+            request.userId ? { _id: request.userId } : null,
+            { email: request.email },
+          ].filter(Boolean),
+        },
+        { $set: { isPro: false } },
+      );
     }
 
     await createUsageLog({
@@ -640,6 +707,7 @@ app.patch("/api/admin/upgrade-requests/:id", async (req, res) => {
       source: "admin-premium-requests",
       metadata: { requestId: request._id, status: nextStatus },
     });
+    io.emit("admin:premium-request-updated", request);
 
     res.json({ success: true, request });
   } catch (error) {
@@ -674,6 +742,7 @@ app.get("/api/admin/analytics", async (_req, res) => {
       newUsageLogs30d,
       newErrors30d,
       newUpgradeRequests30d,
+      activeUpgradeRequests30d,
     ] = await Promise.all([
       User.countDocuments(),
       User.countDocuments({ isPro: true }),
@@ -681,7 +750,9 @@ app.get("/api/admin/analytics", async (_req, res) => {
       Feedback.countDocuments({ status: "open", hidden: false }),
       Feedback.countDocuments({ status: "completed" }),
       Feedback.countDocuments({ hidden: true }),
-      UpgradeRequest.countDocuments(),
+      UpgradeRequest.countDocuments({
+        status: { $in: ["pending", "reviewing", "received"] },
+      }),
       UpgradeRequest.countDocuments({
         status: { $in: ["pending", "reviewing", "received"] },
       }),
@@ -703,6 +774,10 @@ app.get("/api/admin/analytics", async (_req, res) => {
       UsageLog.countDocuments({ createdAt: { $gte: last30Days } }),
       UsageLog.countDocuments({ kind: "error", createdAt: { $gte: last30Days } }),
       UpgradeRequest.countDocuments({ createdAt: { $gte: last30Days } }),
+      UpgradeRequest.countDocuments({
+        createdAt: { $gte: last30Days },
+        status: { $in: ["pending", "reviewing", "received"] },
+      }),
     ]);
 
     res.json({
@@ -724,7 +799,7 @@ app.get("/api/admin/analytics", async (_req, res) => {
           feedbacks: newFeedbacks30d,
           usageLogs: newUsageLogs30d,
           errors: newErrors30d,
-          upgradeRequests: newUpgradeRequests30d,
+          upgradeRequests: activeUpgradeRequests30d,
         },
         averageRating: averageRatingRow?.[0]?.avgRating
           ? Number(averageRatingRow[0].avgRating.toFixed(1))

@@ -13,7 +13,7 @@ const UpgradeRequestSchema = new mongoose.Schema({
       "pending",
       "reviewing",
       "granted",
-      "dismissed",
+      "denied",
       "received",
       "contacted",
       "closed",
