@@ -6822,9 +6822,9 @@
         Object.assign(wrap.style, {
           width: normalizedStyles.width || "260px",
           height: normalizedStyles.height || "100px",
-          left: "150px",
-          top: "150px",
-          zIndex: "10",
+          left: normalizedStyles.left || styles?.left || "150px",
+          top: normalizedStyles.top || styles?.top || "150px",
+          zIndex: normalizedStyles.zIndex || styles?.zIndex || "10",
           opacity: normalizedStyles.opacity,
           mixBlendMode: normalizedStyles.mixBlendMode,
           transform: `rotate(${normalizedStyles.rotate})`,
@@ -8093,11 +8093,11 @@
         };
         const typeDefaults = defaults[type] || defaults.div;
         return {
+          top: styles.top,
+          left: styles.left,
+          zIndex: styles.zIndex,
           width: styles.width || typeDefaults.width || "260px",
           height: styles.height || typeDefaults.height || "100px",
-          top: styles.top || "150px",
-          left: styles.left || "150px",
-          zIndex: styles.zIndex || "10",
           padding: styles.padding || typeDefaults.padding || "16px",
           borderRadius:
             styles.borderRadius || typeDefaults.borderRadius || "18px",
