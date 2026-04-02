@@ -13,12 +13,13 @@ import "dotenv/config";
 import multer from "multer";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
-import { spawn } from "child_process";
 
 // Models & Routes
 import authRoutes from "./routes/authRoutes.js";
 import User from "./models/User.js";
 import Feedback from "./models/Feedback.js";
+import UpgradeRequest from "./models/UpgradeRequest.js";
+import UsageLog from "./models/UsageLog.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,6 +44,79 @@ const io = new Server(httpServer, {
   },
 });
 
+async function createUsageLog({
+  user = null,
+  email = "",
+  name = "",
+  isAnonymous = true,
+  isPro = false,
+  action,
+  summary,
+  source = "web",
+  kind = "activity",
+  metadata = {},
+} = {}) {
+  if (!action || !summary) return null;
+  try {
+    const record = await UsageLog.create({
+      userId: user?._id || null,
+      email: String(email || user?.email || "").trim(),
+      name: String(name || user?.name || "").trim(),
+      isAnonymous: Boolean(user ? false : isAnonymous),
+      isPro: Boolean(user?.isPro || isPro),
+      action: String(action).trim(),
+      summary: String(summary).trim(),
+      source: String(source || "web").trim(),
+      kind,
+      metadata,
+    });
+    const totalLogs = await UsageLog.countDocuments();
+    if (totalLogs > 1000) {
+      const overflow = totalLogs - 1000;
+      const oldLogs = await UsageLog.find({})
+        .sort({ createdAt: 1 })
+        .limit(overflow)
+        .select("_id")
+        .lean();
+      if (oldLogs.length) {
+        await UsageLog.deleteMany({
+          _id: { $in: oldLogs.map((item) => item._id) },
+        });
+      }
+    }
+    const payload = record.toObject();
+    io.emit("admin:usage-log", payload);
+    if (payload.kind === "error") {
+      io.emit("admin:server-error", payload);
+    }
+    return payload;
+  } catch (error) {
+    console.warn("Usage log save failed:", error.message);
+    return null;
+  }
+}
+
+function logServerIssue(summary, metadata = {}) {
+  return createUsageLog({
+    action: "server-error",
+    summary,
+    source: "server",
+    kind: "error",
+    isAnonymous: true,
+    metadata,
+  });
+}
+
+function buildUsageIdentity(req) {
+  return {
+    user: req.user || null,
+    email: req.user?.email || "",
+    name: req.user?.name || "",
+    isAnonymous: !req.user,
+    isPro: Boolean(req.user?.isPro),
+  };
+}
+
 // --- 2. FOLDER & STATIC SETUP ---
 const uploadDir = path.resolve(__dirname, "uploads");
 const exportDir = path.resolve(__dirname, "exports");
@@ -63,6 +137,49 @@ app.use(
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use((req, res, next) => {
+  if (
+    req.path === "/" ||
+    req.path.endsWith(".html") ||
+    req.path === "/sw.js" ||
+    req.path === "/manifest.json"
+  ) {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.set("Pragma", "no-cache");
+    res.set("Expires", "0");
+    res.set("Surrogate-Control", "no-store");
+  }
+  next();
+});
+app.post("/api/usage-log", async (req, res) => {
+  try {
+    const action = String(req.body?.action || "").trim();
+    const summary = String(req.body?.summary || "").trim();
+    if (!action || !summary) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Action and summary are required." });
+    }
+    const payload = await createUsageLog({
+      user: req.user || null,
+      email: req.user?.email || "",
+      name: req.user?.name || "",
+      isAnonymous: !req.user,
+      isPro: Boolean(req.user?.isPro),
+      action,
+      summary,
+      source: String(req.body?.source || "web").trim(),
+      kind: req.body?.kind === "error" ? "error" : "activity",
+      metadata: req.body?.metadata || {},
+    });
+    res.json({ success: true, log: payload });
+  } catch (error) {
+    console.error("Usage log endpoint failed:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Could not save usage log." });
+  }
+});
 
 // --- 3. DATABASE & SESSION ---
 mongoose
@@ -169,57 +286,6 @@ app.post("/api/convert/video-to-audio", async (req, res) => {
     .save(outputPath);
 });
 
-// --- VOICE CLONE ---
-app.post("/api/convert/voice-clone", (req, res) => {
-  const { text, speakerWav, socketId } = req.body;
-  const outputFileName = `clone_${Date.now()}.wav`;
-  const outputPath = path.join(exportDir, outputFileName);
-  const pythonCmd = process.platform === "win32" ? "python" : "python3";
-
-  const pyProcess = spawn(pythonCmd, [
-    "clone_engine.py",
-    text,
-    path.join(uploadDir, speakerWav),
-    outputPath,
-  ]);
-
-  if (socketId)
-    io.to(socketId).emit("process-step", {
-      message: "🧠 Neural Engine Loading...",
-      percent: 15,
-    });
-
-  pyProcess.stdout.on("data", (data) => {
-    const msg = data.toString();
-    if (msg.startsWith("PROGRESS:") && socketId) {
-      io.to(socketId).emit("process-step", {
-        message: "AI Generating Voice...",
-        percent: parseInt(msg.split(":")[1]),
-      });
-    }
-  });
-
-  pyProcess.on("close", async (code) => {
-    if (code === 0) {
-      const finalUrl = `/exports/${outputFileName}`;
-      if (req.user) {
-        await User.findByIdAndUpdate(req.user._id, {
-          $push: {
-            projects: {
-              toolType: "Voice Clone",
-              fileName: "Neural Generation",
-              fileUrl: finalUrl,
-              createdAt: new Date(),
-            },
-          },
-        });
-      }
-      res.json({ success: true, audioUrl: finalUrl });
-    } else {
-      res.status(500).json({ error: "AI Engine Failed" });
-    }
-  });
-});
 
 app.post("/api/community-feedback", async (req, res) => {
   try {
@@ -245,6 +311,13 @@ app.post("/api/community-feedback", async (req, res) => {
       status: "open",
       hidden: false,
     });
+    await createUsageLog({
+      ...buildUsageIdentity(req),
+      action: "feedback-submitted",
+      summary: "submitted community feedback",
+      source: "community-feedback",
+      metadata: { rating, feedbackId: record._id },
+    });
 
     res.json({
       success: true,
@@ -254,6 +327,65 @@ app.post("/api/community-feedback", async (req, res) => {
   } catch (error) {
     console.error("Feedback save failed:", error);
     res.status(500).json({ success: false, message: "Could not save feedback right now." });
+  }
+});
+
+app.post("/api/upgrade-request", async (req, res) => {
+  try {
+    const isLoggedIn = Boolean(req.user);
+    const fallbackName = isLoggedIn ? req.user.name || "MediaLab User" : "";
+    const fallbackEmail = isLoggedIn ? req.user.email || "" : "";
+    const name = String(req.body?.name || fallbackName).trim();
+    const email = String(req.body?.email || fallbackEmail)
+      .trim()
+      .toLowerCase();
+    const requestedFeature = String(
+      req.body?.requestedFeature || "MediaLab Pro",
+    ).trim();
+    const message = String(req.body?.message || "").trim();
+
+    if (!name) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Name is required." });
+    }
+    if (!email || !email.includes("@")) {
+      return res
+        .status(400)
+        .json({ success: false, message: "A valid email is required." });
+    }
+
+    const record = await UpgradeRequest.create({
+      userId: isLoggedIn ? req.user._id : null,
+      name,
+      email,
+      requestedFeature,
+      source: String(req.body?.source || "studio-upgrade"),
+      message,
+      status: "received",
+    });
+    await createUsageLog({
+      ...buildUsageIdentity(req),
+      email,
+      name,
+      isAnonymous: !req.user,
+      action: "upgrade-request",
+      summary: `requested ${requestedFeature}`,
+      source: "upgrade-modal",
+      metadata: { requestId: record._id, requestedFeature },
+    });
+
+    res.json({
+      success: true,
+      message: "Your request has been received. You will get feedback soon.",
+      requestId: record._id,
+    });
+  } catch (error) {
+    console.error("Upgrade request failed:", error);
+    res.status(500).json({
+      success: false,
+      message: "Could not save your upgrade request right now.",
+    });
   }
 });
 
@@ -311,6 +443,13 @@ app.post("/api/builder-drafts", async (req, res) => {
       .slice(-12);
 
     await user.save();
+    await createUsageLog({
+      ...buildUsageIdentity(req),
+      action: isAutoSave ? "builder-autosave" : "builder-save",
+      summary: `${isAutoSave ? "autosaved" : "saved"} builder draft ${draftName}`,
+      source: "web-builder",
+      metadata: { draftName, isAutoSave },
+    });
 
     res.json({
       success: true,
@@ -330,6 +469,21 @@ app.get("/api/admin/feedbacks", async (_req, res) => {
   } catch (error) {
     console.error("Admin feedback fetch failed:", error);
     res.status(500).json({ success: false, message: "Could not load feedbacks." });
+  }
+});
+
+app.get("/api/admin/usage-logs", async (_req, res) => {
+  try {
+    const logs = await UsageLog.find({})
+      .sort({ createdAt: -1 })
+      .limit(1000)
+      .lean({ virtuals: true });
+    res.json({ success: true, logs });
+  } catch (error) {
+    console.error("Admin usage log fetch failed:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Could not load usage logs." });
   }
 });
 
@@ -371,6 +525,8 @@ app.get("/api/admin/analytics", async (_req, res) => {
       hiddenFeedbacks,
       averageRatingRow,
       recentUsers,
+      totalUsageLogs,
+      recentErrors,
     ] = await Promise.all([
       User.countDocuments(),
       User.countDocuments({ isPro: true }),
@@ -382,8 +538,10 @@ app.get("/api/admin/analytics", async (_req, res) => {
       User.find({})
         .sort({ createdAt: -1 })
         .limit(8)
-        .select("name email isPro createdAt")
+        .select("name email isPro createdAt profilePicture lastLogin location provider")
         .lean(),
+      UsageLog.countDocuments(),
+      UsageLog.countDocuments({ kind: "error" }),
     ]);
 
     res.json({
@@ -395,6 +553,8 @@ app.get("/api/admin/analytics", async (_req, res) => {
         openFeedbacks,
         completedFeedbacks,
         hiddenFeedbacks,
+        totalUsageLogs,
+        recentErrors,
         averageRating: averageRatingRow?.[0]?.avgRating
           ? Number(averageRatingRow[0].avgRating.toFixed(1))
           : 0,
@@ -409,6 +569,21 @@ app.get("/api/admin/analytics", async (_req, res) => {
 
 io.on("connection", (socket) => {
   console.log(`🔌 Client connected: ${socket.id}`);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception:", error);
+  logServerIssue("Uncaught exception", {
+    message: error?.message || "Unknown error",
+    stack: error?.stack || "",
+  });
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection:", reason);
+  logServerIssue("Unhandled rejection", {
+    message: reason?.message || String(reason),
+  });
 });
 
 const PORT = process.env.PORT || 3000;

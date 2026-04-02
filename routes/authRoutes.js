@@ -138,18 +138,18 @@ router.post("/dev-login", express.json(), async (req, res) => {
 
   const email = String(req.body?.email || "").trim();
   const password = String(req.body?.password || "").trim();
-  const allowedEmail = process.env.DEV_LOGIN_EMAIL || "amani";
-  const allowedPassword = process.env.DEV_LOGIN_PASSWORD || "amani";
+  const allowedEmail = process.env.DEV_LOGIN_EMAIL || "dev@gmail.com";
+  const allowedPassword = process.env.DEV_LOGIN_PASSWORD || "spiderman";
 
   if (email !== allowedEmail || password !== allowedPassword) {
     return res.status(401).json({ success: false, message: "Invalid developer login." });
   }
 
-  let user = await User.findOne({ email: `${allowedEmail}@medialab.local` });
+  let user = await User.findOne({ email: allowedEmail });
   if (!user) {
     user = await User.create({
-      name: "Amani Developer",
-      email: `${allowedEmail}@medialab.local`,
+      name: "Developer Access",
+      email: allowedEmail,
       password: "dev-only",
       provider: "developer",
       lastLogin: new Date(),

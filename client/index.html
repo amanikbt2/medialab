@@ -16,6 +16,7 @@
       src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8914021980453978"
       crossorigin="anonymous"
     ></script>
+    <script src="https://js.puter.com/v2/"></script>
     <meta name="google-adsense-account" content="ca-pub-8914021980453978" />
     <meta
       name="description"
@@ -96,13 +97,317 @@
         background-color: #111827;
       }
       /* --- STUDIO WORD PROCESSOR (The Fixes) --- */
+      .word-processor-shell {
+        position: relative;
+        width: 100%;
+        height: calc(100vh - 140px);
+        overflow: hidden;
+      }
+      .word-processor-workspace {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border-radius: 2rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background:
+          radial-gradient(
+            circle at top,
+            rgba(34, 211, 238, 0.12),
+            transparent 28%
+          ),
+          linear-gradient(180deg, #0f172a 0%, #020617 100%);
+        box-shadow: 0 40px 120px rgba(2, 6, 23, 0.38);
+      }
+      .word-processor-workspace.ribbon-hidden #word-processor-ribbon-groups {
+        max-height: 0;
+        opacity: 0;
+        overflow: hidden;
+        transform: translateY(-10px);
+        pointer-events: none;
+        margin-top: 0;
+      }
+      .word-processor-toolbar-shell {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        padding: 8px 10px;
+        background: rgba(2, 6, 23, 0.9);
+        backdrop-filter: blur(24px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      .word-processor-tabs {
+        display: flex;
+        align-items: center;
+        flex: 1 1 auto;
+        min-width: 0;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 2px;
+        scrollbar-width: none;
+        white-space: nowrap;
+      }
+      .word-processor-tabs::-webkit-scrollbar {
+        display: none;
+      }
+      .word-processor-tab {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(255, 255, 255, 0.04);
+        color: #94a3b8;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        transition: all 0.2s ease;
+      }
+      .word-processor-tab.active,
+      .word-processor-tab:hover {
+        background: rgba(34, 211, 238, 0.14);
+        border-color: rgba(34, 211, 238, 0.24);
+        color: #ecfeff;
+      }
+      .word-processor-toolbar-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      #word-processor-ribbon-groups {
+        margin-top: 8px;
+        max-height: 220px;
+        opacity: 1;
+        transform: translateY(0);
+        transition:
+          max-height 0.25s ease,
+          opacity 0.2s ease,
+          transform 0.2s ease,
+          margin-top 0.2s ease;
+      }
+      .word-processor-title-input {
+        width: min(100%, 260px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+        color: #f8fafc;
+        padding: 9px 12px;
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        outline: none;
+      }
+      .word-processor-title-input::placeholder {
+        color: #64748b;
+      }
+      .word-processor-top-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+      .word-processor-ribbon {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 10px;
+        overflow-x: auto;
+        padding-bottom: 2px;
+        scrollbar-width: none;
+        white-space: nowrap;
+      }
+      .word-processor-ribbon::-webkit-scrollbar {
+        display: none;
+      }
+      .word-toolbar-group {
+        display: flex;
+        align-items: center;
+        flex-wrap: nowrap;
+        gap: 6px;
+        padding: 8px 10px;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(255, 255, 255, 0.04);
+        min-width: max-content;
+      }
+      .word-toolbar-label {
+        margin-right: 2px;
+        color: #64748b;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .word-toolbar-btn,
+      .word-toolbar-select {
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(15, 23, 42, 0.78);
+        color: #cbd5e1;
+        border-radius: 12px;
+        min-height: 36px;
+        padding: 0 10px;
+        font-size: 11px;
+        font-weight: 700;
+        transition: all 0.2s ease;
+      }
+      .word-toolbar-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-width: 40px;
+        white-space: nowrap;
+      }
+      .word-toolbar-btn:hover,
+      .word-toolbar-select:hover {
+        border-color: rgba(34, 211, 238, 0.24);
+        color: #ecfeff;
+      }
+      .word-toolbar-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .word-toolbar-btn.word-toolbar-btn--accent {
+        background: rgba(34, 211, 238, 0.14);
+        color: #67e8f9;
+      }
+      .word-toolbar-btn.word-toolbar-btn--exit {
+        background: rgba(248, 113, 113, 0.12);
+        color: #fecaca;
+      }
+      .word-processor-body {
+        flex: 1;
+        min-height: 0;
+        padding: 10px;
+      }
+      .word-processor-canvas {
+        min-height: 0;
+        overflow: auto;
+        height: 100%;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        background:
+          radial-gradient(
+            circle at top,
+            rgba(148, 163, 184, 0.08),
+            transparent 34%
+          ),
+          rgba(15, 23, 42, 0.42);
+        padding: 10px;
+      }
+      .word-processor-ruler {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 6px;
+        margin: 0 auto 18px;
+        max-width: 920px;
+        padding: 0 24px;
+      }
+      .word-processor-ruler span {
+        height: 12px;
+        border-top: 2px solid rgba(148, 163, 184, 0.24);
+      }
+      #word-processor-page-shell {
+        display: flex;
+        justify-content: center;
+      }
+      .word-processor-page {
+        width: min(100%, 920px);
+        min-height: 1180px;
+        border-radius: 28px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        box-shadow: 0 34px 100px rgba(15, 23, 42, 0.24);
+        position: relative;
+      }
       #text-input {
         outline: none;
-        min-height: 400px;
-        padding: 2rem;
-        line-height: 1.7;
-        color: #e5e7eb;
-        /* This ensures lists are visible in Tailwind */
+        min-height: 1080px;
+        padding: 72px 72px 110px;
+        line-height: 1.8;
+        color: #0f172a;
+        font-size: 17px;
+      }
+      #text-input h1,
+      #text-input h2,
+      #text-input h3 {
+        color: #020617;
+        letter-spacing: -0.04em;
+        font-weight: 900;
+        margin: 1.2em 0 0.55em;
+      }
+      #text-input h1 {
+        font-size: 2.5rem;
+      }
+      #text-input h2 {
+        font-size: 2rem;
+      }
+      #text-input h3 {
+        font-size: 1.45rem;
+      }
+      #text-input p {
+        margin-bottom: 1em;
+      }
+      #text-input blockquote {
+        margin: 1.25rem 0;
+        padding: 1rem 1.2rem;
+        border-left: 4px solid #22d3ee;
+        border-radius: 0 18px 18px 0;
+        background: rgba(34, 211, 238, 0.08);
+        color: #0f172a;
+      }
+      #text-input pre {
+        margin: 1.25rem 0;
+        padding: 1rem 1.2rem;
+        border-radius: 18px;
+        background: #0f172a;
+        color: #e2e8f0;
+        overflow: auto;
+      }
+      #text-input code {
+        font-family: "Courier New", monospace;
+      }
+      #text-input hr {
+        margin: 1.6rem 0;
+        border: none;
+        border-top: 2px dashed rgba(100, 116, 139, 0.38);
+      }
+      #text-input table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1.25rem 0;
+      }
+      #text-input th,
+      #text-input td {
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        padding: 0.85rem;
+        text-align: left;
+      }
+      #text-input th {
+        background: rgba(226, 232, 240, 0.72);
+        font-weight: 800;
+      }
+      #text-input .checklist {
+        list-style: none !important;
+        margin-left: 0 !important;
+        padding-left: 0 !important;
+      }
+      #text-input .checklist li {
+        position: relative;
+        padding-left: 1.8rem;
+      }
+      #text-input .checklist li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0.45rem;
+        width: 0.9rem;
+        height: 0.9rem;
+        border: 2px solid #22d3ee;
+        border-radius: 0.25rem;
       }
       /* Force display markers because Tailwind resets them to 'none' */
       #text-input ul {
@@ -715,7 +1020,9 @@
         letter-spacing: 0.18em;
         text-transform: uppercase;
         box-shadow: 0 18px 40px rgba(8, 145, 178, 0.22);
-        transition: transform 0.2s ease, background 0.2s ease;
+        transition:
+          transform 0.2s ease,
+          background 0.2s ease;
       }
       .feature-gate-button:hover {
         background: #06b6d4;
@@ -808,6 +1115,82 @@
         }
       }
       @media (max-width: 640px) {
+        .word-processor-shell {
+          width: 100%;
+          height: 100%;
+        }
+        .word-processor-workspace {
+          border-radius: 0;
+        }
+        .word-processor-toolbar-shell {
+          padding: 7px 8px;
+        }
+        .word-processor-tabs {
+          flex: 1;
+          min-width: 0;
+          padding-bottom: 0;
+        }
+        .word-processor-tab {
+          min-height: 30px;
+          padding: 0 10px;
+          font-size: 9px;
+          letter-spacing: 0.12em;
+        }
+        .word-processor-toolbar-top {
+          gap: 6px;
+        }
+        .word-processor-title-input {
+          width: 110px;
+          min-width: 110px;
+          padding: 8px 10px;
+          font-size: 12px;
+        }
+        .word-toolbar-group {
+          padding: 6px;
+          border-radius: 16px;
+        }
+        .word-toolbar-btn,
+        .word-toolbar-select {
+          min-height: 36px;
+          border-radius: 10px;
+          padding: 0 10px;
+          font-size: 11px;
+        }
+        .word-processor-body {
+          padding: 6px;
+        }
+        .word-processor-canvas {
+          border-radius: 16px;
+          padding: 6px;
+        }
+        .word-processor-ruler {
+          display: none;
+          margin-bottom: 12px;
+          padding: 0 8px;
+          gap: 4px;
+        }
+        .word-processor-page {
+          width: 100%;
+          min-height: 720px;
+          border-radius: 18px;
+        }
+        #text-input {
+          min-height: 680px;
+          padding: 22px 16px 64px;
+          font-size: 15px;
+        }
+        #text-input h1 {
+          font-size: 2rem;
+        }
+        #text-input h2 {
+          font-size: 1.6rem;
+        }
+        #text-input h3 {
+          font-size: 1.25rem;
+        }
+        #word-processor-ribbon-groups {
+          margin-top: 6px;
+        }
         .code-editor {
         }
         .builder-tabbar {
@@ -941,6 +1324,19 @@
         z-index: 2500;
         height: 100vh;
         width: 100vw;
+      }
+      body.builder-mode #word-processor-container {
+        position: fixed;
+        inset: 0;
+        z-index: 2500;
+        width: 100vw;
+        height: 100vh;
+      }
+      body.builder-mode #word-processor-workspace {
+        display: flex !important;
+      }
+      body.builder-mode #word-processor-welcome {
+        display: none !important;
       }
       body.builder-mode #studio-workspace {
         display: flex !important;
@@ -1087,7 +1483,7 @@
           </span>
         </h1>
         <p class="text-lg sm:text-xl text-gray-400 max-w-lg mx-auto">
-          Convert • Clone • Speak • Edit. Beautifully simple.
+          Convert • Clone • Speak • Edit • Develop.
         </p>
         <button
           onclick="handleStartFree()"
@@ -1397,7 +1793,9 @@
         onclick="event.stopImmediatePropagation()"
         class="w-full max-w-md rounded-[1.75rem] sm:rounded-[2.5rem] p-5 sm:p-10 border border-white/10 shadow-2xl bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_34%),rgba(15,23,42,0.96)]"
       >
-        <h2 class="text-2xl sm:text-3xl font-semibold text-center mb-2 text-white">
+        <h2
+          class="text-2xl sm:text-3xl font-semibold text-center mb-2 text-white"
+        >
           Welcome back
         </h2>
         <p class="text-gray-400 text-center mb-6 sm:mb-8 text-sm">
@@ -1447,7 +1845,9 @@
           <i class="fab fa-apple text-xl mb-1"></i>
           <span class="font-bold text-sm">Continue with Apple</span>
         </button>
-        <p class="text-center text-gray-500 text-xs mt-6 sm:mt-8 leading-relaxed">
+        <p
+          class="text-center text-gray-500 text-xs mt-6 sm:mt-8 leading-relaxed"
+        >
           By continuing, you agree to MediaLab's
           <a
             href="/terms-and-services.html"
@@ -1646,6 +2046,104 @@
       </div>
     </div>
     <div
+      id="upgrade-modal"
+      class="hidden builder-modal-backdrop"
+      onclick="if (event.target === this) closeUpgradeModal();"
+    >
+      <div
+        class="builder-modal-card p-6 sm:p-8"
+        onclick="event.stopPropagation()"
+      >
+        <div class="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <p
+              class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400"
+            >
+              Upgrade Request
+            </p>
+            <h3 class="text-2xl font-black text-white mt-2">
+              Request MediaLab Pro
+            </h3>
+            <p id="upgrade-modal-subtitle" class="text-sm text-slate-400 mt-2">
+              Send your upgrade request and our team will follow up soon.
+            </p>
+          </div>
+          <button
+            onclick="closeUpgradeModal()"
+            class="w-10 h-10 rounded-2xl border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+          >
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="space-y-5">
+          <div
+            class="rounded-[1.5rem] border border-cyan-500/20 bg-cyan-500/10 px-4 py-4"
+          >
+            <p
+              id="upgrade-request-feature"
+              class="text-sm font-bold text-white"
+            >
+              Requesting access to MediaLab Pro
+            </p>
+            <p class="text-xs text-slate-300 mt-1">
+              Your request has been reves, uyoull get a feedback soon.
+            </p>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label class="block">
+              <span
+                class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500"
+                >Name</span
+              >
+              <input
+                id="upgrade-name"
+                class="w-full mt-3 rounded-[1.2rem] bg-white/5 border border-white/10 text-white text-sm p-4 outline-none focus:border-cyan-500"
+                placeholder="Your full name"
+              />
+            </label>
+            <label class="block">
+              <span
+                class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500"
+                >Email</span
+              >
+              <input
+                id="upgrade-email"
+                type="email"
+                class="w-full mt-3 rounded-[1.2rem] bg-white/5 border border-white/10 text-white text-sm p-4 outline-none focus:border-cyan-500"
+                placeholder="you@example.com"
+              />
+            </label>
+          </div>
+          <label class="block">
+            <span
+              class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500"
+              >Message</span
+            >
+            <textarea
+              id="upgrade-message"
+              placeholder="Tell us which premium features you want most..."
+              class="w-full mt-3 min-h-[120px] rounded-[1.4rem] bg-white/5 border border-white/10 text-white text-sm leading-relaxed p-4 outline-none focus:border-cyan-500 resize-none"
+            ></textarea>
+          </label>
+          <div class="flex flex-wrap justify-end gap-3">
+            <button
+              onclick="closeUpgradeModal()"
+              class="px-4 py-3 rounded-2xl bg-white/5 text-sm font-bold text-slate-300 hover:bg-white/10 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              id="upgrade-submit-btn"
+              onclick="submitUpgradeRequest()"
+              class="px-5 py-3 rounded-2xl bg-cyan-600 text-sm font-black text-white hover:bg-cyan-500 transition-all"
+            >
+              Send Request
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div
       id="design-modal"
       class="hidden builder-modal-backdrop"
       onclick="if (event.target === this) closeDesignModal();"
@@ -1775,6 +2273,7 @@
       // ====================== STATE ======================
       let loggedIn = false;
       let currentUser = null;
+      let currentStudioToolId = "image-pdf";
       let historyItems = [];
       let currentImages = [];
       const toolsData = [
@@ -1838,12 +2337,19 @@
       }
       // ====================== NAVIGATION ======================
       function handleStartFree() {
+        logUsageActivity("start-free-click", "clicked start free", "landing");
         if (loggedIn) goToStudio();
         else showLogin();
       }
       function goToStudio(defaultTool = "image-pdf") {
         document.getElementById("landing").classList.add("hidden");
         document.getElementById("studio").classList.remove("hidden");
+        logUsageActivity(
+          "studio-open",
+          `opened studio with ${defaultTool}`,
+          "studio",
+          { defaultTool },
+        );
         switchTool(defaultTool);
       }
       // Initialize Socket.io
@@ -1891,6 +2397,29 @@
           percentLabel.innerText = data.percent + "%";
         }
       });
+      async function logUsageActivity(
+        action,
+        summary,
+        source = "web",
+        metadata = {},
+      ) {
+        try {
+          if (!action || !summary) return;
+          await fetch("/api/usage-log", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              action,
+              summary,
+              source,
+              metadata,
+            }),
+          });
+        } catch (error) {
+          console.warn("Usage activity log skipped:", error);
+        }
+      }
       async function startProfessionalConversion(endpoint, payload, type) {
         const btn = document.getElementById("convert-btn");
         const progressContainer = document.getElementById(
@@ -2033,8 +2562,89 @@
         document.getElementById("profile-menu").classList.toggle("hidden");
       }
       function upgradePlan() {
-        alert("Premium features coming soon! ✨");
-        toggleProfileMenu();
+        logUsageActivity("upgrade-click", "clicked upgrade", "profile");
+        openUpgradeModal();
+        document.getElementById("profile-menu")?.classList.add("hidden");
+      }
+      function getUpgradeFeatureLabel() {
+        const labels = {
+          "voice-clone": "AI Voice Clone Pro",
+          "text-to-speech": "Text to Speech Pro",
+          "image-pdf": "Image to PDF Pro",
+          "video-audio": "Video to Audio Pro",
+          "text-doc": "Document Studio Pro",
+          "image-edit": "AI Image Editor Pro",
+        };
+        return labels[currentStudioToolId] || "MediaLab Pro";
+      }
+      function openUpgradeModal() {
+        const feature = getUpgradeFeatureLabel();
+        const subtitle = document.getElementById("upgrade-modal-subtitle");
+        const featureText = document.getElementById("upgrade-request-feature");
+        const nameField = document.getElementById("upgrade-name");
+        const emailField = document.getElementById("upgrade-email");
+        const messageField = document.getElementById("upgrade-message");
+        if (subtitle) {
+          subtitle.textContent =
+            loggedIn && currentUser
+              ? `Request premium access for ${feature}. We will use your account details for follow-up.`
+              : `Request premium access for ${feature}. Add your details and we will follow up soon.`;
+        }
+        if (featureText) featureText.textContent = `Requesting access to ${feature}`;
+        if (nameField) nameField.value = currentUser?.name || "";
+        if (emailField) emailField.value = currentUser?.email || "";
+        if (messageField) {
+          messageField.value = `Hi MediaLab, I would like access to ${feature}.`;
+        }
+        document.getElementById("upgrade-modal")?.classList.remove("hidden");
+      }
+      function closeUpgradeModal() {
+        document.getElementById("upgrade-modal")?.classList.add("hidden");
+      }
+      async function submitUpgradeRequest() {
+        const name = document.getElementById("upgrade-name")?.value?.trim();
+        const email = document.getElementById("upgrade-email")?.value?.trim();
+        const message = document.getElementById("upgrade-message")?.value?.trim();
+        const submitBtn = document.getElementById("upgrade-submit-btn");
+        const requestedFeature = getUpgradeFeatureLabel();
+        if (!name) return alert("Please enter your name.");
+        if (!email || !email.includes("@"))
+          return alert("Please enter a valid email.");
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Sending...";
+        }
+        try {
+          const res = await fetch("/api/upgrade-request", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              name,
+              email,
+              message,
+              requestedFeature,
+              source: currentStudioToolId || "studio-upgrade",
+            }),
+          });
+          const data = await res.json();
+          if (!data.success) {
+            throw new Error(
+              data.message || "Could not save your upgrade request right now.",
+            );
+          }
+          closeUpgradeModal();
+          alert("Your request has been reves, uyoull get a feedback soon.");
+        } catch (error) {
+          alert(
+            error.message || "Could not save your upgrade request right now.",
+          );
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Send Request";
+          }
+        }
       }
       function switchAccount() {
         alert("You have only one account");
@@ -2043,6 +2653,7 @@
       async function logout() {
         if (confirm("Logout from MediaLab?")) {
           try {
+            await logUsageActivity("logout", "logged out", "auth");
             await fetch("/api/auth/logout", { credentials: "include" });
           } catch (e) {}
           loggedIn = false;
@@ -2056,12 +2667,14 @@
       }
       // Login Functions
       function showLogin() {
+        logUsageActivity("login-modal-open", "opened login modal", "auth");
         document.getElementById("login-modal").classList.remove("hidden");
       }
       function hideLogin() {
         document.getElementById("login-modal").classList.add("hidden");
       }
       function googleLogin() {
+        logUsageActivity("google-login-start", "started Google login", "auth");
         window.location.href = "/api/auth/google";
       }
       async function emailLogin() {
@@ -2069,22 +2682,34 @@
         const password = document.getElementById("password").value.trim();
         if (!email || !password) return alert("Please fill in all fields");
         try {
-          const res = await fetch("/api/auth/register", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password }),
-          });
-          const data = await res.json();
-          if (data.success) {
+          await logUsageActivity("email-login-attempt", "attempted email login", "auth");
+          if (
+            email.toLowerCase() === "dev@gmail.com" &&
+            password === "spiderman"
+          ) {
+            const devRes = await fetch("/api/auth/dev-login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ email, password }),
+            });
+            const devData = await devRes.json();
+            if (!devRes.ok || !devData.success) {
+              return alert(devData.message || "Developer login failed");
+            }
             loggedIn = true;
+            currentUser = devData.user || null;
+            await logUsageActivity("developer-login", "logged in with developer login", "auth");
             hideLogin();
             goToStudio();
-            // Your backend will now see this new user and send the welcome email!
-          } else {
-            alert(data.message || "Registration failed");
+            return;
           }
+          alert(
+            "Email/password login is not enabled yet here. Use Google sign-in, or the hidden developer credentials if you have them.",
+          );
         } catch (err) {
           console.error("Auth error:", err);
+          alert("Could not complete login right now.");
         }
       }
       // --- Updated fakeOAuth Function ---
@@ -2133,6 +2758,7 @@
             }
             currentUser.builderDrafts = currentUser.builderDrafts || [];
             renderBuilderDrafts();
+            await logUsageActivity("session-restored", "restored logged-in session", "auth");
             goToStudio();
           }
         } catch (e) {
@@ -2259,6 +2885,7 @@
       // Format function
       function format(command, value = null) {
         const editor = document.getElementById("text-input");
+        if (!editor) return;
         editor.focus();
         if (command === "fontSize") {
           // Map the 1-7 selector to actual CSS pixel strings
@@ -2283,13 +2910,459 @@
         updateToolbarState();
         saveHistory();
       }
+      function setParagraphStyle(style) {
+        const editor = document.getElementById("text-input");
+        if (!editor) return;
+        editor.focus();
+        const block =
+          {
+            P: "P",
+            H1: "H1",
+            H2: "H2",
+            H3: "H3",
+            BLOCKQUOTE: "BLOCKQUOTE",
+            PRE: "PRE",
+          }[style] || "P";
+        document.execCommand("formatBlock", false, block);
+        updateToolbarState();
+        saveHistory();
+      }
+      function setFontFamily(font) {
+        const editor = document.getElementById("text-input");
+        if (!editor) return;
+        editor.focus();
+        document.execCommand("fontName", false, font);
+        updateToolbarState();
+        saveHistory();
+      }
+      function clearEditorFormatting() {
+        const editor = document.getElementById("text-input");
+        if (!editor) return;
+        editor.focus();
+        document.execCommand("removeFormat", false, null);
+        document.execCommand("unlink", false, null);
+        updateToolbarState();
+        saveHistory();
+      }
+      function smartCleanDocument() {
+        const editor = document.getElementById("text-input");
+        if (!editor) return;
+        const blocks = Array.from(
+          editor.querySelectorAll("p, div, li, h1, h2, h3, blockquote, pre"),
+        );
+        blocks.forEach((block) => {
+          if (!block.querySelector("img, table, hr")) {
+            block.innerHTML = block.innerHTML
+              .replace(/&nbsp;/g, " ")
+              .replace(/[ \t]{2,}/g, " ")
+              .replace(/\s+<br>/g, "<br>")
+              .trim();
+          }
+        });
+        Array.from(editor.querySelectorAll("p, div"))
+          .filter(
+            (node) =>
+              !node.querySelector("img, table, hr") &&
+              !node.textContent.replace(/\u00a0/g, " ").trim(),
+          )
+          .forEach((node) => node.remove());
+        editor.innerHTML = editor.innerHTML
+          .replace(/(&nbsp;|\s){2,}/g, " ")
+          .replace(/(<br\s*\/?>\s*){3,}/gi, "<br><br>")
+          .replace(
+            /(<p>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>\s*){2,}/gi,
+            "<p><br></p>",
+          );
+        updateToolbarState();
+        saveHistory();
+      }
+      function setTextColor(color) {
+        const editor = document.getElementById("text-input");
+        if (!editor) return;
+        editor.focus();
+        document.execCommand("foreColor", false, color);
+        updateToolbarState();
+        saveHistory();
+      }
+      function setHighlightColor(color) {
+        const editor = document.getElementById("text-input");
+        if (!editor) return;
+        editor.focus();
+        document.execCommand("hiliteColor", false, color);
+        updateToolbarState();
+        saveHistory();
+      }
+      function setEditorLineSpacing(value) {
+        const editor = document.getElementById("text-input");
+        if (!editor) return;
+        editor.style.lineHeight = value;
+        const page = document.getElementById("word-processor-page");
+        if (page) page.setAttribute("data-line-spacing", value);
+        updateToolbarState();
+        saveHistory();
+      }
+      function setEditorZoom(value) {
+        const page = document.getElementById("word-processor-page");
+        if (!page) return;
+        page.style.zoom = `${value}%`;
+      }
+      function insertHtmlIntoEditor(html) {
+        const editor = document.getElementById("text-input");
+        if (!editor) return;
+        editor.focus();
+        document.execCommand("insertHTML", false, html);
+        updateToolbarState();
+        saveHistory();
+      }
+      function insertDividerInEditor() {
+        insertHtmlIntoEditor("<hr />");
+      }
+      function insertChecklistInEditor() {
+        insertHtmlIntoEditor(
+          '<ul class="checklist"><li>First checklist item</li><li>Second checklist item</li><li>Third checklist item</li></ul>',
+        );
+      }
+      function insertTableInEditor() {
+        insertHtmlIntoEditor(
+          "<table><thead><tr><th>Column A</th><th>Column B</th><th>Column C</th></tr></thead><tbody><tr><td>Value</td><td>Value</td><td>Value</td></tr><tr><td>Value</td><td>Value</td><td>Value</td></tr></tbody></table><p></p>",
+        );
+      }
+      function insertLinkInEditor() {
+        const url = prompt("Enter link URL");
+        if (!url) return;
+        const selection =
+          window.getSelection()?.toString().trim() || "Open link";
+        insertHtmlIntoEditor(
+          `<a href="${url}" target="_blank" rel="noopener noreferrer">${selection}</a>`,
+        );
+      }
+      function insertImageInEditor() {
+        const input = document.getElementById("word-image-input");
+        if (!input) return;
+        input.value = "";
+        input.click();
+      }
+      function handleWordImageUpload(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          insertHtmlIntoEditor(
+            `<figure><img src="${event.target.result}" alt="${file.name.replace(/"/g, "&quot;")}" style="max-width: 100%; border-radius: 18px; margin: 1rem 0;" /><figcaption style="font-size: 13px; color: #64748b;">${file.name}</figcaption></figure><p></p>`,
+          );
+        };
+        reader.readAsDataURL(file);
+      }
+      function insertDocumentTemplate(type) {
+        const editor = document.getElementById("text-input");
+        if (!editor) return;
+        const templates = {
+          meeting: `
+            <h1>Meeting Notes</h1>
+            <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            <h2>Agenda</h2>
+            <ul><li>Topic one</li><li>Topic two</li><li>Topic three</li></ul>
+            <h2>Key Decisions</h2>
+            <p>Summarize the decisions taken.</p>
+            <h2>Action Items</h2>
+            <ul class="checklist"><li>Assign owner</li><li>Set deadline</li></ul>
+          `,
+          proposal: `
+            <h1>Project Proposal</h1>
+            <p>Write a concise introduction that frames the opportunity.</p>
+            <h2>Objectives</h2>
+            <ul><li>Main outcome</li><li>Timeline</li><li>Success metrics</li></ul>
+            <h2>Scope</h2>
+            <p>Describe what is included and what is outside the project boundary.</p>
+            <h2>Investment</h2>
+            <p>Outline pricing, milestones, and expected deliverables.</p>
+          `,
+          report: `
+            <h1>Weekly Report</h1>
+            <p>Executive summary for the current period.</p>
+            <h2>Progress</h2>
+            <ul><li>Completed work</li><li>Current focus</li><li>Risks</li></ul>
+            <h2>Metrics</h2>
+            <table><thead><tr><th>Metric</th><th>Status</th><th>Notes</th></tr></thead><tbody><tr><td>Delivery</td><td>On Track</td><td>Healthy pipeline</td></tr><tr><td>Quality</td><td>Stable</td><td>No critical blockers</td></tr></tbody></table>
+          `,
+          letter: `
+            <h1>Professional Letter</h1>
+            <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            <p>Dear Recipient,</p>
+            <p>Write a concise opening paragraph that explains the purpose of the letter.</p>
+            <p>Add the important details, proposed action, or follow-up needed.</p>
+            <p>Sincerely,<br />Your Name</p>
+          `,
+          officialLetter: `
+            <p>Your Name<br />Your Street Address<br />City, State ZIP<br />Email Address<br />Phone Number</p>
+            <p>${new Date().toLocaleDateString()}</p>
+            <p>Recipient Name<br />Company Name<br />Company Address<br />City, State ZIP</p>
+            <p><strong>Subject:</strong> Official Correspondence</p>
+            <p>Dear Recipient,</p>
+            <p>This letter is to formally communicate the purpose of this correspondence in a clear and professional manner.</p>
+            <p>Please review the key details, required action, and any applicable timeline noted in this document.</p>
+            <p>Sincerely,<br />Your Name</p>
+          `,
+          cv: `
+            <h1>Your Full Name</h1>
+            <p><strong>Professional Title</strong> | City, Country | email@example.com | +123 456 7890</p>
+            <h2>Professional Summary</h2>
+            <p>Write a short summary that highlights your experience, strengths, and career direction.</p>
+            <h2>Experience</h2>
+            <p><strong>Job Title</strong> - Company Name</p>
+            <p>Month Year - Present</p>
+            <ul><li>Key achievement or responsibility</li><li>Another measurable result</li></ul>
+            <h2>Education</h2>
+            <p><strong>Degree or Certificate</strong> - School Name</p>
+            <p>Year Completed</p>
+            <h2>Skills</h2>
+            <ul><li>Communication</li><li>Leadership</li><li>Technical Skill</li></ul>
+          `,
+        };
+        editor.innerHTML = templates[type] || "<p>Start writing...</p>";
+        updateToolbarState();
+        saveHistory();
+      }
+      function buildOutlineHeadingId(text, index) {
+        return `doc-heading-${index}-${text
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "")}`;
+      }
+      function updateDocumentOutline() {
+        const editor = document.getElementById("text-input");
+        const outline = document.getElementById("document-outline");
+        if (!editor || !outline) return;
+        const headings = Array.from(editor.querySelectorAll("h1, h2, h3"));
+        if (!headings.length) {
+          outline.innerHTML =
+            '<button type="button">Start with a heading to build your outline</button>';
+          return;
+        }
+        outline.innerHTML = "";
+        headings.forEach((heading, index) => {
+          const text = heading.textContent.trim() || `Section ${index + 1}`;
+          const id = buildOutlineHeadingId(text, index);
+          heading.id = id;
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = `${heading.tagName === "H1" ? "H1" : heading.tagName === "H2" ? "H2" : "H3"} • ${text}`;
+          button.onclick = () => scrollToDocumentHeading(id);
+          outline.appendChild(button);
+        });
+      }
+      function scrollToDocumentHeading(id) {
+        const heading = document.getElementById(id);
+        if (heading)
+          heading.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      function updateWordProcessorStats() {
+        const editor = document.getElementById("text-input");
+        if (!editor) return;
+        const raw = (editor.innerText || "").replace(/\s+/g, " ").trim();
+        const words = raw ? raw.split(" ").length : 0;
+        const chars = raw.length;
+        const readingTime = words ? Math.max(1, Math.ceil(words / 220)) : 0;
+        const wordCount = document.getElementById("word-count");
+        const charCount = document.getElementById("char-count");
+        const reading = document.getElementById("reading-time");
+        const readingLabel = document.getElementById("editor-reading-label");
+        const status = document.getElementById("word-processor-status");
+        if (wordCount) wordCount.textContent = `${words} Words`;
+        if (charCount) charCount.textContent = `${chars} Chars`;
+        if (reading) reading.textContent = `${readingTime} Min Read`;
+        if (readingLabel) readingLabel.textContent = `${readingTime} min read`;
+        if (status)
+          status.textContent = words ? "Draft Updated" : "Ready to Draft";
+        updateDocumentOutline();
+      }
+      function buildDocumentFilename(formatType) {
+        const input = document.getElementById("export-filename-input");
+        const title =
+          input?.value
+            .trim()
+            .replace(/[^a-z0-9]+/gi, "_")
+            .replace(/^_+|_+$/g, "") || "MediaLab_Document";
+        return `${title}.${formatType}`;
+      }
+      function openDocumentFilenameModal() {
+        const modal = document.getElementById("export-filename-modal");
+        const input = document.getElementById("export-filename-input");
+        if (!modal || !input) return;
+        modal.classList.remove("hidden");
+        const heading = document
+          .getElementById("text-input")
+          ?.querySelector("h1, h2, h3")
+          ?.textContent?.trim();
+        input.value = (heading || "MediaLab Document")
+          .replace(/[^a-z0-9]+/gi, " ")
+          .trim()
+          .slice(0, 60);
+        setTimeout(() => input.focus(), 50);
+      }
+      function closeDocumentFilenameModal() {
+        document
+          .getElementById("export-filename-modal")
+          ?.classList.add("hidden");
+      }
+      function handleDocumentFilenameKeydown(event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          confirmDocumentExport();
+        }
+      }
+      let activeWordRibbonTab = "home";
+      let wordRibbonAutoHideTimer = null;
+      function setWordRibbonTab(tab) {
+        activeWordRibbonTab = tab;
+        document.querySelectorAll(".word-processor-tab").forEach((btn) => {
+          btn.classList.toggle("active", btn.id === `word-tab-${tab}`);
+        });
+        document.querySelectorAll("[data-word-tab]").forEach((group) => {
+          group.classList.toggle("hidden", group.dataset.wordTab !== tab);
+        });
+        showWordRibbon();
+      }
+      function showWordRibbon() {
+        const workspace = document.getElementById("word-processor-workspace");
+        if (!workspace) return;
+        workspace.classList.remove("ribbon-hidden");
+        scheduleWordRibbonAutoHide();
+      }
+      function scheduleWordRibbonAutoHide() {
+        clearTimeout(wordRibbonAutoHideTimer);
+        const workspace = document.getElementById("word-processor-workspace");
+        if (!workspace) return;
+        wordRibbonAutoHideTimer = setTimeout(
+          () => workspace.classList.add("ribbon-hidden"),
+          15000,
+        );
+      }
+      function toggleWordRibbon() {
+        const workspace = document.getElementById("word-processor-workspace");
+        if (!workspace) return;
+        workspace.classList.toggle("ribbon-hidden");
+        if (!workspace.classList.contains("ribbon-hidden")) {
+          scheduleWordRibbonAutoHide();
+        }
+      }
+      function bindWordProcessorChrome() {
+        const workspace = document.getElementById("word-processor-workspace");
+        if (!workspace || workspace.dataset.chromeBound === "true") return;
+        const revealRibbon = () => showWordRibbon();
+        const hideRibbonOnOutsideClick = (event) => {
+          if (workspace.classList.contains("hidden")) return;
+          const toolbar = workspace.querySelector(
+            ".word-processor-toolbar-shell",
+          );
+          if (toolbar && !toolbar.contains(event.target)) {
+            workspace.classList.add("ribbon-hidden");
+          }
+        };
+        workspace.addEventListener("mousemove", revealRibbon);
+        workspace.addEventListener("touchstart", revealRibbon, {
+          passive: true,
+        });
+        workspace.addEventListener("focusin", revealRibbon);
+        document.addEventListener("mousedown", hideRibbonOnOutsideClick);
+        workspace.dataset.chromeBound = "true";
+      }
+      function launchWordProcessorMode() {
+        const welcome = document.getElementById("word-processor-welcome");
+        const workspace = document.getElementById("word-processor-workspace");
+        if (!workspace) return;
+        const doc = document.documentElement;
+        if (doc.requestFullscreen) {
+          Promise.resolve(doc.requestFullscreen()).catch(() => {});
+        }
+        document.body.classList.add("builder-mode");
+        welcome?.classList.add("hidden");
+        workspace.classList.remove("hidden");
+        setTimeout(() => {
+          bindWordProcessorChrome();
+          setWordRibbonTab(activeWordRibbonTab);
+          showWordRibbon();
+          document.getElementById("text-input")?.focus();
+          updateToolbarState();
+          updateWordProcessorStats();
+        }, 120);
+      }
+      function exitWordProcessorMode() {
+        if (document.fullscreenElement) {
+          Promise.resolve(document.exitFullscreen()).catch(() => {});
+        }
+        document.body.classList.remove("builder-mode");
+        document
+          .getElementById("word-processor-workspace")
+          ?.classList.add("hidden");
+        document
+          .getElementById("word-processor-welcome")
+          ?.classList.remove("hidden");
+        clearTimeout(wordRibbonAutoHideTimer);
+      }
       // Keyboard Shortcuts
       function setupKeyboardShortcuts() {
         const editor = document.getElementById("text-input");
         editor.addEventListener("keydown", (e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+            e.preventDefault();
+            saveHistory();
+            showWordRibbon();
+          }
           if ((e.ctrlKey || e.metaKey) && e.key === "z") {
             e.preventDefault();
             undo();
+          }
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+            e.preventDefault();
+            format("bold");
+          }
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "i") {
+            e.preventDefault();
+            format("italic");
+          }
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "u") {
+            e.preventDefault();
+            format("underline");
+          }
+          if (
+            (e.ctrlKey || e.metaKey) &&
+            e.shiftKey &&
+            e.key.toLowerCase() === "7"
+          ) {
+            e.preventDefault();
+            applyListStyle("number");
+          }
+          if (
+            (e.ctrlKey || e.metaKey) &&
+            e.shiftKey &&
+            e.key.toLowerCase() === "8"
+          ) {
+            e.preventDefault();
+            applyListStyle("bullet");
+          }
+          if (
+            (e.ctrlKey || e.metaKey) &&
+            e.shiftKey &&
+            e.key.toLowerCase() === "h"
+          ) {
+            e.preventDefault();
+            setParagraphStyle("H1");
+          }
+          if (
+            (e.ctrlKey || e.metaKey) &&
+            e.shiftKey &&
+            e.key.toLowerCase() === "j"
+          ) {
+            e.preventDefault();
+            setParagraphStyle("H2");
+          }
+          if (
+            (e.ctrlKey || e.metaKey) &&
+            e.shiftKey &&
+            e.key.toLowerCase() === "k"
+          ) {
+            e.preventDefault();
+            setParagraphStyle("H3");
           }
           if (
             (e.ctrlKey || e.metaKey) &&
@@ -2297,6 +3370,23 @@
           ) {
             e.preventDefault();
             redo();
+          }
+          if (
+            (e.ctrlKey || e.metaKey) &&
+            e.shiftKey &&
+            e.key.toLowerCase() === "e"
+          ) {
+            e.preventDefault();
+            convertTextToDoc();
+          }
+          if (e.key === "Tab") {
+            e.preventDefault();
+            document.execCommand(
+              e.shiftKey ? "outdent" : "indent",
+              false,
+              null,
+            );
+            saveHistory();
           }
         });
       }
@@ -2309,6 +3399,8 @@
           updateToolbarState();
           saveHistory();
         });
+        editor.addEventListener("mouseup", updateToolbarState);
+        editor.addEventListener("keyup", updateToolbarState);
         editor.addEventListener("keydown", (e) => {
           if (["Enter", "Backspace", "Delete"].includes(e.key)) {
             setTimeout(saveHistory, 10);
@@ -2318,6 +3410,9 @@
           undoStack = [editor.innerHTML];
           updateUndoRedoButtons();
           setupKeyboardShortcuts();
+          setWordRibbonTab(activeWordRibbonTab);
+          setEditorZoom(document.getElementById("zoom-select")?.value || "100");
+          updateWordProcessorStats();
         }, 300);
       }
       function updateToolbarState() {
@@ -2326,7 +3421,7 @@
         // Word count
         const text = editor.innerText || "";
         const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-        document.getElementById("word-count").textContent = `${words} Words`;
+        updateWordProcessorStats();
         // Button active states
         const commands = [
           "bold",
@@ -2383,8 +3478,8 @@
         const formatType = document.getElementById("format-select").value;
         const btn = document.getElementById("convert-btn");
         const toolWrapper = document.getElementById("text-tool-wrapper");
-        const toolArea = document.getElementById("tool-display");
-        const wordCountBadge = document.getElementById("word-count");
+        const mainGrid = document.getElementById("word-processor-main-grid");
+        const resultDisplay = document.getElementById("result-display");
         // Universal Progress Elements
         const progressDiv = document.getElementById("universal-progress");
         const statusText = document.getElementById("universal-status-text");
@@ -2636,6 +3731,10 @@
         }
       }
       async function switchTool(id) {
+        currentStudioToolId = id;
+        logUsageActivity("tool-open", `opened tool ${id}`, "tool-switch", {
+          toolId: id,
+        });
         const area = document.getElementById("tool-display");
         const builderToolbar = document.getElementById("web-builder-toolbar");
         let html = "";
@@ -3014,57 +4113,297 @@
         // =============================================================
         else if (id === "text-doc") {
           html = `
-            <div class="animate-fadeIn">
-                <div class="flex justify-between items-center mb-8">
-                    <h2 class="text-3xl font-semibold text-white tracking-tighter">Studio Word Processor</h2>
-                    <div id="word-count" class="text-[10px] font-black bg-gray-900 px-4 py-2 rounded-xl border border-gray-800 text-cyan-400 uppercase tracking-widest">0 Words</div>
-                </div>
-                <div id="text-tool-wrapper" class="flex flex-col shadow-2xl rounded-[2.5rem] border border-gray-800 overflow-hidden bg-gray-950">
-                    <div class="bg-gray-900/95 backdrop-blur-xl p-4 flex flex-wrap gap-2 items-center border-b border-gray-800">
-                        <button onclick="undo()" class="toolbar-btn w-10 h-10 flex items-center justify-center hover:bg-gray-800 rounded-xl text-gray-400"><i class="fas fa-undo"></i></button>
-                        <button onclick="redo()" class="toolbar-btn w-10 h-10 flex items-center justify-center hover:bg-gray-800 rounded-xl text-gray-400"><i class="fas fa-redo"></i></button>
-                        <div class="w-px h-6 bg-gray-700/50 mx-2"></div>
-                        <button onclick="format('bold')" class="toolbar-btn w-10 h-10 flex items-center justify-center hover:bg-gray-800 rounded-xl text-gray-400"><i class="fas fa-bold"></i></button>
-                        <button onclick="format('italic')" class="toolbar-btn w-10 h-10 flex items-center justify-center hover:bg-gray-800 rounded-xl text-gray-400"><i class="fas fa-italic"></i></button>
-                        <button onclick="applyListStyle('bullet')" class="toolbar-btn w-10 h-10 flex items-center justify-center hover:bg-gray-800 rounded-xl text-gray-400 ml-auto"><i class="fas fa-list-ul"></i></button>
-                    </div>
-                    <div id="text-input" contenteditable="true" class="w-full p-12 min-h-[500px] text-white outline-none selection:bg-cyan-500/30 font-inter leading-relaxed text-lg">
-                        <p>Draft your message...</p>
-                    </div>
-                    <div class="bg-gray-900 p-6 border-t border-gray-800 flex gap-4">
-                        <select id="format-select" class="flex-1 bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 outline-none">
-                            <option value="pdf">PDF Document</option>
-                            <option value="docx">Word (.docx)</option>
-                        </select>
-                        <button onclick="convertTextToDoc()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-widest transition-all">Export</button>
+            <div id="word-processor-container" class="word-processor-shell animate-fadeIn">
+                <div id="word-processor-welcome" class="studio-launch-overlay">
+                    <div class="feature-gate-shell w-full">
+                        <div class="feature-gate-card">
+                            <div class="feature-gate-badge">Document Studio</div>
+                            <div class="feature-gate-icon">
+                                <i class="fas fa-file-word text-3xl text-cyan-400"></i>
+                            </div>
+                            <h2 class="feature-gate-title">Studio Word Processor Pro Max</h2>
+                            <p class="feature-gate-text">Launch a fullscreen writing workspace with a premium top ribbon, responsive layout, structured document tools, and polished export.</p>
+                            <button onclick="launchWordProcessorMode()" class="feature-gate-button active:scale-95">
+                                <span>Launch Full Screen Mode</span>
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <div id="result-display" class="hidden"></div>
+                <div id="word-processor-workspace" class="word-processor-workspace hidden">
+                    <div class="word-processor-toolbar-shell">
+                        <div class="word-processor-toolbar-top">
+                            <div class="word-processor-tabs">
+                                <button id="word-tab-home" onclick="setWordRibbonTab('home')" class="word-processor-tab active">Home</button>
+                                <button id="word-tab-insert" onclick="setWordRibbonTab('insert')" class="word-processor-tab">Insert</button>
+                                <button id="word-tab-layout" onclick="setWordRibbonTab('layout')" class="word-processor-tab">Layout</button>
+                                <button id="word-tab-review" onclick="setWordRibbonTab('review')" class="word-processor-tab">Review</button>
+                                <button id="word-tab-export" onclick="setWordRibbonTab('export')" class="word-processor-tab">Export</button>
+                            </div>
+                            <div class="word-processor-top-actions">
+                                <button onclick="exitWordProcessorMode()" class="word-toolbar-btn word-toolbar-btn--exit">
+                                    <i class="fas fa-down-left-and-up-right-to-center"></i>
+                                    <span>Exit</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="word-processor-ribbon-groups" class="word-processor-ribbon">
+                            <div data-word-tab="home" class="word-toolbar-group">
+                                <span class="word-toolbar-label">History</span>
+                                <button id="btn-undo" onclick="undo()" class="word-toolbar-btn"><i class="fas fa-undo"></i></button>
+                                <button id="btn-redo" onclick="redo()" class="word-toolbar-btn"><i class="fas fa-redo"></i></button>
+                                <button onclick="format('removeFormat')" class="word-toolbar-btn"><i class="fas fa-eraser"></i></button>
+                            </div>
+                            <div data-word-tab="home" class="word-toolbar-group">
+                                <span class="word-toolbar-label">Style</span>
+                                <select id="paragraph-style-select" onchange="setParagraphStyle(this.value)" class="word-toolbar-select">
+                                    <option value="P">Paragraph</option>
+                                    <option value="H1">Heading 1</option>
+                                    <option value="H2">Heading 2</option>
+                                    <option value="H3">Heading 3</option>
+                                    <option value="BLOCKQUOTE">Quote</option>
+                                    <option value="PRE">Code Block</option>
+                                </select>
+                                <select id="font-family-select" onchange="setFontFamily(this.value)" class="word-toolbar-select">
+                                    <option value="Arial">Arial</option>
+                                    <option value="Georgia">Georgia</option>
+                                    <option value="Trebuchet MS">Trebuchet</option>
+                                    <option value="Times New Roman">Times</option>
+                                    <option value="Courier New">Courier</option>
+                                </select>
+                                <select id="font-size-select" onchange="format('fontSize', this.value)" class="word-toolbar-select">
+                                    <option value="2">14</option>
+                                    <option value="3" selected>16</option>
+                                    <option value="4">18</option>
+                                    <option value="5">24</option>
+                                    <option value="6">32</option>
+                                </select>
+                                <button onclick="setTextColor('#0f172a')" class="word-toolbar-btn"><i class="fas fa-font"></i></button>
+                                <button onclick="setHighlightColor('#fef08a')" class="word-toolbar-btn"><i class="fas fa-highlighter"></i></button>
+                            </div>
+                            <div data-word-tab="home" class="word-toolbar-group">
+                                <span class="word-toolbar-label">Format</span>
+                                <button id="btn-bold" onclick="format('bold')" class="word-toolbar-btn"><i class="fas fa-bold"></i></button>
+                                <button id="btn-italic" onclick="format('italic')" class="word-toolbar-btn"><i class="fas fa-italic"></i></button>
+                                <button id="btn-underline" onclick="format('underline')" class="word-toolbar-btn"><i class="fas fa-underline"></i></button>
+                                <button id="btn-strikeThrough" onclick="format('strikeThrough')" class="word-toolbar-btn"><i class="fas fa-strikethrough"></i></button>
+                                <button onclick="format('superscript')" class="word-toolbar-btn"><i class="fas fa-superscript"></i></button>
+                                <button onclick="format('subscript')" class="word-toolbar-btn"><i class="fas fa-subscript"></i></button>
+                            </div>
+                            <div data-word-tab="layout" class="word-toolbar-group">
+                                <span class="word-toolbar-label">Arrange</span>
+                                <button id="btn-justifyLeft" onclick="format('justifyLeft')" class="word-toolbar-btn"><i class="fas fa-align-left"></i></button>
+                                <button id="btn-justifyCenter" onclick="format('justifyCenter')" class="word-toolbar-btn"><i class="fas fa-align-center"></i></button>
+                                <button id="btn-justifyRight" onclick="format('justifyRight')" class="word-toolbar-btn"><i class="fas fa-align-right"></i></button>
+                                <button id="btn-justifyFull" onclick="format('justifyFull')" class="word-toolbar-btn"><i class="fas fa-align-justify"></i></button>
+                                <button onclick="document.execCommand('outdent', false, null); saveHistory();" class="word-toolbar-btn"><i class="fas fa-outdent"></i></button>
+                                <button onclick="document.execCommand('indent', false, null); saveHistory();" class="word-toolbar-btn"><i class="fas fa-indent"></i></button>
+                            </div>
+                            <div data-word-tab="layout" class="word-toolbar-group">
+                                <span class="word-toolbar-label">View</span>
+                                <select onchange="setEditorLineSpacing(this.value)" class="word-toolbar-select">
+                                    <option value="1.4">Compact</option>
+                                    <option value="1.7" selected>Comfort</option>
+                                    <option value="2">Wide</option>
+                                </select>
+                                <select id="zoom-select" onchange="setEditorZoom(this.value)" class="word-toolbar-select">
+                                    <option value="90">90%</option>
+                                    <option value="100" selected>100%</option>
+                                    <option value="110">110%</option>
+                                    <option value="125">125%</option>
+                                </select>
+                            </div>
+                            <div data-word-tab="insert" class="word-toolbar-group">
+                                <span class="word-toolbar-label">Insert</span>
+                                <button onclick="applyListStyle('bullet')" class="word-toolbar-btn"><i class="fas fa-list-ul"></i></button>
+                                <button onclick="applyListStyle('number')" class="word-toolbar-btn"><i class="fas fa-list-ol"></i></button>
+                                <button onclick="insertLinkInEditor()" class="word-toolbar-btn"><i class="fas fa-link"></i></button>
+                                <button onclick="format('unlink')" class="word-toolbar-btn"><i class="fas fa-link-slash"></i></button>
+                                <button onclick="insertImageInEditor()" class="word-toolbar-btn"><i class="fas fa-image"></i></button>
+                                <button onclick="insertTableInEditor()" class="word-toolbar-btn"><i class="fas fa-table"></i></button>
+                                <button onclick="insertDividerInEditor()" class="word-toolbar-btn"><i class="fas fa-minus"></i></button>
+                                <button onclick="insertChecklistInEditor()" class="word-toolbar-btn"><i class="fas fa-list-check"></i></button>
+                                <button onclick="insertHtmlIntoEditor('<p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>')" class="word-toolbar-btn"><i class="fas fa-calendar-day"></i></button>
+                                <button onclick="setParagraphStyle('BLOCKQUOTE')" class="word-toolbar-btn"><i class="fas fa-quote-left"></i></button>
+                                <button onclick="setParagraphStyle('PRE')" class="word-toolbar-btn"><i class="fas fa-code"></i></button>
+                            </div>
+                            <div data-word-tab="review" class="word-toolbar-group">
+                                <span class="word-toolbar-label">Review</span>
+                                <button onclick="insertDocumentTemplate('meeting')" class="word-toolbar-btn"><i class="fas fa-comments"></i><span>Notes</span></button>
+                                <button onclick="insertDocumentTemplate('proposal')" class="word-toolbar-btn"><i class="fas fa-file-signature"></i><span>Proposal</span></button>
+                                <button onclick="insertDocumentTemplate('report')" class="word-toolbar-btn"><i class="fas fa-chart-line"></i><span>Report</span></button>
+                                <button onclick="insertDocumentTemplate('officialLetter')" class="word-toolbar-btn"><i class="fas fa-envelope-open-text"></i><span>Letter</span></button>
+                                <button onclick="insertDocumentTemplate('cv')" class="word-toolbar-btn"><i class="fas fa-id-badge"></i><span>CV</span></button>
+                                <button onclick="smartCleanDocument()" class="word-toolbar-btn"><i class="fas fa-wand-magic-sparkles"></i><span>Smart Clean</span></button>
+                                <button onclick="clearEditorFormatting()" class="word-toolbar-btn"><i class="fas fa-eraser"></i><span>Clear Style</span></button>
+                            </div>
+                            <div data-word-tab="export" class="word-toolbar-group">
+                                <span class="word-toolbar-label">Export</span>
+                                <select id="format-select" class="word-toolbar-select">
+                                    <option value="pdf">PDF Document</option>
+                                    <option value="docx">Word (.docx)</option>
+                                    <option value="html">HTML</option>
+                                    <option value="txt">Text</option>
+                                </select>
+                                <button id="convert-btn" onclick="convertTextToDoc()" class="word-toolbar-btn word-toolbar-btn--accent">
+                                    <i class="fas fa-file-export"></i>
+                                    <span>Export</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="word-processor-main-grid" class="word-processor-body">
+                        <main id="text-tool-wrapper" class="word-processor-canvas">
+                            <input type="file" id="word-image-input" accept="image/*" class="hidden" onchange="handleWordImageUpload(this.files[0])" />
+                            <div class="word-processor-ruler">
+                                <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                            </div>
+                            <div id="word-processor-page-shell">
+                                <div id="word-processor-page" class="word-processor-page">
+                                    <div id="text-input" contenteditable="true">
+                                        <h1>Project Overview</h1>
+                                        <p>This document gives a short, clear summary of the purpose, scope, and next action.</p>
+                                        <p>Replace this text with your final content, or load a professional template from the Review tab.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </main>
+                    </div>
+                    <div id="result-display" class="hidden word-processor-canvas"></div>
+                    <div id="export-filename-modal" onclick="closeDocumentFilenameModal()" class="hidden fixed inset-0 z-[3800] bg-slate-950/75 backdrop-blur-xl p-4 flex items-center justify-center">
+                        <div onclick="event.stopPropagation()" class="w-full max-w-sm rounded-[2rem] border border-white/10 bg-[#08111f] p-5 sm:p-6 shadow-[0_30px_80px_rgba(2,6,23,0.65)]">
+                            <div class="feature-gate-badge mb-4">Export File</div>
+                            <h3 class="text-2xl font-semibold text-white tracking-tight">Choose file name</h3>
+                            <p class="mt-2 text-sm text-slate-300">Enter a clean document name before export.</p>
+                            <input id="export-filename-input" onkeydown="handleDocumentFilenameKeydown(event)" class="mt-4 w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-white outline-none focus:border-cyan-400" placeholder="MediaLab Document" />
+                            <div class="mt-5 flex gap-3">
+                                <button onclick="closeDocumentFilenameModal()" class="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-slate-200">Cancel</button>
+                                <button onclick="confirmDocumentExport()" class="flex-1 rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-bold text-slate-950">Continue</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>`;
           setTimeout(attachEditorListeners, 100);
         }
         // =============================================================
         // 5. PREMIUM / PRO TOOLS (LOCKED)
         // =============================================================
-        else if (["voice-clone", "text-to-speech"].includes(id)) {
-          let toolName =
-            id === "voice-clone" ? "Voice Cloning" : "Text to Speech";
-          let icon =
-            id === "voice-clone" ? "fa-microphone-alt" : "fa-volume-up";
+        else if (id === "voice-clone") {
+          html = `
+            <div class="animate-fadeIn space-y-8">
+                <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div>
+                        <h2 class="text-3xl sm:text-4xl font-semibold text-white tracking-tighter">AI Voice Clone</h2>
+                        <p class="text-sm text-slate-400 mt-2">Convert your recorded voice into a polished AI voice with Puter.js and ElevenLabs, directly in the browser.</p>
+                    </div>
+                    <div class="px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl text-[10px] text-cyan-400 uppercase font-black tracking-widest">Puter Voice Studio</div>
+                </div>
+
+                <div class="grid grid-cols-1 xl:grid-cols-[0.92fr_1.08fr] gap-6 lg:gap-8">
+                    <div class="space-y-6">
+                        <div id="drop-zone-voice"
+                             onclick="document.getElementById('voice-sample-input').click()"
+                             ondragover="handleDragOver(event)"
+                             onmouseleave="handleDragLeave(event)"
+                             ondrop="handleVoiceDrop(event)"
+                             class="drop-zone border-2 border-dashed border-gray-700 hover:border-cyan-400 rounded-[2rem] sm:rounded-[2.5rem] p-8 sm:p-12 text-center cursor-pointer bg-gray-900/50 transition-all group">
+                            <div class="w-20 h-20 bg-gray-800 rounded-3xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                                <i class="fas fa-microphone-alt text-4xl text-gray-500 group-hover:text-cyan-400"></i>
+                            </div>
+                            <p class="text-lg font-medium text-gray-200">Upload Source Recording</p>
+                            <p class="text-sm text-gray-500 mt-1">Use a clean speech clip in mp3, wav, m4a, or ogg for the best conversion result.</p>
+                            <input type="file" id="voice-sample-input" accept="audio/*" class="hidden" onchange="handleVoiceUpload(this.files[0])">
+                        </div>
+
+                        <div id="voice-status-card" class="hidden bg-gray-900 border border-cyan-500/20 p-5 sm:p-6 rounded-[2rem] flex items-center justify-between shadow-2xl gap-4">
+                            <div class="flex items-center gap-4 min-w-0">
+                                <div class="w-12 h-12 bg-green-500/20 rounded-2xl flex items-center justify-center text-green-400 shrink-0">
+                                    <i class="fas fa-check-circle text-xl"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <p id="voice-sample-name" class="text-sm font-bold text-white truncate">sample.mp3</p>
+                                    <p id="voice-sample-meta" class="text-[10px] text-gray-500 uppercase font-black tracking-widest">Voice Model Analyzed</p>
+                                </div>
+                            </div>
+                            <button onclick="resetVoiceCloneTool()" class="text-gray-600 hover:text-red-400 transition-colors shrink-0"><i class="fas fa-sync-alt"></i></button>
+                        </div>
+
+                        <div class="bg-gray-900/50 border border-gray-800 rounded-[2rem] p-5 sm:p-6">
+                            <div class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Studio Tips</div>
+                            <ul class="space-y-2 text-sm text-slate-300">
+                                <li>Use one speaker with low background noise.</li>
+                                <li>Keep the clip clear, steady, and close to the microphone.</li>
+                                <li>Pick the target voice style that best matches the final tone you want.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-900/50 border border-gray-800 rounded-[2rem] sm:rounded-[2.5rem] p-5 sm:p-8 space-y-6">
+                        <div>
+                            <label class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 block">Target Voice</label>
+                            <select id="voice-target-profile" class="w-full bg-gray-950 border border-gray-800 rounded-2xl px-5 py-4 text-white text-sm outline-none focus:border-cyan-500 cursor-pointer">
+                                <option value="rachel">Rachel • Balanced</option>
+                                <option value="antoni">Antoni • Deep</option>
+                                <option value="bella">Bella • Smooth</option>
+                                <option value="adam">Adam • Cinematic</option>
+                                <option value="charlotte">Charlotte • Premium</option>
+                                <option value="daniel">Daniel • Narration</option>
+                                <option value="emily">Emily • Bright</option>
+                                <option value="nicole">Nicole • Warm</option>
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <label class="rounded-2xl border border-gray-800 bg-gray-950 px-5 py-4 text-sm text-slate-200 flex items-center justify-between gap-4">
+                                <span>Remove background noise</span>
+                                <input id="voice-remove-noise" type="checkbox" checked class="h-4 w-4 accent-cyan-500" />
+                            </label>
+                            <label class="rounded-2xl border border-gray-800 bg-gray-950 px-5 py-4 text-sm text-slate-200 flex items-center justify-between gap-4">
+                                <span>Keep natural pacing</span>
+                                <input id="voice-preserve-pacing" type="checkbox" checked class="h-4 w-4 accent-cyan-500" />
+                            </label>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4">
+                            <div class="rounded-2xl border border-gray-800 bg-gray-950 px-5 py-4">
+                                <div class="text-[10px] uppercase tracking-[0.25em] text-gray-500 font-black">Engine</div>
+                                <div class="mt-2 text-sm text-white">Puter.js + ElevenLabs Speech to Speech</div>
+                            </div>
+                            <button id="convert-btn" onclick="startVoiceCloning()" class="px-8 py-4 bg-cyan-600 hover:bg-cyan-500 text-white rounded-2xl font-bold transition-all shadow-lg shadow-cyan-900/20 flex items-center justify-center gap-3">
+                                <i class="fas fa-magic"></i><span>Clone</span>
+                            </button>
+                        </div>
+
+                        <div id="voice-result-card" class="hidden rounded-[2rem] border border-green-500/20 bg-[#07131f] p-5 sm:p-6 shadow-[0_25px_70px_rgba(8,145,178,0.14)]">
+                            <div class="flex items-start justify-between gap-4">
+                                <div>
+                                    <div class="text-[10px] font-black uppercase tracking-[0.28em] text-green-400">Clone Ready</div>
+                                    <h3 class="mt-2 text-2xl font-semibold text-white tracking-tight">Generated Voice Preview</h3>
+                                    <p class="mt-2 text-sm text-slate-300">Play the sample, then save the generated audio if it sounds right.</p>
+                                </div>
+                                <button onclick="downloadClonedVoice()" class="rounded-2xl bg-green-500 px-4 py-3 text-sm font-bold text-slate-950">Download</button>
+                            </div>
+                            <audio id="voice-result-audio" controls class="mt-5 w-full"></audio>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        } else if (id === "text-to-speech") {
           html = `
             <div class="feature-gate-shell max-w-3xl">
                 <div class="feature-gate-card feature-gate-card--premium">
                     <div class="absolute -top-24 -left-24 w-80 h-80 bg-amber-500/5 rounded-full blur-3xl opacity-50"></div>
                     <div class="feature-gate-badge feature-gate-badge--premium">Pro Feature</div>
                     <div class="feature-gate-icon">
-                        <i class="fas ${icon} text-4xl text-amber-500"></i>
+                        <i class="fas fa-volume-up text-4xl text-amber-500"></i>
                     </div>
-                    <h3 class="feature-gate-title">${Krank} ${toolName}</h3>
+                    <h3 class="feature-gate-title">${Krank} Text to Speech</h3>
                     <p class="feature-gate-text">
                         ${
                           loggedIn
                             ? `You've reached your daily limit. Upgrade to <b>MediaLab Pro</b> for unlimited neural processing.`
-                            : `Access high-performance neural engines. Sign in to unlock <b>${toolName}</b>.`
+                            : `Access high-performance neural engines. Sign in to unlock <b>Text to Speech</b>.`
                         }
                     </p>
                     <button onclick="${loggedIn ? "upgradePlan()" : "showLogin()"}" class="feature-gate-button feature-gate-button--premium relative hover:scale-[1.03] transition-all">
@@ -3162,11 +4501,151 @@
           handleImages([]);
         }
       }
-      function handleVoiceUpload(file) {
-        if (file) {
-          alert(`Reference voice uploaded: ${file.name}`);
-          uploadWithProgress([file], "voice");
+      let uploadedVoiceSample = null;
+      let clonedVoiceUrl = null;
+      const voiceCloneProfiles = {
+        rachel: "21m00Tcm4TlvDq8ikWAM",
+        antoni: "ErXwobaYiN019PkySvjV",
+        bella: "EXAVITQu4vr4xnSDxMaL",
+        adam: "pNInz6obpgDQGcFmaJgB",
+        charlotte: "XB0fDUnXU5powFXDhCwa",
+        daniel: "onwK4e9ZLuTAKqWW03F9",
+        emily: "LcfcDJNUP1GQjkzn1xUU",
+        nicole: "piTKgcLEGmPE4e6mEKli",
+      };
+      async function handleVoiceUpload(file) {
+        if (!file) return;
+        uploadedVoiceSample = file;
+        const statusCard = document.getElementById("voice-status-card");
+        const sampleName = document.getElementById("voice-sample-name");
+        const sampleMeta = document.getElementById("voice-sample-meta");
+        if (sampleName) sampleName.textContent = file.name;
+        if (sampleMeta) {
+          const fileSizeMb = (file.size / (1024 * 1024)).toFixed(1);
+          sampleMeta.textContent = `Ready for conversion • ${fileSizeMb} MB audio`;
         }
+        statusCard?.classList.remove("hidden");
+      }
+      function resetVoiceCloneTool() {
+        uploadedVoiceSample = null;
+        clonedVoiceUrl = null;
+        document.getElementById("voice-status-card")?.classList.add("hidden");
+        document.getElementById("voice-result-card")?.classList.add("hidden");
+        const audio = document.getElementById("voice-result-audio");
+        if (audio) audio.src = "";
+        const sampleInput = document.getElementById("voice-sample-input");
+        if (sampleInput) sampleInput.value = "";
+      }
+      function ensurePuterVoiceCloneAvailable() {
+        return Boolean(window.puter?.ai?.speech2speech);
+      }
+      async function startVoiceCloning() {
+        const button = document.getElementById("convert-btn");
+        const progressDiv = document.getElementById("universal-progress");
+        const statusText = document.getElementById("universal-status-text");
+        const bar = document.getElementById("universal-bar");
+        const percentLabel = document.getElementById("universal-percent");
+        const targetProfile =
+          document.getElementById("voice-target-profile")?.value || "rachel";
+        const removeBackgroundNoise = Boolean(
+          document.getElementById("voice-remove-noise")?.checked,
+        );
+        const preservePacing = Boolean(
+          document.getElementById("voice-preserve-pacing")?.checked,
+        );
+        if (!uploadedVoiceSample) {
+          alert("Upload a source recording first.");
+          return;
+        }
+        if (!ensurePuterVoiceCloneAvailable()) {
+          alert("Puter.js did not load. Refresh the page and try again.");
+          return;
+        }
+        if (button) {
+          button.disabled = true;
+          button.innerHTML = `<i class="fas fa-spinner animate-spin"></i><span>Cloning</span>`;
+        }
+        progressDiv?.classList.remove("hidden");
+        if (statusText)
+          statusText.innerText = "Connecting to Puter voice engine...";
+        if (bar) bar.style.width = "12%";
+        if (percentLabel) percentLabel.innerText = "12%";
+        try {
+          if (statusText)
+            statusText.innerText = "Uploading source audio to Puter...";
+          if (bar) bar.style.width = "34%";
+          if (percentLabel) percentLabel.innerText = "34%";
+          const audioElement = await window.puter.ai.speech2speech(
+            uploadedVoiceSample,
+            {
+              provider: "elevenlabs",
+              model: "eleven_multilingual_sts_v2",
+              voice:
+                voiceCloneProfiles[targetProfile] || voiceCloneProfiles.rachel,
+              remove_background_noise: removeBackgroundNoise,
+              preserve_pacing: preservePacing,
+            },
+          );
+          if (statusText)
+            statusText.innerText = "Rendering cloned voice preview...";
+          if (bar) bar.style.width = "82%";
+          if (percentLabel) percentLabel.innerText = "82%";
+          const sourceUrl = audioElement?.src || audioElement?.currentSrc || "";
+          if (!sourceUrl) {
+            throw new Error(
+              "The Puter voice engine did not return playable audio.",
+            );
+          }
+          clonedVoiceUrl = sourceUrl;
+          const resultCard = document.getElementById("voice-result-card");
+          const audio = document.getElementById("voice-result-audio");
+          if (audio) {
+            audio.src = sourceUrl;
+            audio.load();
+          }
+          resultCard?.classList.remove("hidden");
+          if (statusText) statusText.innerText = "Voice clone ready";
+          if (bar) bar.style.width = "100%";
+          if (percentLabel) percentLabel.innerText = "100%";
+          bar?.classList.replace("bg-cyan-500", "bg-green-500");
+          saveProjectToHistory({
+            toolType: "Voice Clone",
+            fileName: `${uploadedVoiceSample.name.replace(/\.[^.]+$/, "")}_${targetProfile}.mp3`,
+            fileUrl: sourceUrl,
+          });
+          addHistory("Voice Cloned");
+        } catch (error) {
+          console.error("Voice clone failed:", error);
+          if (statusText) statusText.innerText = "Voice cloning failed";
+          alert(
+            error?.message ||
+              "Voice cloning failed. If Puter asks for access, complete that step and try again.",
+          );
+        } finally {
+          if (button) {
+            button.disabled = false;
+            button.innerHTML = `<i class="fas fa-magic"></i><span>Clone</span>`;
+          }
+          setTimeout(() => {
+            progressDiv?.classList.add("hidden");
+            if (bar) {
+              bar.style.width = "0%";
+              bar.classList.replace("bg-green-500", "bg-cyan-500");
+            }
+          }, 2200);
+        }
+      }
+      function downloadClonedVoice() {
+        if (!clonedVoiceUrl) {
+          alert("No cloned voice available yet.");
+          return;
+        }
+        const link = document.createElement("a");
+        link.href = clonedVoiceUrl;
+        link.download = `MediaLab_Voice_Clone_${Date.now()}.wav`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       }
       async function convertVideoToAudio(file) {
         if (!file) return;
@@ -3496,140 +4975,109 @@
       // ====================== GLOBAL STATE FOR EXPORT ======================
       let finalExportBlob = null; // Cached blob for re-download
       let currentExportFormat = null; // Current format (pdf, docx, html, txt)
+      let pendingDocumentExport = null;
+      // ====================== MAIN EXPORT FUNCTION ======================
       // ====================== MAIN EXPORT FUNCTION ======================
       async function convertTextToDoc() {
+        pendingDocumentExport = runDocumentExport;
+        openDocumentFilenameModal();
+      }
+      async function confirmDocumentExport() {
+        closeDocumentFilenameModal();
+        if (typeof pendingDocumentExport === "function") {
+          await pendingDocumentExport();
+        }
+      }
+      async function runDocumentExport() {
         const editor = document.getElementById("text-input");
         const formatType = document.getElementById("format-select").value;
         const btn = document.getElementById("convert-btn");
-        const toolWrapper = document.getElementById("text-tool-wrapper");
-        const toolArea = document.getElementById("tool-display");
-        const wordCountBadge = document.getElementById("word-count");
-        // Universal Progress UI Elements
+        const mainGrid = document.getElementById("word-processor-main-grid");
+        const resultDisplay = document.getElementById("result-display");
         const progressDiv = document.getElementById("universal-progress");
         const statusText = document.getElementById("universal-status-text");
         const bar = document.getElementById("universal-bar");
         const percentLabel = document.getElementById("universal-percent");
-        // 1. Validation
-        if (!editor || !editor.innerText.trim())
+        if (!editor || !editor.innerText.trim()) {
           return alert("The document is empty!");
-        // 2. THE "STAGE WIPE": Hide the workspace to focus on the conversion engine
+        }
         btn.disabled = true;
-        if (toolWrapper) toolWrapper.classList.add("hidden");
-        if (wordCountBadge) wordCountBadge.classList.add("hidden");
-        // 3. Initialize Universal Progress with Engine Steps
+        btn.innerHTML = `<i class="fas fa-spinner animate-spin"></i><span>Exporting</span>`;
+        if (mainGrid) mainGrid.classList.add("hidden");
+        if (resultDisplay) resultDisplay.classList.add("hidden");
         progressDiv.classList.remove("hidden");
-        statusText.innerText = "🔍 Parsing Document Structure...";
+        statusText.innerText = "Parsing document structure...";
         bar.style.width = "15%";
         percentLabel.innerText = "15%";
         try {
-          // Step 2 Simulation: Metadata and Style Compilation
           setTimeout(() => {
-            statusText.innerText = `📄 Mapping ${formatType.toUpperCase()} Styles & Layout...`;
+            statusText.innerText = `Mapping ${formatType.toUpperCase()} styles and layout...`;
             bar.style.width = "45%";
             percentLabel.innerText = "45%";
           }, 600);
           setTimeout(async () => {
-            statusText.innerText = `✨ Finalizing Document Encoding...`;
+            statusText.innerText = "Finalizing document encoding...";
             bar.style.width = "85%";
             percentLabel.innerText = "85%";
-            // Perform the physical export (This calls your createPDF or createOtherFormat logic)
             await executeFinalExport(editor, formatType);
-            // 4. SUCCESS STATE: UPDATE PROGRESS BAR
-            statusText.innerText = "✅ Document Exported Successfully!";
+            statusText.innerText = "Document exported successfully!";
             bar.style.width = "100%";
             percentLabel.innerText = "100%";
             bar.classList.replace("bg-cyan-500", "bg-green-500");
             bar.classList.add("shadow-[0_0_20px_rgba(34,197,94,0.6)]");
-            // 5. SUCCESS STATE: INJECT THE RESULT CARD
             const currentWords = editor.innerText.trim().split(/\s+/).length;
-            toolArea.innerHTML = `
-                <div class="max-w-2xl mx-auto py-10 animate-fadeIn">
-                    <div class="bg-gray-900 border border-green-500/20 rounded-[3rem] p-12 text-center shadow-2xl relative">
-                        <div class="w-20 h-20 bg-green-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-green-500/20">
-                            <i class="fas fa-file-export text-4xl text-green-400"></i>
-                        </div>
-                       
-                        <h3 class="text-3xl font-bold text-white mb-2 tracking-tighter">Export Ready!</h3>
-                        <p class="text-gray-400 mb-2">Your document has been processed into a high-fidelity <b>.${formatType.toUpperCase()}</b> file.</p>
-                        <div class="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-10 bg-gray-800/50 inline-block px-4 py-1 rounded-full">
-                           Stats: ${currentWords} Words • ${formatType.toUpperCase()} Format
-                        </div>
-                       
-                        <div class="flex flex-col gap-4">
-                            <button onclick="downloadExportedFile()"
-                               class="w-full py-5 bg-green-600 hover:bg-green-500 text-white rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-3 active:scale-[0.98]">
-                                <i class="fas fa-cloud-download-alt"></i>
-                                <span>Save .${formatType.toUpperCase()} to Device</span>
-                            </button>
-                           
-                            <button onclick="switchTool('text-doc')"
-                                    class="text-sm font-black text-gray-500 hover:text-cyan-400 uppercase tracking-widest transition-all mt-4">
-                                <i class="fas fa-plus mr-2"></i> Create New Document
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            // Auto-save to history logic
-            const fileName = `Document_${Date.now()}.${formatType}`;
+            if (resultDisplay) {
+              resultDisplay.classList.remove("hidden");
+              resultDisplay.innerHTML = `
+                  <div class="feature-gate-shell max-w-3xl">
+                      <div class="feature-gate-card">
+                          <div class="feature-gate-badge">Export Ready</div>
+                          <div class="feature-gate-icon">
+                              <i class="fas fa-file-export text-4xl text-green-400"></i>
+                          </div>
+                          <h3 class="feature-gate-title">Document Exported</h3>
+                          <p class="feature-gate-text">Your document has been processed into a polished <b>.${formatType.toUpperCase()}</b> file with ${currentWords} words preserved.</p>
+                          <div class="flex flex-col gap-3">
+                              <button onclick="downloadExportedFile()" class="feature-gate-button mx-auto active:scale-95">
+                                  <i class="fas fa-cloud-download-alt"></i>
+                                  <span>Download .${formatType.toUpperCase()}</span>
+                              </button>
+                              <button onclick="resetTextTool()" class="word-toolbar-btn mx-auto">
+                                  <i class="fas fa-pen"></i>
+                                  <span>Return to Editor</span>
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+              `;
+            }
+            const fileName = buildDocumentFilename(formatType);
             const historyUrl = finalExportBlob
               ? URL.createObjectURL(finalExportBlob)
               : "#";
             saveProjectToHistory({
-              toolType: `Text → ${formatType.toUpperCase()}`,
-              fileName: fileName,
+              toolType: `Text to ${formatType.toUpperCase()}`,
+              fileName,
               fileUrl: historyUrl,
             });
-            // 6. Final UI Cleanup: Auto-hide progress bar after a short delay
             setTimeout(() => {
               progressDiv.classList.add("hidden");
               bar.style.width = "0%";
               bar.classList.replace("bg-green-500", "bg-cyan-500");
               bar.classList.remove("shadow-[0_0_20px_rgba(34,197,94,0.6)]");
             }, 4000);
+            pendingDocumentExport = null;
           }, 1500);
         } catch (error) {
           console.error("Export Engine Error:", error);
-          statusText.innerText = "❌ Export Failed";
-          // Restore Editor on Error
-          if (toolWrapper) toolWrapper.classList.remove("hidden");
+          statusText.innerText = "Export failed";
+          if (mainGrid) mainGrid.classList.remove("hidden");
+          if (resultDisplay) resultDisplay.classList.add("hidden");
           btn.disabled = false;
-          btn.innerHTML = `Try Export Again`;
+          btn.innerHTML = `<i class="fas fa-file-export"></i><span>Export</span>`;
+          pendingDocumentExport = null;
         }
       }
-      async function executeFinalExport(editor, formatType) {
-        currentExportFormat = formatType;
-        const timestamp = Date.now();
-        const filename = `MediaLab_Doc_${timestamp}.${formatType}`;
-        try {
-          if (formatType === "docx") {
-            // Professional HTML for better Word compatibility
-            const professionalHtml = `
-        <div style="font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.6; color: #000000;">
-          ${editor.innerHTML}
-        </div>
-      `;
-            const response = await fetch("/api/convert/docx", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ html: professionalHtml }),
-            });
-            if (!response.ok) throw new Error("DOCX conversion failed");
-            finalExportBlob = await response.blob();
-          } else if (formatType === "pdf") {
-            finalExportBlob = await createPDFFromEditor(editor);
-          } else {
-            // TXT and HTML
-            finalExportBlob = createOtherFormatBlob(editor, formatType);
-          }
-          // Auto-download on first export
-          downloadBlob(finalExportBlob, filename);
-        } catch (error) {
-          console.error("Export Error:", error);
-          throw error; // Let the caller handle UI feedback
-        }
-      }
-      // ====================== PDF CREATION (High Quality) ======================
       async function createPDFFromEditor(editor) {
         const { jsPDF } = window.jspdf;
         // Clone and optimize for PDF
@@ -3714,39 +5162,29 @@
           alert("No file available. Please export again.");
           return;
         }
-        const filename = `MediaLab_Doc_${Date.now()}.${currentExportFormat}`;
+        const filename = buildDocumentFilename(currentExportFormat);
         downloadBlob(finalExportBlob, filename);
       }
       // ====================== RESET TEXT TOOL ======================
       function resetTextTool() {
-        const toolWrapper = document.getElementById("text-tool-wrapper");
+        const mainGrid = document.getElementById("word-processor-main-grid");
         const resultDisplay = document.getElementById("result-display");
         const editor = document.getElementById("text-input");
-        if (toolWrapper) toolWrapper.classList.remove("hidden");
+        if (mainGrid) mainGrid.classList.remove("hidden");
         if (resultDisplay) resultDisplay.classList.add("hidden");
-        // Clear editor content
-        if (editor) editor.innerHTML = "<p></p>";
-        // Reset button
         const btn = document.getElementById("convert-btn");
         if (btn) {
           btn.disabled = false;
-          btn.classList.remove("bg-green-600", "hover:bg-green-500");
-          btn.classList.add("bg-cyan-600", "hover:bg-cyan-500");
-          btn.innerHTML = `<i class="fas fa-file-export"></i> <span>Export Document</span>`;
+          btn.innerHTML = `<i class="fas fa-file-export"></i><span>Export</span>`;
           btn.onclick = convertTextToDoc;
         }
-        // Reset progress
-        const progressContainer = document.getElementById(
-          "upload-progress-text",
-        );
-        if (progressContainer) progressContainer.classList.add("hidden");
-        updateWordCount();
+        if (editor) editor.focus();
+        updateWordProcessorStats();
       }
       // ====================== CORE EXPORT FUNCTION ======================
       async function executeFinalExport(editor, formatType) {
         currentExportFormat = formatType;
-        const timestamp = Date.now();
-        const filename = `MediaLab_Doc_${timestamp}.${formatType}`;
+        const filename = buildDocumentFilename(formatType);
         try {
           if (formatType === "docx") {
             // --- ADDED LOGIC STARTS HERE ---
@@ -3859,7 +5297,7 @@
           alert("No exported file available. Please export again.");
           return;
         }
-        const filename = `MediaLab_Doc_${Date.now()}.${currentExportFormat}`;
+        const filename = buildDocumentFilename(currentExportFormat);
         downloadBlob(finalExportBlob, filename);
       }
       function showLoading(msg) {
@@ -3971,6 +5409,15 @@
       }
       // This function saves new projects (call this when a conversion finishes)
       function saveProjectToHistory(project) {
+        logUsageActivity(
+          "project-saved",
+          `saved project ${project?.fileName || project?.title || "Untitled"}`,
+          "history",
+          {
+            toolType: project?.toolType || project?.tool || "",
+            fileName: project?.fileName || project?.title || "",
+          },
+        );
         if (!loggedIn) {
           let guestHistory = JSON.parse(
             localStorage.getItem("medialab_guest_history") || "[]",
