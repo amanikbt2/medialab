@@ -1752,6 +1752,14 @@
       <div class="studio-tool-ribbon lg:hidden px-4 py-3 shrink-0">
         <div class="studio-tool-ribbon-track no-scrollbar">
           <div
+            data-tool-switch="console"
+            onclick="switchTool('console')"
+            class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-gray-800 px-5 py-2.5 rounded-3xl cursor-pointer"
+          >
+            <i class="fas fa-gauge-high text-cyan-400"></i>
+            <span class="font-medium text-sm text-gray-200">Console</span>
+          </div>
+          <div
             data-tool-switch="web-builder"
             onclick="switchTool('web-builder')"
             class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-cyan-500/10 border border-cyan-500/20 px-5 py-2.5 rounded-3xl cursor-pointer"
@@ -1860,6 +1868,18 @@
             >
               Creation Suite
             </p>
+            <div
+              onclick="switchTool('console')"
+              class="flex items-center gap-x-4 px-5 py-3.5 hover:bg-gray-800 rounded-2xl cursor-pointer group transition-all border border-transparent hover:border-cyan-500/30"
+            >
+              <i
+                class="fas fa-gauge-high text-lg text-gray-500 group-hover:text-cyan-400"
+              ></i>
+              <span
+                class="font-bold text-sm text-gray-400 group-hover:text-white"
+                >Console</span
+              >
+            </div>
             <div
               onclick="switchTool('web-builder')"
               class="flex items-center gap-x-4 px-5 py-3.5 hover:bg-gray-800 rounded-2xl cursor-pointer group transition-all border border-transparent hover:border-cyan-500/30"
@@ -1995,6 +2015,14 @@
         <div class="flex-1 flex flex-col bg-gray-950 relative overflow-hidden">
           <div class="studio-tool-ribbon hidden lg:block px-4 sm:px-8 py-3">
             <div class="studio-tool-ribbon-track no-scrollbar">
+              <button
+                data-tool-switch="console"
+                onclick="switchTool('console')"
+                class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-gray-800 border border-white/5 px-5 py-2.5 rounded-3xl cursor-pointer"
+              >
+                <i class="fas fa-gauge-high text-cyan-400"></i
+                ><span class="font-medium text-sm text-gray-200">Console</span>
+              </button>
               <button
                 data-tool-switch="web-builder"
                 onclick="switchTool('web-builder')"
@@ -2782,8 +2810,139 @@
         </div>
       </div>
     </div>
+    <div
+      id="render-hosting-modal"
+      class="hidden fixed inset-0 z-[3950] bg-slate-950/92 backdrop-blur-2xl p-3 sm:p-5 overflow-y-auto"
+    >
+      <div class="mx-auto w-full max-w-3xl rounded-[2.2rem] border border-cyan-500/20 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.14),transparent_28%),#08111f] p-5 sm:p-7 shadow-[0_40px_120px_rgba(2,6,23,0.78)]">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <div class="feature-gate-badge mb-3">Hosting Required</div>
+            <h3 class="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+              Take your project live on Render
+            </h3>
+            <p class="mt-3 text-sm leading-6 text-slate-300">
+              Your project is already pushed to GitHub. Now sign in to Render with your email, create a Static Site from your <span class="font-black text-white">medialab</span> repository, then paste the live Render URL here so Workflow AI can verify it.
+            </p>
+          </div>
+          <div class="w-12 h-12 rounded-[1.4rem] border border-cyan-400/20 bg-cyan-500/10 text-cyan-300 flex items-center justify-center shrink-0 shadow-[0_12px_30px_rgba(34,211,238,0.16)]">
+            <i class="fas fa-cloud-arrow-up text-lg"></i>
+          </div>
+        </div>
+        <div class="mt-6 rounded-[1.8rem] border border-white/10 bg-white/[0.04] p-4 sm:p-5">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0">
+              <p class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Current Project</p>
+              <p id="render-hosting-project-name" class="mt-2 text-lg font-semibold text-white">Untitled Project</p>
+              <a id="render-hosting-github-link" href="#" target="_blank" rel="noopener noreferrer" class="mt-2 inline-flex max-w-full items-center gap-2 truncate text-sm text-cyan-300 hover:text-cyan-200">
+                <i class="fas fa-arrow-up-right-from-square text-xs"></i>
+                <span class="truncate">Open GitHub-hosted version</span>
+              </a>
+            </div>
+            <span class="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-amber-300">
+              <span class="relative flex h-2 w-2">
+                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-300 opacity-75"></span>
+                <span class="relative inline-flex h-2 w-2 rounded-full bg-amber-300"></span>
+              </span>
+              Waiting for Render hosting
+            </span>
+          </div>
+        </div>
+        <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <a
+            href="https://dashboard.render.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="rounded-[1.7rem] border border-white/10 bg-white/[0.04] p-5 hover:border-cyan-400/20 hover:bg-white/[0.06] transition-all"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Step 1</p>
+                <p class="mt-2 text-lg font-semibold text-white">Open Render</p>
+                <p class="mt-2 text-sm leading-6 text-slate-400">Sign in with your email and start a new Static Site from GitHub.</p>
+              </div>
+              <i class="fas fa-arrow-up-right-from-square text-cyan-300 text-lg"></i>
+            </div>
+          </a>
+          <div class="rounded-[1.7rem] border border-white/10 bg-white/[0.04] p-5">
+            <p class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Step 2</p>
+            <p class="mt-2 text-lg font-semibold text-white">Choose the right source</p>
+            <p class="mt-2 text-sm leading-6 text-slate-400">Pick your <span class="font-black text-white">medialab</span> repository, deploy it as a Static Site, then copy the final Render URL below.</p>
+          </div>
+        </div>
+        <div class="mt-6 rounded-[1.9rem] border border-cyan-400/15 bg-cyan-500/5 p-5 sm:p-6">
+          <label class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Render Live URL</label>
+          <input
+            id="render-hosting-url-input"
+            type="url"
+            placeholder="https://your-project.onrender.com"
+            class="mt-3 w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3.5 text-white outline-none focus:border-cyan-400"
+          />
+          <p class="mt-3 text-xs leading-6 text-slate-400">
+            Paste the live Render URL for this project. MediaLab will ping it and save it beside your GitHub deployment once it’s reachable.
+          </p>
+          <p id="render-hosting-error" class="hidden mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"></p>
+          <div class="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3">
+            <button
+              onclick="openRenderHostingGuide()"
+              class="px-4 py-3 rounded-2xl bg-white/5 text-sm font-bold text-slate-200 hover:bg-white/10 transition-all"
+            >
+              Open Render Again
+            </button>
+            <button
+              id="render-hosting-verify-btn"
+              onclick="verifyRenderHosting()"
+              class="px-5 py-3 rounded-2xl bg-cyan-500 text-slate-950 text-sm font-black hover:bg-cyan-400 transition-all"
+            >
+              Verify Hosting
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
     <div id="builder-snackbar" class="hidden fixed left-1/2 -translate-x-1/2 bottom-4 sm:bottom-6 z-[1000010] px-4 py-3 rounded-2xl bg-slate-950/92 border border-cyan-400/20 text-sm font-bold text-cyan-100 shadow-[0_20px_50px_rgba(2,6,23,0.45)] backdrop-blur-xl">
       Code copied to clipboard
+    </div>
+    <div
+      id="builder-run-modal"
+      class="hidden fixed inset-0 z-[1900000] bg-slate-950/80 backdrop-blur-xl p-3 sm:p-5"
+      onclick="if (event.target === this) closeBuilderRunMode();"
+    >
+      <div class="h-full w-full max-w-7xl mx-auto rounded-[2rem] border border-white/10 bg-[#030712] shadow-[0_35px_120px_rgba(2,6,23,0.72)] overflow-hidden flex flex-col">
+        <div class="shrink-0 border-b border-white/10 bg-white/[0.04] px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-[10px] font-black uppercase tracking-[0.24em] text-emerald-300">Run Site</p>
+            <h4 class="text-base sm:text-lg font-bold text-white truncate">Interactive preview environment</h4>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              onclick="openBuilderRunModeInNewTab()"
+              class="px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-[10px] sm:text-[11px] font-black uppercase tracking-[0.18em] text-slate-200 hover:bg-white/10 transition-all"
+            >
+              Open Tab
+            </button>
+            <button
+              type="button"
+              onclick="closeBuilderRunMode()"
+              class="w-10 h-10 rounded-2xl border border-white/10 text-slate-300 hover:text-white hover:bg-white/5 transition-all"
+            >
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        <div class="shrink-0 px-4 py-3 sm:px-5 border-b border-white/5 bg-[linear-gradient(90deg,rgba(16,185,129,0.14),rgba(6,182,212,0.08),transparent)]">
+          <p class="text-xs sm:text-sm text-slate-300">Studio controls are hidden here so you can test the page like a real live website.</p>
+        </div>
+        <div class="flex-1 min-h-0 bg-white">
+          <iframe
+            id="builder-run-frame"
+            title="MediaLab Run Preview"
+            class="w-full h-full bg-white"
+            sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads allow-same-origin"
+          ></iframe>
+        </div>
+      </div>
     </div>
     <div id="builder-tour-overlay" class="hidden fixed inset-0 z-[1000000] pointer-events-none">
       <div id="builder-tour-highlight" class="builder-tour-highlight hidden"></div>
@@ -2925,6 +3084,79 @@
       </div>
     </div>
     <div
+      id="adsense-link-modal"
+      class="hidden builder-modal-backdrop"
+      onclick="if (event.target === this) closeAdsenseLinkModal();"
+    >
+      <div
+        class="builder-modal-card w-full max-w-2xl p-5 sm:p-8"
+        onclick="event.stopPropagation()"
+      >
+        <div class="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-[0.22em] text-amber-300">
+              AdSense Link
+            </p>
+            <h3 class="text-2xl font-black text-white mt-2">
+              Connect your AdSense site
+            </h3>
+            <p class="text-sm text-slate-400 mt-2">
+              Paste your live MediaLab project URL and Workflow AI will find the matching AdSense account and site automatically.
+            </p>
+          </div>
+          <button
+            onclick="closeAdsenseLinkModal()"
+            class="w-10 h-10 rounded-2xl border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+          >
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="space-y-5">
+          <div class="rounded-[1.6rem] border border-white/10 bg-white/[0.03] p-5">
+            <label class="text-[11px] uppercase tracking-[0.18em] text-slate-500 font-black block">Enter your Live Project URL</label>
+            <input
+              id="adsense-link-url-input"
+              type="url"
+              placeholder="https://username.github.io/medialab/project.html"
+              class="mt-3 w-full rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3.5 text-white outline-none focus:border-amber-400 transition-all"
+            />
+            <p class="mt-3 text-xs leading-6 text-slate-400">
+              MediaLab only accepts URLs that match your own hosted GitHub or Render projects.
+            </p>
+          </div>
+          <p id="adsense-link-error" class="hidden rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"></p>
+          <div id="adsense-link-success" class="hidden rounded-[1.7rem] border border-emerald-400/20 bg-emerald-500/10 p-5">
+            <p id="adsense-link-success-title" class="text-sm font-black text-white">Success! We found your AdSense account.</p>
+            <p id="adsense-link-success-subtitle" class="mt-2 text-sm text-emerald-100/80"></p>
+          </div>
+          <div id="adsense-link-checklist" class="hidden rounded-[1.7rem] border border-amber-400/20 bg-amber-500/10 p-5">
+            <p class="text-[10px] font-black uppercase tracking-[0.22em] text-amber-300">Monetization Checklist</p>
+            <div class="mt-4 space-y-3 text-sm">
+              <div id="adsense-check-script" class="text-slate-100">[ ] AdSense Script Injected (Automatic by MediaLab)</div>
+              <div id="adsense-check-ads-txt" class="text-slate-100">[ ] ads.txt detected in GitHub root (Automatic by MediaLab)</div>
+              <div id="adsense-check-review" class="text-slate-100">[ ] Google Review Pending (External step)</div>
+            </div>
+          </div>
+          <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
+            <button
+              id="adsense-google-reconnect-btn"
+              onclick="googleLogin()"
+              class="hidden px-4 py-3 rounded-2xl bg-white text-slate-950 text-sm font-black hover:bg-amber-50 transition-all"
+            >
+              Continue with Google
+            </button>
+            <button
+              id="adsense-find-account-btn"
+              onclick="findAdsenseAccountForUrl()"
+              class="px-5 py-3 rounded-2xl bg-amber-400 text-slate-950 text-sm font-black hover:bg-amber-300 transition-all"
+            >
+              Find Account
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div
       id="withdraw-modal"
       class="hidden builder-modal-backdrop"
       onclick="if (event.target === this) closeWithdrawModal();"
@@ -2958,7 +3190,7 @@
             <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500 font-black mb-3">
               Select Method
             </p>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div id="withdraw-method-grid" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <button type="button" id="withdraw-method-paypal" onclick="selectWithdrawMethod('paypal')" class="withdraw-method-card rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-left transition-all hover:border-cyan-400/40">
                 <div class="w-11 h-11 rounded-2xl bg-sky-500/15 text-sky-300 flex items-center justify-center mb-3"><i class="fab fa-paypal text-lg"></i></div>
                 <div class="font-black text-white">PayPal</div>
@@ -3053,11 +3285,15 @@
       let currentStudioToolId = "image-pdf";
       let currentLiveProjectDetail = null;
       let currentLiveProjectMonitor = null;
+      let currentRenderHostingProject = null;
+      let currentAdsenseConsoleReport = null;
       let monetizeWizardStep = 1;
       let pendingAdsTxtFile = null;
+      let builderRunPreviewUrl = null;
       let selectedWithdrawalMethod = "";
       let withdrawalStep = "form";
       let withdrawalSubmissionInFlight = false;
+      let withdrawMethodsCollapsed = false;
       const LOGIN_REQUIRED_TOOL_IDS = ["image-pdf"];
       const PREMIUM_TOOL_IDS = ["voice-clone", "text-to-speech", "image-edit"];
       let historyItems = [];
@@ -3071,6 +3307,13 @@
         context: {},
       };
       const toolsData = [
+        {
+          id: "console",
+          title: "Studio Console",
+          icon: "fa-gauge-high",
+          desc: "Wallet, hosting, and live project command center",
+          isNew: true,
+        },
         {
           id: "web-builder",
           title: "Web Builder",
@@ -3253,16 +3496,22 @@
             </div>
           </div>`;
       }
-      function goToStudio(defaultTool = "web-builder") {
+      function getPreferredStudioEntryTool(defaultTool = null) {
+        if (defaultTool) return defaultTool;
+        return window.innerWidth < 768 ? "console" : "web-builder";
+      }
+      function goToStudio(defaultTool = null) {
+        const entryTool = getPreferredStudioEntryTool(defaultTool);
         document.getElementById("landing").classList.add("hidden");
         document.getElementById("studio").classList.remove("hidden");
         logUsageActivity(
           "studio-open",
-          `opened studio with ${defaultTool}`,
+          `opened studio with ${entryTool}`,
           "studio",
-          { defaultTool },
+          { defaultTool: entryTool },
         );
-        switchTool(defaultTool);
+        switchTool(entryTool);
+        setTimeout(() => maybePromptRenderHostingOnboarding(), 500);
       }
       // Initialize Socket.io
       const socket = io();
@@ -3535,6 +3784,11 @@
                     Live
                   </span>
                   ${
+                    project.renderHostedConfirmed
+                      ? `<span class="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">☁ Render Linked</span>`
+                      : ""
+                  }
+                  ${
                     project.adsensePublisherId
                       ? `<span class="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">💰 Ads Active</span>`
                       : ""
@@ -3578,6 +3832,7 @@
           currentUser = { ...(currentUser || {}), ...(data.user || {}) };
           currentUser.liveProjects = Array.isArray(data.projects) ? data.projects : [];
           updateUserProfileUi();
+          maybePromptRenderHostingOnboarding();
           return currentUser.liveProjects;
         } catch (error) {
           console.warn("GitHub projects fetch skipped:", error);
@@ -3748,6 +4003,16 @@
         `;
       }
       function openMonetizeProjectWizard() {
+        if (!currentLiveProjectDetail?.renderHostedConfirmed) {
+          showBuilderSnackbar(
+            "Finish Render hosting for this project before moving to AdSense.",
+            "error",
+          );
+          openRenderHostingOnboarding(
+            currentLiveProjectDetail?.fileName || currentLiveProjectDetail?.filename,
+          );
+          return;
+        }
         document.getElementById("live-project-monetize-panel")?.classList.remove("hidden");
         setMonetizeWizardStep(1);
       }
@@ -3841,9 +4106,16 @@
           .getElementById("live-project-detail-title")
           .textContent = project?.name || project?.fileName || "Live Project";
         document.getElementById("live-project-detail-subtitle").innerHTML = `
-          <a href="${project?.liveUrl || project?.url || "#"}" target="_blank" rel="noopener noreferrer" class="text-cyan-300 hover:text-cyan-200">
-            ${project?.liveUrl || project?.url || "Live URL unavailable"}
-          </a>
+          <div class="flex flex-col gap-2">
+            <a href="${project?.liveUrl || project?.url || "#"}" target="_blank" rel="noopener noreferrer" class="text-cyan-300 hover:text-cyan-200">
+              ${project?.liveUrl || project?.url || "Live URL unavailable"}
+            </a>
+            ${
+              project?.renderHostedConfirmed && project?.renderUrl
+                ? `<a href="${project.renderUrl}" target="_blank" rel="noopener noreferrer" class="text-emerald-300 hover:text-emerald-200">Render Host: ${project.renderUrl}</a>`
+                : `<span class="text-amber-300">Render hosting still pending for this project.</span>`
+            }
+          </div>
         `;
         renderProjectStatCard(
           "project-stat-health",
@@ -3880,6 +4152,126 @@
         );
         document.getElementById("live-project-preview-frame").src =
           project?.liveUrl || project?.url || "about:blank";
+      }
+      function getPendingRenderHostingProject() {
+        if (!loggedIn || !currentUser) return null;
+        const projects = Array.isArray(currentUser.liveProjects)
+          ? [...currentUser.liveProjects]
+          : [];
+        return projects
+          .sort(
+            (a, b) =>
+              new Date(b.updatedAt || b.lastSyncedAt || b.createdAt || 0) -
+              new Date(a.updatedAt || a.lastSyncedAt || a.createdAt || 0),
+          )
+          .find((project) => !project?.renderHostedConfirmed);
+      }
+      function openRenderHostingGuide() {
+        window.open("https://dashboard.render.com/", "_blank", "noopener,noreferrer");
+      }
+      function closeRenderHostingOnboarding() {
+        document.getElementById("render-hosting-modal")?.classList.add("hidden");
+        currentRenderHostingProject = null;
+        document.getElementById("render-hosting-error")?.classList.add("hidden");
+      }
+      function openRenderHostingOnboarding(filename = "") {
+        const project =
+          (Array.isArray(currentUser?.liveProjects) ? currentUser.liveProjects : []).find(
+            (item) =>
+              String(item?.fileName || item?.filename || "").trim() ===
+              String(filename || "").trim(),
+          ) || getPendingRenderHostingProject();
+        if (!project) {
+          closeRenderHostingOnboarding();
+          return;
+        }
+        currentRenderHostingProject = project;
+        document.getElementById("render-hosting-project-name").textContent =
+          project.name || project.fileName || "Untitled Project";
+        const liveUrl = project.liveUrl || project.url || "#";
+        const link = document.getElementById("render-hosting-github-link");
+        if (link) link.href = liveUrl;
+        const input = document.getElementById("render-hosting-url-input");
+        if (input) input.value = project.renderUrl || "";
+        document.getElementById("render-hosting-error")?.classList.add("hidden");
+        document.getElementById("render-hosting-modal")?.classList.remove("hidden");
+      }
+      function maybePromptRenderHostingOnboarding(force = false) {
+        if (!loggedIn || !currentUser) return;
+        if (document.getElementById("studio")?.classList.contains("hidden")) return;
+        const pendingProject = getPendingRenderHostingProject();
+        if (!pendingProject) {
+          closeRenderHostingOnboarding();
+          return;
+        }
+        if (
+          force ||
+          !currentRenderHostingProject ||
+          String(currentRenderHostingProject.fileName || currentRenderHostingProject.filename) !==
+            String(pendingProject.fileName || pendingProject.filename)
+        ) {
+          openRenderHostingOnboarding(
+            pendingProject.fileName || pendingProject.filename,
+          );
+        }
+      }
+      async function verifyRenderHosting() {
+        const project = currentRenderHostingProject || getPendingRenderHostingProject();
+        if (!project) return;
+        const errorNode = document.getElementById("render-hosting-error");
+        const input = document.getElementById("render-hosting-url-input");
+        const verifyBtn = document.getElementById("render-hosting-verify-btn");
+        const renderUrl = String(input?.value || "").trim();
+        if (errorNode) errorNode.classList.add("hidden");
+        if (!renderUrl) {
+          if (errorNode) {
+            errorNode.textContent = "Paste the Render live URL first.";
+            errorNode.classList.remove("hidden");
+          }
+          input?.focus();
+          return;
+        }
+        if (verifyBtn) {
+          verifyBtn.disabled = true;
+          verifyBtn.textContent = "Verifying...";
+        }
+        try {
+          const res = await fetch("/api/github/verify-render-hosting", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename: project.fileName || project.filename,
+              renderUrl,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || "Could not verify Render hosting.");
+          }
+          currentUser = { ...(currentUser || {}), ...(data.user || {}) };
+          updateUserProfileUi();
+          showBuilderSnackbar("Render hosting verified. Project is fully live.", "success");
+          if (
+            currentLiveProjectDetail &&
+            String(currentLiveProjectDetail.fileName || currentLiveProjectDetail.filename) ===
+              String(project.fileName || project.filename)
+          ) {
+            await refreshCurrentLiveProjectDetail();
+          }
+          maybePromptRenderHostingOnboarding(true);
+        } catch (error) {
+          if (errorNode) {
+            errorNode.textContent =
+              error.message || "Could not verify Render hosting right now.";
+            errorNode.classList.remove("hidden");
+          }
+        } finally {
+          if (verifyBtn) {
+            verifyBtn.disabled = false;
+            verifyBtn.textContent = "Verify Hosting";
+          }
+        }
       }
       async function openLiveProjectDetail(filename) {
         if (!filename) return;
@@ -4016,6 +4408,7 @@
           userSection?.classList.add("hidden");
           startBtn?.classList.remove("hidden");
           renderGithubStorageStatus();
+          closeRenderHostingOnboarding();
           return;
         }
         userSection?.classList.remove("hidden");
@@ -4052,90 +4445,103 @@
         }
         renderGithubStorageStatus();
         updateAccountModalUi();
+        maybePromptRenderHostingOnboarding();
+      }
+      function buildGithubStorageStatusMarkup(context = "sidebar") {
+        const isConsole = context === "console";
+        const shellClass = isConsole
+          ? "rounded-[2rem] border border-white/10 bg-white/5 backdrop-blur-2xl p-5 sm:p-6 shadow-[0_20px_60px_rgba(15,23,42,0.35)]"
+          : "";
+        if (!loggedIn || !currentUser) {
+          return `
+            <div class="${shellClass}">
+              <div class="flex items-start gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-gray-800 border border-white/5 flex items-center justify-center text-gray-300">
+                  <i class="fab fa-github text-lg"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500">GitHub Status</p>
+                  <p class="mt-2 text-sm font-semibold text-white">Connect GitHub to enable cloud storage.</p>
+                  <p class="mt-1 text-[11px] leading-5 text-gray-400">Sign in first, then link GitHub and activate GitHub Pages for exports.</p>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+        if (!currentUser.githubUsername) {
+          return `
+            <div class="${shellClass}">
+              <div class="flex items-start gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center text-white">
+                  <i class="fab fa-github text-lg"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <p class="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500">GitHub Status</p>
+                      <p class="mt-2 text-sm font-semibold text-white">GitHub not connected</p>
+                    </div>
+                    <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-gray-300">Ready</span>
+                  </div>
+                  <p class="mt-1 text-[11px] leading-5 text-gray-400">Link your GitHub account so MediaLab can prepare the <span class="font-black text-white">medialab</span> storage repo for live exports.</p>
+                  <button onclick="connectGithubStorage()" class="mt-3 inline-flex items-center gap-2 rounded-2xl bg-white text-slate-950 px-3.5 py-2 text-[11px] font-black uppercase tracking-[0.16em] shadow-[0_12px_30px_rgba(255,255,255,0.12)]">
+                    <i class="fab fa-github"></i>
+                    Link GitHub Account
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+        if (!currentUser.githubRepoCreated) {
+          return `
+            <div class="${shellClass}">
+              <div class="flex items-start gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-400/20 flex items-center justify-center text-amber-300">
+                  <i class="fab fa-github text-lg"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <p class="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500">GitHub Status</p>
+                      <p class="mt-2 text-sm font-semibold text-white">Connected as @${currentUser.githubUsername}</p>
+                    </div>
+                    <span class="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-amber-300">Setup Needed</span>
+                  </div>
+                  <p class="mt-1 text-[11px] leading-5 text-gray-400">Initialize the <span class="font-black text-white">medialab</span> repository and enable GitHub Pages so exports can go live.</p>
+                  <button id="github-storage-init-btn" onclick="setupGithubRepository()" class="mt-3 inline-flex items-center gap-2 rounded-2xl bg-emerald-400 text-slate-950 px-3.5 py-2 text-[11px] font-black uppercase tracking-[0.16em] shadow-[0_14px_36px_rgba(16,185,129,0.26)]">
+                    <i class="fas fa-cloud"></i>
+                    🚀 Initialize Storage
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+        return `
+          <div class="${shellClass}">
+            <div class="flex items-start gap-3">
+              <div class="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-400/20 flex items-center justify-center text-emerald-300 shadow-[0_0_25px_rgba(16,185,129,0.18)]">
+                <i class="fas fa-check"></i>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <p class="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500">GitHub Status</p>
+                    <p class="mt-2 text-sm font-semibold text-white">Cloud Storage Online</p>
+                  </div>
+                  <span class="inline-flex items-center rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-emerald-300">Live</span>
+                </div>
+                <p class="mt-1 text-[11px] leading-5 text-gray-400">Repository <span class="font-black text-white">medialab</span> is ready under <span class="font-black text-white">@${currentUser.githubUsername}</span> with GitHub Pages enabled.</p>
+              </div>
+            </div>
+          </div>
+        `;
       }
       function renderGithubStorageStatus() {
         const card = document.getElementById("github-storage-card");
         if (!card) return;
-        if (!loggedIn || !currentUser) {
-          card.innerHTML = `
-            <div class="flex items-start gap-3">
-              <div class="w-11 h-11 rounded-2xl bg-gray-800 border border-white/5 flex items-center justify-center text-gray-300">
-                <i class="fab fa-github text-lg"></i>
-              </div>
-              <div class="min-w-0 flex-1">
-                <p class="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500">GitHub Status</p>
-                <p class="mt-2 text-sm font-semibold text-white">Connect GitHub to enable cloud storage.</p>
-                <p class="mt-1 text-[11px] leading-5 text-gray-400">Sign in first, then link GitHub and activate GitHub Pages for exports.</p>
-              </div>
-            </div>
-          `;
-          return;
-        }
-        if (!currentUser.githubUsername) {
-          card.innerHTML = `
-            <div class="flex items-start gap-3">
-              <div class="w-11 h-11 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center text-white">
-                <i class="fab fa-github text-lg"></i>
-              </div>
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center justify-between gap-3">
-                  <div>
-                    <p class="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500">GitHub Status</p>
-                    <p class="mt-2 text-sm font-semibold text-white">GitHub not connected</p>
-                  </div>
-                  <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-gray-300">Ready</span>
-                </div>
-                <p class="mt-1 text-[11px] leading-5 text-gray-400">Link your GitHub account so MediaLab can prepare the <span class="font-black text-white">medialab</span> storage repo for live exports.</p>
-                <button onclick="connectGithubStorage()" class="mt-3 inline-flex items-center gap-2 rounded-2xl bg-white text-slate-950 px-3.5 py-2 text-[11px] font-black uppercase tracking-[0.16em] shadow-[0_12px_30px_rgba(255,255,255,0.12)]">
-                  <i class="fab fa-github"></i>
-                  Connect GitHub
-                </button>
-              </div>
-            </div>
-          `;
-          return;
-        }
-        if (!currentUser.githubRepoCreated) {
-          card.innerHTML = `
-            <div class="flex items-start gap-3">
-              <div class="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-400/20 flex items-center justify-center text-amber-300">
-                <i class="fab fa-github text-lg"></i>
-              </div>
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center justify-between gap-3">
-                  <div>
-                    <p class="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500">GitHub Status</p>
-                    <p class="mt-2 text-sm font-semibold text-white">Connected as @${currentUser.githubUsername}</p>
-                  </div>
-                  <span class="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-amber-300">Setup Needed</span>
-                </div>
-                <p class="mt-1 text-[11px] leading-5 text-gray-400">Initialize the <span class="font-black text-white">medialab</span> repository and enable GitHub Pages so exports can go live.</p>
-                <button id="github-storage-init-btn" onclick="setupGithubRepository()" class="mt-3 inline-flex items-center gap-2 rounded-2xl bg-emerald-400 text-slate-950 px-3.5 py-2 text-[11px] font-black uppercase tracking-[0.16em] shadow-[0_14px_36px_rgba(16,185,129,0.26)]">
-                  <i class="fas fa-cloud"></i>
-                  🚀 Setup GitHub Hosting
-                </button>
-              </div>
-            </div>
-          `;
-          return;
-        }
-        card.innerHTML = `
-          <div class="flex items-start gap-3">
-            <div class="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-400/20 flex items-center justify-center text-emerald-300 shadow-[0_0_25px_rgba(16,185,129,0.18)]">
-              <i class="fas fa-check"></i>
-            </div>
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <p class="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500">GitHub Status</p>
-                  <p class="mt-2 text-sm font-semibold text-white">GitHub Storage Active</p>
-                </div>
-                <span class="inline-flex items-center rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-emerald-300">Live</span>
-              </div>
-              <p class="mt-1 text-[11px] leading-5 text-gray-400">Repository <span class="font-black text-white">medialab</span> is ready under <span class="font-black text-white">@${currentUser.githubUsername}</span> with GitHub Pages enabled.</p>
-            </div>
-          </div>
-        `;
+        card.innerHTML = buildGithubStorageStatusMarkup("sidebar");
       }
       function connectGithubStorage() {
         if (!loggedIn || !currentUser) {
@@ -4201,6 +4607,12 @@
       function formatCurrency(value) {
         return `$${Number(value || 0).toFixed(2)}`;
       }
+      function formatCompactNumber(value) {
+        return new Intl.NumberFormat("en", {
+          notation: "compact",
+          maximumFractionDigits: 1,
+        }).format(Number(value || 0));
+      }
       function formatPayoutMethod(method) {
         return method === "paypal"
           ? "PayPal"
@@ -4209,6 +4621,42 @@
             : method === "airtel"
               ? "Airtel Money"
               : "Not selected";
+      }
+      function getRecentLiveProjects(limit = 3) {
+        return [...(currentUser?.liveProjects || [])]
+          .sort((a, b) => {
+            const left = new Date(
+              b?.updatedAt || b?.lastSyncedAt || b?.createdAt || 0,
+            ).getTime();
+            const right = new Date(
+              a?.updatedAt || a?.lastSyncedAt || a?.createdAt || 0,
+            ).getTime();
+            return left - right;
+          })
+          .slice(0, limit);
+      }
+      async function fetchAdsenseConsoleReport() {
+        if (!loggedIn || !currentUser) return null;
+        try {
+          const res = await fetch("/api/adsense/report", {
+            credentials: "include",
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || "Could not load AdSense stats.");
+          }
+          currentAdsenseConsoleReport = data;
+          return data;
+        } catch (error) {
+          console.warn("AdSense report fetch skipped:", error);
+          currentAdsenseConsoleReport = {
+            success: false,
+            connected: Boolean(currentUser?.adsenseConnected),
+            stats: null,
+            message: error.message || "Could not load AdSense stats.",
+          };
+          return currentAdsenseConsoleReport;
+        }
       }
       function updateAccountModalUi() {
         const balance = getCurrentBalance();
@@ -4253,12 +4701,132 @@
         document.getElementById("account-modal")?.classList.remove("hidden");
         document.getElementById("account-modal")?.classList.add("flex");
       }
+      function closeAdsenseLinkModal() {
+        document.getElementById("adsense-link-modal")?.classList.add("hidden");
+        document.getElementById("adsense-link-modal")?.classList.remove("flex");
+      }
+      function openAdsenseLinkModal() {
+        if (!loggedIn || !currentUser) {
+          showLogin();
+          return;
+        }
+        document.getElementById("adsense-link-error")?.classList.add("hidden");
+        document.getElementById("adsense-link-success")?.classList.add("hidden");
+        document.getElementById("adsense-link-checklist")?.classList.add("hidden");
+        document.getElementById("adsense-google-reconnect-btn")?.classList.add("hidden");
+        const input = document.getElementById("adsense-link-url-input");
+        if (input && !input.value.trim()) {
+          const suggested =
+            currentLiveProjectDetail?.renderUrl ||
+            currentLiveProjectDetail?.liveUrl ||
+            currentLiveProjectDetail?.url ||
+            currentUser?.liveProjects?.find((project) => project?.renderHostedConfirmed)?.renderUrl ||
+            currentUser?.liveProjects?.[0]?.renderUrl ||
+            currentUser?.liveProjects?.[0]?.liveUrl ||
+            currentUser?.liveProjects?.[0]?.url ||
+            "";
+          input.value = suggested;
+        }
+        document.getElementById("adsense-link-modal")?.classList.remove("hidden");
+        document.getElementById("adsense-link-modal")?.classList.add("flex");
+      }
+      function renderAdsenseChecklist(checklist = {}) {
+        const setLine = (id, ok, label) => {
+          const node = document.getElementById(id);
+          if (!node) return;
+          node.textContent = `${ok ? "[x]" : "[ ]"} ${label}`;
+          node.className = ok ? "text-emerald-200" : "text-slate-100";
+        };
+        setLine(
+          "adsense-check-script",
+          Boolean(checklist.scriptInjectedAutomatic),
+          "AdSense Script Injected (Automatic by MediaLab)",
+        );
+        setLine(
+          "adsense-check-ads-txt",
+          Boolean(checklist.adsTxtDetected),
+          "ads.txt detected in GitHub root (Automatic by MediaLab)",
+        );
+        setLine(
+          "adsense-check-review",
+          Boolean(checklist.googleReviewPending),
+          "Google Review Pending (External step)",
+        );
+        document.getElementById("adsense-link-checklist")?.classList.remove("hidden");
+      }
+      async function findAdsenseAccountForUrl() {
+        const input = document.getElementById("adsense-link-url-input");
+        const actionBtn = document.getElementById("adsense-find-account-btn");
+        const errorNode = document.getElementById("adsense-link-error");
+        const successNode = document.getElementById("adsense-link-success");
+        const reconnectBtn = document.getElementById("adsense-google-reconnect-btn");
+        const liveProjectUrl = String(input?.value || "").trim();
+        errorNode?.classList.add("hidden");
+        successNode?.classList.add("hidden");
+        document.getElementById("adsense-link-checklist")?.classList.add("hidden");
+        reconnectBtn?.classList.add("hidden");
+        if (!liveProjectUrl) {
+          if (errorNode) {
+            errorNode.textContent = "Enter your live project URL first.";
+            errorNode.classList.remove("hidden");
+          }
+          input?.focus();
+          return;
+        }
+        if (actionBtn) {
+          actionBtn.disabled = true;
+          actionBtn.textContent = "Finding...";
+        }
+        try {
+          const res = await fetch("/api/adsense/link-site", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ liveProjectUrl }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            if (data.requiresGoogleReconnect) {
+              reconnectBtn?.classList.remove("hidden");
+            }
+            throw new Error(data.message || "Could not link your AdSense site.");
+          }
+          currentUser = { ...(currentUser || {}), ...(data.user || {}) };
+          updateUserProfileUi();
+          document.getElementById("adsense-link-success-title").textContent =
+            `Success! We found your AdSense account ${data.adsenseId || ""}.`;
+          document.getElementById("adsense-link-success-subtitle").textContent =
+            `${data.siteUrl || liveProjectUrl} is now linked. Status: ${data.siteStatus || "UNKNOWN"}.`;
+          successNode?.classList.remove("hidden");
+          renderAdsenseChecklist(data.checklist || {});
+          showBuilderSnackbar(
+            "AdSense site linked successfully.",
+            "success",
+          );
+          if (currentLiveProjectDetail) {
+            await refreshCurrentLiveProjectDetail();
+          }
+        } catch (error) {
+          if (errorNode) {
+            errorNode.textContent =
+              error.message ||
+              "We couldn't find this URL in your AdSense account yet.";
+            errorNode.classList.remove("hidden");
+          }
+        } finally {
+          if (actionBtn) {
+            actionBtn.disabled = false;
+            actionBtn.textContent = "Find Account";
+          }
+        }
+      }
       function closeAccountModal() {
         document.getElementById("account-modal")?.classList.add("hidden");
         document.getElementById("account-modal")?.classList.remove("flex");
       }
       function resetWithdrawalFlow() {
         selectedWithdrawalMethod = "";
+        withdrawMethodsCollapsed = false;
         withdrawalStep = "form";
         withdrawalSubmissionInFlight = false;
         document.getElementById("withdraw-destination-input").value = "";
@@ -4270,7 +4838,14 @@
         document.getElementById("withdraw-step-confirm")?.classList.add("hidden");
         document.querySelectorAll(".withdraw-method-card").forEach((card) => {
           card.classList.remove("border-cyan-400", "bg-cyan-500/10", "shadow-[0_16px_40px_rgba(34,211,238,0.12)]");
+          card.classList.remove("hidden", "sm:col-span-3");
         });
+        document
+          .getElementById("withdraw-method-grid")
+          ?.classList.remove("sm:grid-cols-1");
+        document
+          .getElementById("withdraw-method-grid")
+          ?.classList.add("sm:grid-cols-3");
         document.getElementById("withdraw-destination-block")?.classList.add("hidden");
         document.getElementById("withdraw-continue-btn").disabled = false;
         document.getElementById("withdraw-submit-btn").disabled = false;
@@ -4294,8 +4869,22 @@
         document.getElementById("withdraw-modal")?.classList.add("hidden");
         document.getElementById("withdraw-modal")?.classList.remove("flex");
       }
+      function updateWithdrawalMethodLayout() {
+        const methodGrid = document.getElementById("withdraw-method-grid");
+        document.querySelectorAll(".withdraw-method-card").forEach((card) => {
+          const isSelected = card.id === `withdraw-method-${selectedWithdrawalMethod}`;
+          card.classList.toggle("hidden", withdrawMethodsCollapsed && !isSelected);
+          card.classList.toggle("sm:col-span-3", withdrawMethodsCollapsed && isSelected);
+        });
+        if (methodGrid) {
+          methodGrid.classList.toggle("sm:grid-cols-1", withdrawMethodsCollapsed);
+          methodGrid.classList.toggle("sm:grid-cols-3", !withdrawMethodsCollapsed);
+        }
+      }
       function selectWithdrawMethod(method) {
+        const clickedSameMethod = selectedWithdrawalMethod === method;
         selectedWithdrawalMethod = method;
+        withdrawMethodsCollapsed = clickedSameMethod ? !withdrawMethodsCollapsed : true;
         const destinationBlock = document.getElementById("withdraw-destination-block");
         const destinationLabel = document.getElementById("withdraw-destination-label");
         const destinationInput = document.getElementById("withdraw-destination-input");
@@ -4309,6 +4898,7 @@
             "bg-cyan-500/10",
             "shadow-[0_16px_40px_rgba(34,211,238,0.12)]",
           );
+        updateWithdrawalMethodLayout();
         if (destinationBlock) destinationBlock.classList.remove("hidden");
         if (destinationLabel) {
           destinationLabel.textContent =
@@ -4744,6 +5334,7 @@
               "auth",
             );
             goToStudio();
+            setTimeout(() => maybePromptRenderHostingOnboarding(), 600);
           } else {
             currentPremiumRequest = null;
           }
@@ -5744,9 +6335,194 @@
           return;
         }
         // =============================================================
+        // 0. STUDIO CONSOLE
+        // =============================================================
+        if (id === "console") {
+          const liveProjects =
+            loggedIn && currentUser?.githubUsername
+              ? await fetchGithubProjects()
+              : currentUser?.liveProjects || [];
+          const adsenseReport = loggedIn ? await fetchAdsenseConsoleReport() : null;
+          const recentProjects = liveProjects.slice(0, 3);
+          const balance = getCurrentBalance();
+          const canWithdraw = loggedIn && balance >= 5;
+          html = `
+            <div class="animate-fadeIn h-full">
+              <div class="max-w-6xl mx-auto min-h-full space-y-6 sm:space-y-8">
+                <div class="relative overflow-hidden rounded-[2.25rem] border border-cyan-500/15 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.14),transparent_28%),linear-gradient(135deg,rgba(8,145,178,0.18),rgba(2,6,23,0.96))] px-5 py-6 sm:px-7 sm:py-8 shadow-[0_28px_80px_rgba(2,6,23,0.42)]">
+                  <div class="absolute inset-y-0 right-0 w-40 bg-[radial-gradient(circle,rgba(34,211,238,0.22),transparent_65%)] blur-2xl opacity-70"></div>
+                  <div class="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                    <div class="max-w-2xl">
+                      <p class="text-[10px] font-black uppercase tracking-[0.28em] text-cyan-300">Studio Console</p>
+                      <h2 class="mt-3 text-3xl sm:text-4xl font-semibold text-white tracking-tighter">Operate your sites like a real creator cloud.</h2>
+                      <p class="mt-3 text-sm leading-6 text-slate-300/80">Everything important stays in one polished surface: wallet, GitHub hosting, and recent live projects built for mobile speed and desktop clarity.</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 sm:w-auto sm:min-w-[280px]">
+                      <div class="rounded-[1.5rem] border border-white/10 bg-white/8 px-4 py-4 backdrop-blur-xl">
+                        <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Balance</p>
+                        <p class="mt-2 text-2xl font-black text-white">${formatCurrency(balance)}</p>
+                      </div>
+                      <div class="rounded-[1.5rem] border border-white/10 bg-white/8 px-4 py-4 backdrop-blur-xl">
+                        <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Live Sites</p>
+                        <p class="mt-2 text-2xl font-black text-white">${liveProjects.length}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 xl:grid-cols-[1.05fr_0.95fr] gap-6 lg:gap-8">
+                  <div class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div class="relative overflow-hidden rounded-[2rem] border border-cyan-400/20 bg-[linear-gradient(145deg,rgba(6,182,212,0.18),rgba(15,23,42,0.98))] p-5 sm:p-6 shadow-[0_24px_70px_rgba(8,145,178,0.22)] backdrop-blur-2xl">
+                        <div class="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-cyan-300/10 blur-2xl"></div>
+                        <p class="relative text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/80">Current Balance</p>
+                        <div class="relative mt-4 flex items-end justify-between gap-4">
+                          <div>
+                            <p class="text-4xl sm:text-5xl font-black text-white tracking-tight">${formatCurrency(balance)}</p>
+                            <p class="mt-2 text-xs leading-5 text-cyan-100/70">Available for creator payouts, secure withdrawals, and future monetization.</p>
+                          </div>
+                          <div class="w-14 h-14 rounded-[1.4rem] border border-white/10 bg-white/10 flex items-center justify-center text-cyan-100 text-xl shadow-[0_10px_35px_rgba(34,211,238,0.18)]">
+                            <i class="fas fa-wallet"></i>
+                          </div>
+                        </div>
+                        <div class="relative mt-6 flex items-center justify-between gap-4">
+                          <button onclick="openAccountModal()" ${canWithdraw ? "" : "disabled"} class="inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] transition-all ${canWithdraw ? "bg-white text-slate-950 hover:bg-cyan-50 shadow-[0_18px_35px_rgba(255,255,255,0.16)]" : "bg-white/10 text-slate-400 cursor-not-allowed border border-white/10"}">
+                            <i class="fas fa-arrow-up-right-from-square"></i>
+                            Withdraw
+                          </button>
+                          <p class="text-[11px] text-right text-slate-300/70">${canWithdraw ? "Ready for payout" : "Minimum withdrawal is $5"}</p>
+                        </div>
+                      </div>
+                      <div class="relative overflow-hidden rounded-[2rem] border border-emerald-400/20 bg-[linear-gradient(145deg,rgba(16,185,129,0.18),rgba(15,23,42,0.98))] p-5 sm:p-6 shadow-[0_24px_70px_rgba(16,185,129,0.18)] backdrop-blur-2xl">
+                        <div class="absolute -left-8 -bottom-8 h-28 w-28 rounded-full bg-emerald-300/10 blur-2xl"></div>
+                        <p class="relative text-[10px] font-black uppercase tracking-[0.24em] text-emerald-200/80">Total Live Sites</p>
+                        <div class="relative mt-4 flex items-end justify-between gap-4">
+                          <div>
+                            <p class="text-4xl sm:text-5xl font-black text-white tracking-tight">${liveProjects.length}</p>
+                            <p class="mt-2 text-xs leading-5 text-emerald-100/70">Published from MediaLab into your GitHub Pages storage with managed cloud delivery.</p>
+                          </div>
+                          <div class="w-14 h-14 rounded-[1.4rem] border border-white/10 bg-white/10 flex items-center justify-center text-emerald-100 text-xl shadow-[0_10px_35px_rgba(16,185,129,0.16)]">
+                            <i class="fas fa-globe"></i>
+                          </div>
+                        </div>
+                        <div class="relative mt-6 flex items-center justify-between gap-4">
+                          <button onclick="switchTool('history')" class="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white hover:bg-white/15 transition-all border border-white/10">
+                            <i class="fas fa-layer-group"></i>
+                            Open Library
+                          </button>
+                          <p class="text-[11px] text-right text-slate-300/70">Recent sites stay synced here.</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(15,23,42,0.82))] backdrop-blur-2xl p-5 sm:p-6 shadow-[0_24px_60px_rgba(2,6,23,0.32)]">
+                      <div class="flex items-start justify-between gap-4">
+                        <div>
+                          <p class="text-[10px] font-black uppercase tracking-[0.24em] text-amber-300">AdSense Performance</p>
+                          <h3 class="mt-2 text-2xl font-semibold tracking-tight text-white">Real-time creator stats</h3>
+                          <p class="mt-2 text-sm text-slate-400">${
+                            adsenseReport?.connected
+                              ? "Live numbers pulled from your Google AdSense connection across your hosted MediaLab domains."
+                              : "Connect AdSense for real-time earnings, impressions, RPM, and click performance."
+                          }</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-[1.3rem] border border-amber-400/20 bg-amber-500/10 flex items-center justify-center text-amber-300 shadow-[0_10px_30px_rgba(245,158,11,0.14)]">
+                          <i class="fab fa-google"></i>
+                        </div>
+                      </div>
+                      ${
+                        adsenseReport?.connected && adsenseReport?.stats
+                          ? `<div class="mt-5 grid grid-cols-2 gap-3">
+                              <div class="rounded-[1.4rem] border border-white/10 bg-slate-950/70 p-4">
+                                <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Estimated Earnings</p>
+                                <p class="mt-2 text-2xl font-black text-white">$${Number(adsenseReport.stats.estimatedEarnings || 0).toFixed(2)}</p>
+                              </div>
+                              <div class="rounded-[1.4rem] border border-white/10 bg-slate-950/70 p-4">
+                                <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Impressions</p>
+                                <p class="mt-2 text-2xl font-black text-white">${formatCompactNumber(adsenseReport.stats.impressions || 0)}</p>
+                              </div>
+                              <div class="rounded-[1.4rem] border border-white/10 bg-slate-950/70 p-4">
+                                <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Page RPM</p>
+                                <p class="mt-2 text-2xl font-black text-white">$${Number(adsenseReport.stats.pageViewsRpm || 0).toFixed(2)}</p>
+                              </div>
+                              <div class="rounded-[1.4rem] border border-white/10 bg-slate-950/70 p-4">
+                                <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Clicks</p>
+                                <p class="mt-2 text-2xl font-black text-white">${formatCompactNumber(adsenseReport.stats.clicks || 0)}</p>
+                              </div>
+                            </div>
+                            <p class="mt-4 text-xs leading-6 text-slate-400">${adsenseReport.message || ""}</p>`
+                          : `<div class="mt-5 rounded-[1.5rem] border border-dashed border-amber-400/20 bg-amber-500/5 p-5">
+                              <p class="text-sm font-semibold text-white">Connect AdSense for Real-Time Stats</p>
+                              <p class="mt-2 text-sm leading-6 text-slate-400">MediaLab will reuse your Google sign-in, request AdSense read access, and then pull your actual earnings and traffic metrics into the Console.</p>
+                              <button onclick="openAdsenseLinkModal()" class="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white text-slate-950 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] hover:bg-amber-50 transition-all shadow-[0_18px_35px_rgba(255,255,255,0.12)]">
+                                <i class="fas fa-link"></i>
+                                Connect AdSense
+                              </button>
+                            </div>`
+                      }
+                    </div>
+                    ${buildGithubStorageStatusMarkup("console")}
+                  </div>
+                  <div class="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(15,23,42,0.82))] backdrop-blur-2xl p-5 sm:p-6 shadow-[0_24px_60px_rgba(2,6,23,0.32)]">
+                    <div class="flex items-start justify-between gap-4 mb-5">
+                      <div>
+                        <p class="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-400">Quick Project List</p>
+                        <h3 class="mt-2 text-2xl font-semibold tracking-tight text-white">Recent live sites</h3>
+                        <p class="mt-2 text-sm text-slate-400">A focused project rail for fast management, monitoring, and opening the full control center.</p>
+                      </div>
+                      <div class="w-12 h-12 rounded-[1.3rem] border border-white/10 bg-white/5 flex items-center justify-center text-cyan-300 shadow-[0_10px_30px_rgba(34,211,238,0.12)]">
+                        <i class="fas fa-rocket"></i>
+                      </div>
+                    </div>
+                    <div class="space-y-3">
+                      ${
+                        recentProjects.length
+                          ? recentProjects
+                              .map((project) => {
+                                const filename =
+                                  project.filename || project.fileName || "";
+                                const lastPublished = new Date(
+                                  project.updatedAt ||
+                                    project.lastSyncedAt ||
+                                    project.createdAt ||
+                                    Date.now(),
+                                ).toLocaleString();
+                                return `
+                                  <div class="rounded-[1.6rem] border border-white/10 bg-slate-950/75 px-4 py-4 shadow-[0_18px_40px_rgba(2,6,23,0.35)] transition-all hover:border-cyan-400/25 hover:bg-slate-950/90">
+                                    <div class="flex items-start justify-between gap-4">
+                                      <div class="min-w-0">
+                                        <p class="text-sm font-semibold text-white truncate">${project.name || filename || "Untitled Project"}</p>
+                                        <p class="mt-1 text-[11px] text-slate-500 truncate">${project.liveUrl || project.url || ""}</p>
+                                        <p class="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Last Published ${lastPublished}</p>
+                                      </div>
+                                      <button onclick="openLiveProjectDetail('${filename}')" class="shrink-0 inline-flex items-center gap-2 rounded-2xl bg-cyan-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300 border border-cyan-400/20 hover:bg-cyan-500/15 transition-all">
+                                        <i class="fas fa-sliders"></i>
+                                        Manage
+                                      </button>
+                                    </div>
+                                  </div>`;
+                              })
+                              .join("")
+                          : `<div class="rounded-[1.6rem] border border-dashed border-white/10 bg-slate-950/55 px-5 py-10 text-center">
+                              <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[1.4rem] bg-white/5 border border-white/10 text-cyan-300">
+                                <i class="fas fa-cloud"></i>
+                              </div>
+                              <p class="mt-4 text-base font-semibold text-white">No live sites yet</p>
+                              <p class="mt-2 text-sm leading-6 text-slate-400">Use the Web Builder to publish your first page to the cloud.</p>
+                            </div>`
+                      }
+                    </div>
+                    <button onclick="switchTool('history')" class="mt-5 w-full inline-flex items-center justify-center gap-2 rounded-[1.4rem] bg-cyan-500/10 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-cyan-200 border border-cyan-400/20 hover:bg-cyan-500/15 transition-all">
+                      <i class="fas fa-arrow-right"></i>
+                      View All Projects
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>`;
+        }
+        // =============================================================
         // 0. PROJECT HISTORY / LIBRARY
         // =============================================================
-        if (id === "history") {
+        else if (id === "history") {
           const liveProjects =
             loggedIn && currentUser?.githubUsername
               ? await fetchGithubProjects()
@@ -5952,6 +6728,7 @@
                             <button onclick="requestNewBuilderProject(); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-file-circle-plus text-cyan-400"></i><span>New Project<small>Reset current canvas</small></span></button>
                             <button onclick="saveBuilderDraft(); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-floppy-disk text-cyan-400"></i><span>Save Draft<small>Keep work locally</small></span></button>
                             <button onclick="openBuilderFilePicker('builder-file-input'); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-file-import text-cyan-400"></i><span>Import HTML<small>Open local project code</small></span></button>
+                            <button onclick="openBuilderRunMode(); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-play text-emerald-400"></i><span>Run Site<small>Open a clean live preview</small></span></button>
                             <button onclick="downloadBuilderHtmlFile(); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-file-export text-cyan-400"></i><span>Export HTML<small>Download polished page file</small></span></button>
                             <button onclick="openBuilderPublishModal(); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-rocket text-emerald-400"></i><span>Publish To Web<small>Push live HTML to GitHub Pages</small></span></button>
                             <button onclick="downloadBuilderStylesTxt(); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-file-lines text-cyan-400"></i><span>Export TXT<small>Download full code as text</small></span></button>
@@ -11277,6 +12054,11 @@ ${payload.body || "  "}
             "success",
             true,
           );
+          if (data.needsHostingOnboarding) {
+            setTimeout(() => {
+              maybePromptRenderHostingOnboarding(true);
+            }, 200);
+          }
           setTimeout(() => {
             progressDiv?.classList.add("hidden");
             if (bar) {
@@ -11556,6 +12338,46 @@ ${payload.body || "  "}
       }
       function downloadBuilderHtmlFile() {
         exportCanvasToHTML();
+      }
+      function openBuilderRunMode() {
+        const payload = buildExportPayload("medialab-page");
+        if (!payload?.body?.trim()) {
+          showBuilderSnackbar("Add content to the canvas before running the site.", "error");
+          return;
+        }
+        const modal = document.getElementById("builder-run-modal");
+        const frame = document.getElementById("builder-run-frame");
+        if (!modal || !frame) return;
+        modal.classList.remove("hidden");
+        frame.srcdoc = buildCodeModeDocument();
+      }
+      function closeBuilderRunMode() {
+        const modal = document.getElementById("builder-run-modal");
+        const frame = document.getElementById("builder-run-frame");
+        if (modal) modal.classList.add("hidden");
+        if (frame) {
+          frame.srcdoc = "";
+          frame.removeAttribute("src");
+        }
+        if (builderRunPreviewUrl) {
+          URL.revokeObjectURL(builderRunPreviewUrl);
+          builderRunPreviewUrl = null;
+        }
+      }
+      function openBuilderRunModeInNewTab() {
+        const payload = buildExportPayload("medialab-page");
+        if (!payload?.body?.trim()) {
+          showBuilderSnackbar("Add content to the canvas before running the site.", "error");
+          return;
+        }
+        if (builderRunPreviewUrl) {
+          URL.revokeObjectURL(builderRunPreviewUrl);
+          builderRunPreviewUrl = null;
+        }
+        builderRunPreviewUrl = URL.createObjectURL(
+          new Blob([buildCodeModeDocument()], { type: "text/html" }),
+        );
+        window.open(builderRunPreviewUrl, "_blank", "noopener,noreferrer");
       }
       function downloadBuilderStylesTxt() {
         const stamp = `medialab-code-${Date.now()}`;

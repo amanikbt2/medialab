@@ -13,10 +13,12 @@ import "dotenv/config";
 import multer from "multer";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
+import { google } from "googleapis";
 
 // Models & Routes
 import authRoutes, {
   buildGithubClient,
+  decryptGoogleRefreshToken,
   initializeGithubStorageForUser,
   toSafeUser,
 } from "./routes/authRoutes.js";
@@ -142,6 +144,7 @@ function buildPublishedHtmlDocument({
   htmlContent = "",
   cssContent = "",
   adsenseId = "",
+  adsenseAdCode = "",
   description = "",
   keywords = "",
   includeRepoFavicon = true,
@@ -153,8 +156,11 @@ function buildPublishedHtmlDocument({
     description || `${safeTitle} published with MediaLab.`,
   );
   const safeKeywords = escapeMetaContent(keywords || "MediaLab, website, publish");
+  const trimmedAdCode = String(adsenseAdCode || "").trim();
   const adsenseTag =
-    adsenseId && /^ca-pub-/i.test(String(adsenseId).trim())
+    trimmedAdCode && /pagead2\.googlesyndication\.com/i.test(trimmedAdCode)
+      ? `\n    ${trimmedAdCode}`
+      : adsenseId && /^ca-pub-/i.test(String(adsenseId).trim())
       ? `\n    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${String(
           adsenseId,
         ).trim()}" crossorigin="anonymous"></script>`
@@ -214,6 +220,80 @@ function buildAdsTxtCandidateUrls(user) {
     `https://${user.githubUsername}.github.io/medialab/ads.txt`,
     `https://${user.githubUsername}.github.io/ads.txt`,
   ];
+}
+
+function normalizeRenderUrl(url = "") {
+  const raw = String(url || "").trim();
+  if (!raw) return "";
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  const parsed = new URL(withProtocol);
+  parsed.hash = "";
+  return parsed.toString().replace(/\/$/, "");
+}
+
+function getAdsenseOAuthClient(user) {
+  const refreshToken = decryptGoogleRefreshToken(user?.googleRefreshToken || "");
+  if (!refreshToken) {
+    throw new Error("Connect AdSense with Google first to load real-time stats.");
+  }
+  const client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_CALLBACK_URL,
+  );
+  client.setCredentials({ refresh_token: refreshToken });
+  return client;
+}
+
+function collectHostedDomains(projects = []) {
+  const urls = projects.flatMap((project) => [
+    project?.renderUrl || "",
+    project?.liveUrl || project?.url || "",
+  ]);
+  return [...new Set(
+    urls
+      .map((url) => {
+        try {
+          return new URL(url).hostname;
+        } catch {
+          return "";
+        }
+      })
+      .filter(Boolean),
+  )];
+}
+
+function isAllowedAdsenseProjectUrl(user, rawUrl = "") {
+  const normalized = normalizeRenderUrl(rawUrl);
+  if (!normalized) return false;
+  const allowedUrls = new Set();
+  const projects = Array.isArray(user?.liveProjects) ? user.liveProjects : [];
+  projects.forEach((project) => {
+    [project?.renderUrl, project?.liveUrl, project?.url].forEach((value) => {
+      const candidate = normalizeRenderUrl(value || "");
+      if (candidate) allowedUrls.add(candidate);
+    });
+  });
+  if (allowedUrls.has(normalized)) return true;
+  try {
+    const parsed = new URL(normalized);
+    if (
+      user?.githubUsername &&
+      parsed.hostname === `${user.githubUsername}.github.io` &&
+      parsed.pathname.startsWith("/medialab/")
+    ) {
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+function extractDomainNameFromUrl(url = "") {
+  try {
+    return new URL(String(url || "").trim()).hostname;
+  } catch {
+    return "";
+  }
 }
 
 function detectAdsenseScript(html = "", adsenseId = "") {
@@ -451,7 +531,7 @@ app.post("/api/github/setup-repository", async (req, res) => {
   }
 
   try {
-    const user = await User.findById(req.user._id).select("+githubToken");
+    const user = await User.findById(req.user._id).select("+githubToken +adsenseAdCode");
     if (!user) {
       return res
         .status(404)
@@ -549,6 +629,7 @@ app.post("/api/github/publish", express.json({ limit: "10mb" }), async (req, res
       htmlContent,
       cssContent,
       adsenseId: user.adsenseId || "",
+      adsenseAdCode: user.adsenseAdCode || "",
       description,
       keywords,
     });
@@ -587,6 +668,9 @@ app.post("/api/github/publish", express.json({ limit: "10mb" }), async (req, res
     });
 
     const liveUrl = `https://${owner}.github.io/${repo}/${filename}`;
+    const existingProject = user.liveProjects.find(
+      (project) => String(project?.fileName || project?.filename || "") === filename,
+    );
     const nextProject = {
       name: projectName,
       fileName: filename,
@@ -595,10 +679,13 @@ app.post("/api/github/publish", express.json({ limit: "10mb" }), async (req, res
       url: liveUrl,
       liveUrl,
       status: "live",
+      renderUrl: existingProject?.renderUrl || "",
+      renderHostedConfirmed: Boolean(existingProject?.renderHostedConfirmed),
+      renderVerifiedAt: existingProject?.renderVerifiedAt || null,
       adsensePublisherId: user.adsenseId || "",
       lastSyncedAt: new Date(),
       updatedAt: new Date(),
-      createdAt: new Date(),
+      createdAt: existingProject?.createdAt || new Date(),
     };
 
     user.liveProjects = Array.isArray(user.liveProjects) ? user.liveProjects : [];
@@ -626,6 +713,7 @@ app.post("/api/github/publish", express.json({ limit: "10mb" }), async (req, res
       message: "Project published successfully.",
       liveProject: nextProject,
       liveUrl,
+      needsHostingOnboarding: !nextProject.renderHostedConfirmed,
       warnings,
       sizeBytes: htmlSizeBytes,
       user: toSafeUser(user),
@@ -1119,6 +1207,478 @@ app.get("/api/github/project-monitor", async (req, res) => {
     return res.status(500).json({
       success: false,
       message: error?.message || "Could not load project monitor right now.",
+    });
+  }
+});
+
+app.post("/api/github/verify-render-hosting", express.json(), async (req, res) => {
+  if (!req.isAuthenticated() || !req.user) {
+    return res
+      .status(401)
+      .json({ success: false, message: "You need to sign in first." });
+  }
+
+  try {
+    const filename = String(req.body?.filename || "").trim();
+    const normalizedRenderUrl = normalizeRenderUrl(req.body?.renderUrl || "");
+    if (!filename || !normalizedRenderUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "Project file and Render URL are required.",
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    user.liveProjects = Array.isArray(user.liveProjects) ? user.liveProjects : [];
+    const projectIndex = user.liveProjects.findIndex(
+      (item) => String(item?.fileName || item?.filename || "").trim() === filename,
+    );
+    if (projectIndex < 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Live project not found for Render verification.",
+      });
+    }
+
+    let response;
+    try {
+      response = await fetch(normalizedRenderUrl, {
+        method: "GET",
+        redirect: "follow",
+        headers: { "User-Agent": "MediaLab-Render-Verify" },
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: "Render URL could not be reached yet. Finish hosting and try verify again.",
+      });
+    }
+
+    if (response.status >= 400) {
+      return res.status(400).json({
+        success: false,
+        message: `Render site responded with ${response.status}. Publish it on Render first, then verify again.`,
+      });
+    }
+
+    const project = user.liveProjects[projectIndex];
+    project.renderUrl = normalizedRenderUrl;
+    project.renderHostedConfirmed = true;
+    project.renderVerifiedAt = new Date();
+    project.updatedAt = new Date();
+
+    if (!user.confirmedFirstHosting) {
+      user.confirmedFirstHosting = true;
+      user.firstHostingConfirmedAt = new Date();
+    }
+
+    await user.save();
+    req.user.liveProjects = user.liveProjects;
+
+    await createUsageLog({
+      user,
+      email: user.email,
+      name: user.name,
+      isPro: Boolean(user.isPro),
+      action: "render-hosting-verified",
+      summary: `verified Render hosting for ${filename}`,
+      source: "render",
+      metadata: { filename, renderUrl: normalizedRenderUrl },
+    });
+
+    return res.json({
+      success: true,
+      message: "Render hosting verified successfully.",
+      project: user.liveProjects[projectIndex],
+      user: toSafeUser(user),
+    });
+  } catch (error) {
+    console.error("Render hosting verification failed:", error);
+    return res.status(500).json({
+      success: false,
+      message: error?.message || "Could not verify Render hosting right now.",
+    });
+  }
+});
+
+app.post("/api/adsense/link-site", express.json(), async (req, res) => {
+  if (!req.isAuthenticated() || !req.user) {
+    return res
+      .status(401)
+      .json({ success: false, message: "You need to sign in first." });
+  }
+
+  try {
+    const liveProjectUrl = normalizeRenderUrl(req.body?.liveProjectUrl || "");
+    if (!liveProjectUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "Enter your live project URL first.",
+      });
+    }
+
+    const user = await User.findById(req.user._id).select("+googleRefreshToken +adsenseAdCode");
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+    if (!user.googleRefreshToken) {
+      return res.status(400).json({
+        success: false,
+        requiresGoogleReconnect: true,
+        message: "Reconnect Google first so MediaLab can read your AdSense data.",
+      });
+    }
+    if (!isAllowedAdsenseProjectUrl(user, liveProjectUrl)) {
+      return res.status(403).json({
+        success: false,
+        message: "That URL is not recognized as one of your MediaLab projects.",
+      });
+    }
+
+    const domainName = extractDomainNameFromUrl(liveProjectUrl);
+    const auth = getAdsenseOAuthClient(user);
+    const adsense = google.adsense({ version: "v2", auth });
+    const accountsResponse = await adsense.accounts.list();
+    const accounts = accountsResponse.data?.accounts || [];
+
+    let matchedAccount = null;
+    let matchedSite = null;
+    for (const account of accounts) {
+      const sitesResponse = await adsense.accounts.sites.list({
+        parent: account.name,
+        pageSize: 200,
+      });
+      const sites = sitesResponse.data?.sites || [];
+      matchedSite = sites.find((site) => {
+        const siteUrl =
+          site.siteUrl || site.url || site.domain || site.reportingDimensionId || "";
+        const siteDomain = extractDomainNameFromUrl(siteUrl) || String(siteUrl).trim();
+        return siteDomain === domainName;
+      });
+      if (matchedSite) {
+        matchedAccount = account;
+        break;
+      }
+    }
+
+    if (!matchedAccount || !matchedSite) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "We couldn't find this URL in your AdSense account. Make sure you've added this site in your AdSense dashboard under Sites.",
+      });
+    }
+
+    const adClientsResponse = await adsense.accounts.adclients.list({
+      parent: matchedAccount.name,
+      pageSize: 50,
+    });
+    const adClients = adClientsResponse.data?.adClients || [];
+    const matchedAdClient =
+      adClients.find((client) =>
+        String(client.productCode || "").toUpperCase().includes("AFC"),
+      ) || adClients[0] || null;
+
+    let adCode = "";
+    if (matchedAdClient?.name) {
+      const adCodeResponse = await adsense.accounts.adclients.getAdcode({
+        name: matchedAdClient.name,
+      });
+      adCode = String(adCodeResponse.data?.adCode || "").trim();
+    }
+
+    const adsenseIdMatch = adCode.match(/ca-pub-\d+/i);
+    if (adsenseIdMatch?.[0]) {
+      user.adsenseId = normalizeAdsensePublisherId(adsenseIdMatch[0]);
+    }
+    user.adsenseAccountName = matchedAccount.name || "";
+    user.adsenseSiteUrl =
+      matchedSite.siteUrl || matchedSite.url || matchedSite.domain || liveProjectUrl;
+    user.adsenseSiteStatus =
+      matchedSite.state || matchedSite.status || matchedSite.platformType || "";
+    if (adCode) {
+      user.adsenseAdCode = adCode;
+    }
+    await user.save();
+
+    let adsTxtDetected = false;
+    for (const candidateUrl of buildAdsTxtCandidateUrls(user)) {
+      try {
+        const response = await fetch(candidateUrl, {
+          method: "GET",
+          redirect: "follow",
+          headers: { "User-Agent": "MediaLab-AdsTxt-Verify" },
+        });
+        if (response.status < 400) {
+          adsTxtDetected = true;
+          break;
+        }
+      } catch {}
+    }
+
+    const siteState = String(user.adsenseSiteStatus || "").toUpperCase();
+    const reviewPending =
+      siteState === "REQUIRES_REVIEW" || siteState === "GETTING_READY";
+
+    return res.json({
+      success: true,
+      message: `Success! We found your AdSense account ${user.adsenseId || ""}.`,
+      accountName: user.adsenseAccountName,
+      adsenseId: user.adsenseId,
+      siteUrl: user.adsenseSiteUrl,
+      siteStatus: user.adsenseSiteStatus,
+      checklist: {
+        scriptInjectedAutomatic: Boolean(user.adsenseAdCode || user.adsenseId),
+        adsTxtDetected,
+        googleReviewPending: reviewPending,
+      },
+      user: toSafeUser(user),
+    });
+  } catch (error) {
+    console.error("AdSense link-site failed:", error);
+    return res.status(500).json({
+      success: false,
+      message:
+        error?.response?.data?.error?.message ||
+        error?.message ||
+        "Could not link your AdSense site right now.",
+    });
+  }
+});
+
+app.get("/api/adsense/report", async (req, res) => {
+  if (!req.isAuthenticated() || !req.user) {
+    return res
+      .status(401)
+      .json({ success: false, message: "You need to sign in first." });
+  }
+
+  try {
+    const user = await User.findById(req.user._id).select("+googleRefreshToken");
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    const refreshToken = decryptGoogleRefreshToken(user.googleRefreshToken || "");
+    if (!refreshToken) {
+      return res.json({
+        success: true,
+        connected: false,
+        message: "Connect AdSense for real-time stats.",
+      });
+    }
+
+    const targetUrl =
+      String(req.query?.url || "").trim() ||
+      String(
+        user.liveProjects?.find((project) => project?.renderHostedConfirmed)?.renderUrl ||
+          user.liveProjects?.[0]?.renderUrl ||
+          user.liveProjects?.[0]?.liveUrl ||
+          user.liveProjects?.[0]?.url ||
+          "",
+      ).trim();
+    const domainName = extractDomainNameFromUrl(targetUrl);
+    if (!domainName) {
+      return res.json({
+        success: true,
+        connected: true,
+        hasDomain: false,
+        message: "Publish and host a project first to fetch domain-based AdSense stats.",
+      });
+    }
+
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_CALLBACK_URL,
+    );
+    oauth2Client.setCredentials({ refresh_token: refreshToken });
+
+    const adsense = google.adsense({
+      version: "v2",
+      auth: oauth2Client,
+    });
+
+    const accountsResponse = await adsense.accounts.list();
+    const accountName = accountsResponse.data?.accounts?.[0]?.name;
+    if (!accountName) {
+      return res.status(400).json({
+        success: false,
+        message: "No AdSense account was found for this Google profile.",
+      });
+    }
+
+    const reportResponse = await adsense.accounts.reports.generate({
+      account: accountName,
+      dateRange: "LAST_7_DAYS",
+      metrics: [
+        "ESTIMATED_EARNINGS",
+        "IMPRESSIONS",
+        "PAGE_VIEWS_RPM",
+        "CLICKS",
+      ],
+      dimensions: ["DOMAIN_NAME"],
+      filters: [`DOMAIN_NAME==${domainName}`],
+      languageCode: "en",
+    });
+
+    const headers = reportResponse.data?.headers || [];
+    const row = reportResponse.data?.rows?.[0]?.cells || [];
+    const readMetric = (name) => {
+      const index = headers.findIndex(
+        (header) => String(header?.name || "").toUpperCase() === name,
+      );
+      return index >= 0 ? row[index]?.value || row[index] || "0" : "0";
+    };
+
+    return res.json({
+      success: true,
+      connected: true,
+      hasDomain: true,
+      domainName,
+      report: {
+        estimatedEarnings: readMetric("ESTIMATED_EARNINGS"),
+        impressions: readMetric("IMPRESSIONS"),
+        pageViewsRpm: readMetric("PAGE_VIEWS_RPM"),
+        clicks: readMetric("CLICKS"),
+      },
+    });
+  } catch (error) {
+    console.error("AdSense report failed:", error);
+    return res.status(500).json({
+      success: false,
+      message:
+        error?.response?.data?.error?.message ||
+        error?.message ||
+        "Could not load AdSense report right now.",
+    });
+  }
+});
+
+app.get("/api/adsense/report", async (req, res) => {
+  if (!req.isAuthenticated() || !req.user) {
+    return res
+      .status(401)
+      .json({ success: false, message: "You need to sign in first." });
+  }
+
+  try {
+    const user = await User.findById(req.user._id).select("+googleRefreshToken");
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    if (!user.googleRefreshToken) {
+      return res.json({
+        success: true,
+        connected: false,
+        stats: null,
+        domains: [],
+        message: "Connect AdSense for real-time stats.",
+      });
+    }
+
+    const domains = collectHostedDomains(user.liveProjects || []);
+    if (!domains.length) {
+      return res.json({
+        success: true,
+        connected: true,
+        stats: {
+          estimatedEarnings: 0,
+          impressions: 0,
+          pageViewsRpm: 0,
+          clicks: 0,
+        },
+        domains: [],
+        message: "Publish and host a project first to start matching AdSense domains.",
+      });
+    }
+
+    const auth = getAdsenseOAuthClient(user);
+    const adsense = google.adsense({ version: "v2", auth });
+    const accountResponse = await adsense.accounts.list({ pageSize: 1 });
+    const accountName = accountResponse.data?.accounts?.[0]?.name;
+    if (!accountName) {
+      return res.json({
+        success: true,
+        connected: true,
+        stats: {
+          estimatedEarnings: 0,
+          impressions: 0,
+          pageViewsRpm: 0,
+          clicks: 0,
+        },
+        domains,
+        message: "No AdSense account was returned for this Google connection yet.",
+      });
+    }
+
+    const metrics = [
+      "ESTIMATED_EARNINGS",
+      "IMPRESSIONS",
+      "PAGE_VIEWS_RPM",
+      "CLICKS",
+    ];
+
+    const aggregate = {
+      estimatedEarnings: 0,
+      impressions: 0,
+      pageViewsRpm: 0,
+      clicks: 0,
+    };
+    let rpmSamples = 0;
+
+    for (const domain of domains.slice(0, 10)) {
+      const report = await adsense.accounts.reports.generate({
+        account: accountName,
+        dateRange: "LAST_7_DAYS",
+        dimensions: ["DOMAIN_NAME"],
+        metrics,
+        filters: [`DOMAIN_NAME==${domain}`],
+        languageCode: "en",
+        limit: 1,
+      });
+
+      const totals = report.data?.totals?.cells || report.data?.rows?.[0]?.cells || [];
+      const metricCells = totals.slice(-metrics.length);
+      if (metricCells.length < metrics.length) continue;
+
+      aggregate.estimatedEarnings += Number(metricCells[0]?.value || 0);
+      aggregate.impressions += Number(metricCells[1]?.value || 0);
+      aggregate.pageViewsRpm += Number(metricCells[2]?.value || 0);
+      aggregate.clicks += Number(metricCells[3]?.value || 0);
+      rpmSamples += 1;
+    }
+
+    if (rpmSamples > 0) {
+      aggregate.pageViewsRpm = aggregate.pageViewsRpm / rpmSamples;
+    }
+
+    return res.json({
+      success: true,
+      connected: true,
+      stats: {
+        estimatedEarnings: Number(aggregate.estimatedEarnings.toFixed(2)),
+        impressions: Math.round(aggregate.impressions),
+        pageViewsRpm: Number(aggregate.pageViewsRpm.toFixed(2)),
+        clicks: Math.round(aggregate.clicks),
+      },
+      domains,
+      accountName,
+      message: "Real-time AdSense stats loaded.",
+    });
+  } catch (error) {
+    console.error("AdSense report fetch failed:", error);
+    return res.status(500).json({
+      success: false,
+      message:
+        error?.response?.data?.error?.message ||
+        error?.message ||
+        "Could not load AdSense stats right now.",
     });
   }
 });

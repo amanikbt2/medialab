@@ -19,6 +19,8 @@ const githubClientId = process.env.GITHUB_CLIENT_ID || "";
 const githubClientSecret = process.env.GITHUB_CLIENT_SECRET || "";
 const githubEncryptionSecret =
   process.env.GITHUB_TOKEN_SECRET || process.env.SESSION_SECRET || "medialab-github-secret";
+const googleTokenSecret =
+  process.env.GOOGLE_TOKEN_SECRET || process.env.SESSION_SECRET || "medialab-google-secret";
 
 const resolveGithubCallbackUrl = (req) => {
   if (process.env.GITHUB_CALLBACK_URL) {
@@ -32,6 +34,8 @@ const resolveGithubCallbackUrl = (req) => {
 
 const buildGithubEncryptionKey = () =>
   crypto.createHash("sha256").update(String(githubEncryptionSecret)).digest();
+const buildGoogleEncryptionKey = () =>
+  crypto.createHash("sha256").update(String(googleTokenSecret)).digest();
 
 const encryptGithubToken = (token = "") => {
   const iv = crypto.randomBytes(16);
@@ -57,6 +61,34 @@ const decryptGithubToken = (payload = "") => {
     return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
   } catch (error) {
     console.error("GitHub token decrypt failed:", error.message);
+    return "";
+  }
+};
+
+const encryptGoogleRefreshToken = (token = "") => {
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv("aes-256-gcm", buildGoogleEncryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(String(token), "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return JSON.stringify({
+    iv: iv.toString("hex"),
+    content: encrypted.toString("hex"),
+    tag: authTag.toString("hex"),
+  });
+};
+
+export const decryptGoogleRefreshToken = (payload = "") => {
+  if (!payload) return "";
+  try {
+    const parsed = JSON.parse(String(payload));
+    const iv = Buffer.from(parsed.iv || "", "hex");
+    const encrypted = Buffer.from(parsed.content || "", "hex");
+    const authTag = Buffer.from(parsed.tag || "", "hex");
+    const decipher = crypto.createDecipheriv("aes-256-gcm", buildGoogleEncryptionKey(), iv);
+    decipher.setAuthTag(authTag);
+    return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
+  } catch (error) {
+    console.error("Google refresh token decrypt failed:", error.message);
     return "";
   }
 };
@@ -164,9 +196,15 @@ export const initializeGithubStorageForUser = async (user) => {
 export const toSafeUser = (user) => {
   if (!user) return null;
   const source = typeof user.toObject === "function" ? user.toObject() : { ...user };
+  const hasAdsenseConnection = Boolean(
+    source.googleRefreshToken || source.adsenseId || source.adsenseAccountName,
+  );
   delete source.password;
   delete source.githubToken;
+  delete source.googleRefreshToken;
+  delete source.adsenseAdCode;
   source.githubConnected = Boolean(source.githubUsername);
+  source.adsenseConnected = hasAdsenseConnection;
   return source;
 };
 
@@ -297,6 +335,9 @@ passport.use(
             user.googleId = profile.id;
             if (!user.profilePicture) user.profilePicture = profilePic;
             user.lastLogin = new Date();
+            if (refreshToken) {
+              user.googleRefreshToken = encryptGoogleRefreshToken(refreshToken);
+            }
             await user.save();
             console.log(`🔗 Account Linked: ${profileEmail}`);
           }
@@ -311,6 +352,9 @@ passport.use(
             profilePicture: profilePic,
             provider: "google",
             lastLogin: new Date(),
+            googleRefreshToken: refreshToken
+              ? encryptGoogleRefreshToken(refreshToken)
+              : "",
           });
 
           if (user.email) sendWelcomeEmail(user.email, user.name);
@@ -318,6 +362,9 @@ passport.use(
         } else {
           // Update last login for existing users
           user.lastLogin = new Date();
+          if (refreshToken) {
+            user.googleRefreshToken = encryptGoogleRefreshToken(refreshToken);
+          }
           await user.save();
         }
 
@@ -335,8 +382,14 @@ passport.use(
 router.get(
   "/google",
   passport.authenticate("google", {
-    scope: ["profile", "email"],
-    prompt: "select_account",
+    scope: [
+      "profile",
+      "email",
+      "https://www.googleapis.com/auth/adsense.readonly",
+    ],
+    accessType: "offline",
+    includeGrantedScopes: true,
+    prompt: "consent select_account",
   }),
 );
 
