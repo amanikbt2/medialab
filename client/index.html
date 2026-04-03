@@ -2849,21 +2849,32 @@
           </div>
         </div>
         <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <a
-            href="https://dashboard.render.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="rounded-[1.7rem] border border-white/10 bg-white/[0.04] p-5 hover:border-cyan-400/20 hover:bg-white/[0.06] transition-all"
-          >
+          <div class="rounded-[1.7rem] border border-emerald-400/20 bg-emerald-500/10 p-5">
             <div class="flex items-center justify-between gap-3">
               <div>
-                <p class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Step 1</p>
-                <p class="mt-2 text-lg font-semibold text-white">Open Render</p>
-                <p class="mt-2 text-sm leading-6 text-slate-400">Sign in with your email and start a new Static Site from GitHub.</p>
+                <p class="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-300">Code Pushed</p>
+                <p class="mt-2 text-lg font-semibold text-white">Now, let’s go live.</p>
+                <p class="mt-2 text-sm leading-6 text-slate-300">Launch Render with MediaLab’s pre-configured blueprint in one click.</p>
               </div>
-              <i class="fas fa-arrow-up-right-from-square text-cyan-300 text-lg"></i>
+              <i class="fas fa-rocket text-emerald-300 text-lg"></i>
             </div>
-          </a>
+            <button
+              id="render-blueprint-launch-btn"
+              onclick="openRenderDeployBlueprint()"
+              class="mt-5 w-full rounded-[1.2rem] bg-emerald-400 px-4 py-3.5 text-sm font-black text-slate-950 hover:bg-emerald-300 transition-all"
+            >
+              🚀 Setup My Render Server
+            </button>
+            <div class="mt-4 rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-4">
+              <p class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">What happens next?</p>
+              <div class="mt-3 space-y-2 text-sm leading-6 text-slate-300">
+                <p>1. Sign in to Render with GitHub.</p>
+                <p>2. Click Apply to use our pre-configured Blueprint.</p>
+                <p>3. Your Candy Crush &amp; MediaLab API will be live in 60 seconds.</p>
+              </div>
+            </div>
+            <p id="render-blueprint-warning" class="hidden mt-4 rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"></p>
+          </div>
           <div class="rounded-[1.7rem] border border-white/10 bg-white/[0.04] p-5">
             <p class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Step 2</p>
             <p class="mt-2 text-lg font-semibold text-white">Choose the right source</p>
@@ -4204,6 +4215,51 @@
       function openRenderHostingGuide() {
         window.open("https://dashboard.render.com/", "_blank", "noopener,noreferrer");
       }
+      function generateDeployUrl(repoUrl = "") {
+        const cleanRepoUrl = String(repoUrl || "").trim();
+        if (!cleanRepoUrl) return "";
+        return `https://render.com/deploy?repo=${encodeURIComponent(cleanRepoUrl)}`;
+      }
+      function getCurrentRenderRepoUrl() {
+        return (
+          String(currentRenderHostingProject?.renderRepoUrl || "").trim() ||
+          (currentUser?.githubUsername
+            ? `https://github.com/${currentUser.githubUsername}/medialab`
+            : "")
+        );
+      }
+      function updateRenderDeployUi() {
+        const launchBtn = document.getElementById("render-blueprint-launch-btn");
+        const warning = document.getElementById("render-blueprint-warning");
+        if (!launchBtn || !warning) return;
+        const repoUrl = getCurrentRenderRepoUrl();
+        const hasRenderYaml = Boolean(currentUser?.githubRepoCreated && currentUser?.githubUsername);
+        launchBtn.disabled = !repoUrl;
+        launchBtn.classList.toggle("opacity-60", !repoUrl);
+        launchBtn.classList.toggle("cursor-not-allowed", !repoUrl);
+        if (hasRenderYaml) {
+          warning.classList.add("hidden");
+          warning.textContent = "";
+          return;
+        }
+        warning.textContent =
+          "Your repo must contain render.yaml at the root for one-click deploy to work. Set up GitHub hosting first so MediaLab can add it automatically.";
+        warning.classList.remove("hidden");
+      }
+      function openRenderDeployBlueprint() {
+        const repoUrl = getCurrentRenderRepoUrl();
+        const warning = document.getElementById("render-blueprint-warning");
+        if (!repoUrl) {
+          if (warning) {
+            warning.textContent =
+              "GitHub repository URL not found yet. Connect GitHub and publish your project first.";
+            warning.classList.remove("hidden");
+          }
+          return;
+        }
+        const deployUrl = generateDeployUrl(repoUrl);
+        window.open(deployUrl, "_blank", "noopener,noreferrer");
+      }
       function closeRenderHostingOnboarding() {
         document.getElementById("render-hosting-modal")?.classList.add("hidden");
         currentRenderHostingProject = null;
@@ -4229,6 +4285,7 @@
         const input = document.getElementById("render-hosting-url-input");
         if (input) input.value = project.renderUrl || "";
         document.getElementById("render-hosting-error")?.classList.add("hidden");
+        updateRenderDeployUi();
         document.getElementById("render-hosting-modal")?.classList.remove("hidden");
       }
       function maybePromptRenderHostingOnboarding(force = false) {

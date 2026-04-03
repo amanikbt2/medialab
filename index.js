@@ -28,6 +28,10 @@ import UpgradeRequest from "./models/UpgradeRequest.js";
 import UsageLog from "./models/UsageLog.js";
 import Download from "./models/Download.js";
 import WithdrawalRequest from "./models/WithdrawalRequest.js";
+import {
+  createRenderBlueprintInstance,
+  extractRenderDeploySuccessPayload,
+} from "./controllers/renderBlueprintController.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -344,9 +348,25 @@ app.listen(port, () => {
 .DS_Store
 npm-debug.log*
 `;
+  const renderYaml = `services:
+  - type: web
+    name: medialab-${String(owner || "client")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "client"}-host
+    runtime: node
+    plan: free
+    autoDeploy: true
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+`;
   return [
     { path: "package.json", content: packageJson },
     { path: "index.js", content: serverIndex },
+    { path: "render.yaml", content: renderYaml },
     { path: ".gitignore", content: gitignore },
     { path: "public/index.html", content: publicIndexHtml },
     { path: "public/.gitkeep", content: "" },
@@ -577,6 +597,12 @@ function sortLiveProjects(projects = []) {
   );
 }
 
+function buildGithubRepoUrl(username = "", repo = "medialab") {
+  const owner = String(username || "").trim();
+  if (!owner) return "";
+  return `https://github.com/${owner}/${repo}`;
+}
+
 function buildProjectLiveUrl(user, project = {}) {
   const filename = String(project?.fileName || project?.filename || "").trim();
   if (project?.liveUrl || project?.url) return project.liveUrl || project.url;
@@ -599,6 +625,14 @@ function normalizeRenderUrl(url = "") {
   const parsed = new URL(withProtocol);
   parsed.hash = "";
   return parsed.toString().replace(/\/$/, "");
+}
+
+function findLiveProjectIndex(user, filename = "") {
+  const target = String(filename || "").trim();
+  const projects = Array.isArray(user?.liveProjects) ? user.liveProjects : [];
+  return projects.findIndex(
+    (item) => String(item?.fileName || item?.filename || "").trim() === target,
+  );
 }
 
 function getAdsenseOAuthClient(user) {
@@ -1064,6 +1098,7 @@ app.post("/api/github/publish", publishRateLimit, express.json({ limit: "10mb" }
       url: liveUrl,
       liveUrl,
       status: "live",
+      renderRepoUrl: buildGithubRepoUrl(owner, repo),
       renderUrl: existingProject?.renderUrl || "",
       renderHostedConfirmed: Boolean(existingProject?.renderHostedConfirmed),
       renderVerifiedAt: existingProject?.renderVerifiedAt || null,
@@ -1098,6 +1133,8 @@ app.post("/api/github/publish", publishRateLimit, express.json({ limit: "10mb" }
       message: "Project published successfully.",
       liveProject: nextProject,
       liveUrl,
+      repoUrl: buildGithubRepoUrl(owner, repo),
+      renderBlueprintReady: true,
       needsHostingOnboarding: !nextProject.renderHostedConfirmed,
       warnings,
       sizeBytes: htmlSizeBytes,
@@ -1228,6 +1265,7 @@ app.post("/api/github/publish-folder", publishRateLimit, express.json({ limit: "
       url: liveUrl,
       liveUrl,
       status: "live",
+      renderRepoUrl: buildGithubRepoUrl(owner, repo),
       renderUrl: existingProject?.renderUrl || "",
       renderHostedConfirmed: Boolean(existingProject?.renderHostedConfirmed),
       renderVerifiedAt: existingProject?.renderVerifiedAt || null,
@@ -1261,6 +1299,8 @@ app.post("/api/github/publish-folder", publishRateLimit, express.json({ limit: "
       message: "Project folder published successfully.",
       liveProject: nextProject,
       liveUrl,
+      repoUrl: buildGithubRepoUrl(owner, repo),
+      renderBlueprintReady: true,
       needsHostingOnboarding: !nextProject.renderHostedConfirmed,
       fileCount: safeFiles.length,
       user: toSafeUser(user),
@@ -1861,6 +1901,159 @@ app.post("/api/github/verify-render-hosting", express.json(), async (req, res) =
     return res.status(500).json({
       success: false,
       message: error?.message || "Could not verify Render hosting right now.",
+    });
+  }
+});
+
+app.post("/api/render/deploy", publishRateLimit, express.json(), async (req, res) => {
+  if (!req.isAuthenticated() || !req.user) {
+    return res.status(401).json({ success: false, message: "You need to sign in first." });
+  }
+
+  try {
+    const filename = String(req.body?.filename || "").trim();
+    const clientName = String(req.body?.clientName || req.user?.name || "client").trim();
+    const repoUrl = String(req.body?.repoUrl || "").trim();
+    const branch = String(req.body?.branch || "main").trim() || "main";
+    if (!filename || !repoUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "Project filename and repository URL are required.",
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    user.liveProjects = Array.isArray(user.liveProjects) ? user.liveProjects : [];
+    const projectIndex = findLiveProjectIndex(user, filename);
+    if (projectIndex < 0) {
+      return res.status(404).json({ success: false, message: "Live project not found." });
+    }
+
+    const deployment = await createRenderBlueprintInstance({
+      clientName,
+      repoUrl,
+      branch,
+    });
+
+    const project = user.liveProjects[projectIndex];
+    project.renderRepoUrl = repoUrl;
+    project.renderServiceName = deployment.serviceName;
+    project.renderBlueprintId = String(
+      deployment.data?.id || deployment.data?.blueprintId || "",
+    ).trim();
+    project.renderDeployStatus = "deploying";
+    project.updatedAt = new Date();
+
+    await user.save();
+    req.user.liveProjects = user.liveProjects;
+
+    await createUsageLog({
+      user,
+      email: user.email,
+      name: user.name,
+      isPro: Boolean(user.isPro),
+      action: "render-blueprint-created",
+      summary: `started Render deployment for ${filename}`,
+      source: "render",
+      metadata: {
+        filename,
+        repoUrl,
+        serviceName: deployment.serviceName,
+        blueprintId: project.renderBlueprintId,
+      },
+    });
+
+    return res.json({
+      success: true,
+      message: "Render deployment started.",
+      serviceName: deployment.serviceName,
+      blueprintId: project.renderBlueprintId,
+      renderYaml: deployment.renderYaml,
+      project,
+      user: toSafeUser(user),
+    });
+  } catch (error) {
+    console.error("Render auto deploy failed:", error);
+    return res.status(500).json({
+      success: false,
+      message: error?.message || "Could not start Render deployment right now.",
+    });
+  }
+});
+
+app.post("/api/deploy-status", express.json(), async (req, res) => {
+  try {
+    const event = extractRenderDeploySuccessPayload(req.body || {});
+    if (!event) {
+      return res.json({ success: true, ignored: true });
+    }
+
+    const user = await User.findOne({
+      "liveProjects.renderServiceName": event.serviceName,
+    });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "No MediaLab project matched that Render service.",
+      });
+    }
+
+    user.liveProjects = Array.isArray(user.liveProjects) ? user.liveProjects : [];
+    const project = user.liveProjects.find(
+      (item) => String(item?.renderServiceName || "").trim() === event.serviceName,
+    );
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Matched user found, but project record is missing.",
+      });
+    }
+
+    project.renderUrl = normalizeRenderUrl(event.serviceUrl);
+    project.renderServiceId = event.serviceId;
+    project.renderDeployStatus = "deploy.succeeded";
+    project.renderHostedConfirmed = true;
+    project.renderVerifiedAt = new Date();
+    project.updatedAt = new Date();
+
+    if (!user.confirmedFirstHosting) {
+      user.confirmedFirstHosting = true;
+      user.firstHostingConfirmedAt = new Date();
+    }
+
+    await user.save();
+
+    await createUsageLog({
+      user,
+      email: user.email,
+      name: user.name,
+      isPro: Boolean(user.isPro),
+      action: "render-deploy-succeeded",
+      summary: `Render deployment succeeded for ${project.fileName || event.serviceName}`,
+      source: "render",
+      metadata: {
+        serviceId: event.serviceId,
+        serviceName: event.serviceName,
+        renderUrl: project.renderUrl,
+      },
+    });
+
+    return res.json({
+      success: true,
+      message: "Deployment status synced.",
+      serviceId: event.serviceId,
+      serviceName: event.serviceName,
+      renderUrl: project.renderUrl,
+    });
+  } catch (error) {
+    console.error("Render deploy status sync failed:", error);
+    return res.status(500).json({
+      success: false,
+      message: error?.message || "Could not process deployment status.",
     });
   }
 });

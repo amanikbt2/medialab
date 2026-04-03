@@ -207,6 +207,24 @@ app.listen(port, () => {
   return [
     { path: "package.json", content: packageJson },
     { path: "index.js", content: serverIndex },
+    {
+      path: "render.yaml",
+      content: `services:
+  - type: web
+    name: medialab-${String(owner || "client")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "client"}-host
+    runtime: node
+    plan: free
+    autoDeploy: true
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+`,
+    },
     { path: ".gitignore", content: "node_modules\n.env\n.DS_Store\nnpm-debug.log*\n" },
     { path: "public/index.html", content: publicIndexHtml },
     { path: "public/.gitkeep", content: "" },
