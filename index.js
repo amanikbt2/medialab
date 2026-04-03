@@ -603,6 +603,14 @@ function buildGithubRepoUrl(username = "", repo = "medialab") {
   return `https://github.com/${owner}/${repo}`;
 }
 
+function buildDefaultRenderServiceName(owner = "client") {
+  return `medialab-${String(owner || "client")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "client"}-host`;
+}
+
 function buildProjectLiveUrl(user, project = {}) {
   const filename = String(project?.fileName || project?.filename || "").trim();
   if (project?.liveUrl || project?.url) return project.liveUrl || project.url;
@@ -1099,6 +1107,8 @@ app.post("/api/github/publish", publishRateLimit, express.json({ limit: "10mb" }
       liveUrl,
       status: "live",
       renderRepoUrl: buildGithubRepoUrl(owner, repo),
+      renderServiceName:
+        existingProject?.renderServiceName || buildDefaultRenderServiceName(owner),
       renderUrl: existingProject?.renderUrl || "",
       renderHostedConfirmed: Boolean(existingProject?.renderHostedConfirmed),
       renderVerifiedAt: existingProject?.renderVerifiedAt || null,
@@ -1266,6 +1276,8 @@ app.post("/api/github/publish-folder", publishRateLimit, express.json({ limit: "
       liveUrl,
       status: "live",
       renderRepoUrl: buildGithubRepoUrl(owner, repo),
+      renderServiceName:
+        existingProject?.renderServiceName || buildDefaultRenderServiceName(owner),
       renderUrl: existingProject?.renderUrl || "",
       renderHostedConfirmed: Boolean(existingProject?.renderHostedConfirmed),
       renderVerifiedAt: existingProject?.renderVerifiedAt || null,
