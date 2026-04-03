@@ -184,6 +184,8 @@ function slugifyProjectName(value = "medialab-page") {
   return `${slug || "medialab-page"}.html`;
 }
 
+const GITHUB_PROJECTS_ROOT = "medialab";
+
 function slugifyProjectFolderName(value = "medialab-project") {
   return (
     String(value || "")
@@ -789,6 +791,7 @@ app.post("/api/github/publish", publishRateLimit, express.json({ limit: "10mb" }
     const owner = user.githubUsername;
     const repo = "medialab";
     const filename = slugifyProjectName(projectName);
+    const repoFilePath = normalizeRepoFilePath(`${GITHUB_PROJECTS_ROOT}/${filename}`);
     const fullHtml = buildPublishedHtmlDocument({
       projectName,
       htmlContent,
@@ -808,24 +811,24 @@ app.post("/api/github/publish", publishRateLimit, express.json({ limit: "10mb" }
       );
     }
 
-    const existingSha = await getGithubFileSha(octokit, owner, repo, filename);
+    const existingSha = await getGithubFileSha(octokit, owner, repo, repoFilePath);
     await upsertGithubFile({
       octokit,
       owner,
       repo,
-      path: filename,
-      message: `${existingSha ? "Update" : "Publish"} ${filename} from MediaLab`,
+      path: repoFilePath,
+      message: `${existingSha ? "Update" : "Publish"} ${repoFilePath} from MediaLab`,
       contentBase64: Buffer.from(fullHtml).toString("base64"),
     });
 
-    const liveUrl = `https://${owner}.github.io/${repo}/${filename}`;
+    const liveUrl = `https://${owner}.github.io/${repo}/${GITHUB_PROJECTS_ROOT}/${filename}`;
     const existingProject = user.liveProjects.find(
-      (project) => String(project?.fileName || project?.filename || "") === filename,
+      (project) => String(project?.fileName || project?.filename || "") === repoFilePath,
     );
     const nextProject = {
       name: projectName,
-      fileName: filename,
-      filename,
+      fileName: repoFilePath,
+      filename: repoFilePath,
       entryPath: filename,
       repoPath: "",
       projectType: "single",
@@ -844,7 +847,7 @@ app.post("/api/github/publish", publishRateLimit, express.json({ limit: "10mb" }
 
     user.liveProjects = Array.isArray(user.liveProjects) ? user.liveProjects : [];
     user.liveProjects = user.liveProjects.filter(
-      (project) => String(project?.fileName || project?.filename || "") !== filename,
+      (project) => String(project?.fileName || project?.filename || "") !== repoFilePath,
     );
     user.liveProjects.push(nextProject);
     await user.save();
@@ -857,9 +860,9 @@ app.post("/api/github/publish", publishRateLimit, express.json({ limit: "10mb" }
       name: user.name,
       isPro: Boolean(user.isPro),
       action: "github-publish",
-      summary: `published ${filename} to GitHub Pages`,
+      summary: `published ${repoFilePath} to GitHub Pages`,
       source: "github",
-      metadata: { projectName, filename, liveUrl },
+      metadata: { projectName, filename: repoFilePath, liveUrl },
     });
 
     return res.json({
@@ -962,12 +965,13 @@ app.post("/api/github/publish-folder", publishRateLimit, express.json({ limit: "
     }
 
     const folderSlug = slugifyProjectFolderName(projectName);
+    const repoFolderPath = normalizeRepoFilePath(`${GITHUB_PROJECTS_ROOT}/${folderSlug}`);
     const owner = user.githubUsername;
     const repo = "medialab";
     const octokit = buildGithubClient(user);
 
     for (const file of safeFiles) {
-      const repoPath = normalizeRepoFilePath(`${folderSlug}/${file.path}`);
+      const repoPath = normalizeRepoFilePath(`${repoFolderPath}/${file.path}`);
       const exists = await getGithubFileSha(octokit, owner, repo, repoPath);
       await upsertGithubFile({
         octokit,
@@ -979,8 +983,8 @@ app.post("/api/github/publish-folder", publishRateLimit, express.json({ limit: "
       });
     }
 
-    const repoEntryPath = normalizeRepoFilePath(`${folderSlug}/${entryPath}`);
-    const liveUrl = buildFolderProjectLiveUrl(owner, repo, folderSlug, entryPath);
+    const repoEntryPath = normalizeRepoFilePath(`${repoFolderPath}/${entryPath}`);
+    const liveUrl = buildFolderProjectLiveUrl(owner, repo, repoFolderPath, entryPath);
     const existingProject = (Array.isArray(user.liveProjects) ? user.liveProjects : []).find(
       (project) => String(project?.fileName || project?.filename || "").trim() === repoEntryPath,
     );
@@ -989,7 +993,7 @@ app.post("/api/github/publish-folder", publishRateLimit, express.json({ limit: "
       fileName: repoEntryPath,
       filename: repoEntryPath,
       entryPath,
-      repoPath: folderSlug,
+      repoPath: repoFolderPath,
       projectType: "folder",
       repo,
       url: liveUrl,
@@ -1018,9 +1022,9 @@ app.post("/api/github/publish-folder", publishRateLimit, express.json({ limit: "
       name: user.name,
       isPro: Boolean(user.isPro),
       action: "github-publish-folder",
-      summary: `published ${safeFiles.length} files to ${folderSlug}`,
+      summary: `published ${safeFiles.length} files to ${repoFolderPath}`,
       source: "github",
-      metadata: { projectName, folderSlug, entryPath: repoEntryPath, liveUrl },
+      metadata: { projectName, folderSlug: repoFolderPath, entryPath: repoEntryPath, liveUrl },
     });
 
     return res.json({
@@ -1182,7 +1186,7 @@ app.delete("/api/github/project", async (req, res) => {
       (project) => String(project?.fileName || project?.filename || "").trim() === filename,
     );
 
-    if (projectToDelete?.repoPath) {
+    if (projectToDelete?.projectType === "folder" && projectToDelete?.repoPath) {
       await deleteGithubPathRecursive(
         octokit,
         user.githubUsername,
