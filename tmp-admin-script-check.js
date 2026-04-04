@@ -6,6 +6,7 @@
       let adminDownloads = [];
       let adminWithdrawals = [];
       let adminPayoutUsers = [];
+      let adminNotifications = [];
       let adminMarketplace = { pendingListings: [], approvedListings: [], pendingPurchases: [], completedPurchases: [] };
       let adminMarketplaceTab = "pending";
       let currentAdminMarketplaceItem = null;
@@ -26,6 +27,9 @@
       let feedbackView = "all";
       let audienceQuery = "";
       let payoutAmounts = {};
+      let adminNotifyMode = "all";
+      let adminNotifyEmail = "";
+      let adminNotifyMessage = "";
       let withdrawalFilterTab = "pending";
       let pendingWithdrawalFailureId = "";
       let feedbackFilters = {
@@ -122,7 +126,7 @@
         document
           .querySelectorAll(`.top-tab[data-tab="${name}"]`)
           .forEach((tab) => tab.classList.add("active"));
-        ["analytics", "feedbacks", "logs", "users", "premium", "downloads", "withdrawals", "payouts", "marketplace"].forEach((tabName) => {
+        ["analytics", "feedbacks", "logs", "users", "premium", "downloads", "withdrawals", "payouts", "notify", "marketplace"].forEach((tabName) => {
           document
             .getElementById(`tab-${tabName}`)
             ?.classList.toggle("hidden", tabName !== name);
@@ -159,7 +163,9 @@
       }
 
       function formatLogSummary(item) {
-        return item.summary || item.action || "activity";
+        const base = item.summary || item.action || "activity";
+        const device = String(item?.metadata?.device || "").trim();
+        return device ? `${base} [${device}]` : base;
       }
 
       function updateLogFilter(value) {
@@ -205,6 +211,7 @@
         const email = String(item.email || "").toLowerCase();
         const location = String(item.location || item.metadata?.location || "").toLowerCase();
         const ip = String(item.ip || item.metadata?.ip || "").toLowerCase();
+        const device = String(item.metadata?.device || "").toLowerCase();
         const activity = [action, summary, source, metadataText].filter(Boolean).join(" ");
         const full = [
           name,
@@ -215,6 +222,7 @@
           created,
           location,
           ip,
+          device,
           metadataText,
         ]
           .filter(Boolean)
@@ -233,6 +241,7 @@
           time: created,
           location,
           ip,
+          device,
           text: full,
           any: full,
           full,
@@ -244,6 +253,31 @@
           .split(new RegExp(`\\s+${operator}\\s+`, "i"))
           .map((part) => part.trim())
           .filter(Boolean);
+      }
+
+      function wrapAdminQueryKeywords(query = "", fields = []) {
+        const escaped = escapeHtml(String(query || ""));
+        if (!escaped.trim()) {
+          return `<span class="text-slate-500">Smart query preview will appear here.</span>`;
+        }
+        let html = escaped;
+        const operators = ["and", "or", "not"];
+        operators.forEach((keyword) => {
+          const regex = new RegExp(`(^|\\s)(${keyword})(?=\\s|$)`, "gi");
+          html = html.replace(
+            regex,
+            (_match, prefix, word) =>
+              `${prefix}<span class="font-black text-cyan-300">${word}</span>`,
+          );
+        });
+        fields.forEach((field) => {
+          const regex = new RegExp(`\\b(${field})\\s*(=|:|~)`, "gi");
+          html = html.replace(
+            regex,
+            '<span class="font-black text-sky-300">$1</span><span class="font-black text-cyan-300">$2</span>',
+          );
+        });
+        return html;
       }
 
       const SMART_LOG_FIELDS = [
@@ -260,25 +294,70 @@
         "time",
         "location",
         "ip",
+        "device",
         "text",
         "any",
       ];
 
+      function normalizeLogDateToken(value = "") {
+        const raw = String(value || "").trim();
+        if (!raw) return "";
+        const now = new Date();
+        const lower = raw.toLowerCase();
+        if (lower.startsWith("today")) {
+          return `${now.toLocaleDateString()} ${raw.slice(5).trim()}`.trim();
+        }
+        if (lower.startsWith("yesterday")) {
+          const yesterday = new Date(now);
+          yesterday.setDate(now.getDate() - 1);
+          return `${yesterday.toLocaleDateString()} ${raw.slice(9).trim()}`.trim();
+        }
+        return raw;
+      }
+
+      function parseLogDateValue(value = "") {
+        const normalized = normalizeLogDateToken(value);
+        if (!normalized) return null;
+        const parsed = new Date(normalized);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+      }
+
+      function parseLogDateRange(raw = "") {
+        const value = String(raw || "").trim();
+        if (!value) return null;
+        const parts = value.split(/\s+to\s+/i).map((part) => part.trim()).filter(Boolean);
+        if (parts.length === 2) {
+          const from = parseLogDateValue(parts[0]);
+          const to = parseLogDateValue(parts[1]);
+          if (!from || !to) return "__invalid_date__";
+          return { from, to };
+        }
+        const point = parseLogDateValue(value);
+        if (!point) return "__invalid_date__";
+        return { from: point, to: point };
+      }
+
       function parseSmartLogClause(clause) {
         const normalized = String(clause || "").trim();
         if (!normalized) return null;
-        const match = normalized.match(
-          /^(username|name|user|email|activity|action|summary|tool|source|date|time|location|ip|text|any)\s*(=|:|~)\s*(.+)$/i,
+        const isNegated = /^not\s+/i.test(normalized);
+        const baseClause = normalized.replace(/^not\s+/i, "").trim();
+        const match = baseClause.match(
+          /^(username|name|user|email|activity|action|summary|tool|source|date|time|location|ip|device|text|any)\s*(=|:|~)\s*(.+)$/i,
         );
         if (match) {
+          const field = match[1].toLowerCase();
+          const rawValue = match[3].trim().replace(/^["']|["']$/g, "");
           return {
-            field: match[1].toLowerCase(),
-            value: match[3].trim().replace(/^["']|["']$/g, "").toLowerCase(),
+            field,
+            isNegated,
+            value: field === "date" || field === "time" ? rawValue : rawValue.toLowerCase(),
           };
         }
         return {
           field: "full",
-          value: normalized.replace(/^["']|["']$/g, "").toLowerCase(),
+          isNegated,
+          value: baseClause.replace(/^["']|["']$/g, "").toLowerCase(),
         };
       }
       function analyzeSmartLogClause(clause) {
@@ -286,14 +365,33 @@
         if (!normalized) {
           return { status: "empty", message: "Type a query to filter logs." };
         }
+        if (/^not\s*$/i.test(normalized)) {
+          return { status: "invalid", message: 'Finish the "not" clause with a field or value.' };
+        }
         const parsed = parseSmartLogClause(normalized);
         if (parsed?.field !== "full") {
+          if (
+            (parsed.field === "date" || parsed.field === "time") &&
+            parseLogDateRange(parsed.value) === "__invalid_date__"
+          ) {
+            return {
+              status: "partial",
+              message:
+                "Use a date like 4/4/2026, 5:24:20 PM or a range like Today 5:24:20 PM TO 4/4/2026, 5:25:20 PM.",
+            };
+          }
           return parsed.value
-            ? { status: "valid", message: `Filtering by ${parsed.field}.` }
+            ? { status: "valid", message: `${parsed.isNegated ? "Excluding" : "Filtering by"} ${parsed.field}.` }
             : {
                 status: "partial",
                 message: `Add a value after ${parsed.field}= to finish this filter.`,
               };
+        }
+        if (/[=:~]/.test(normalized)) {
+          return {
+            status: "invalid",
+            message: "Unknown log field. Try username=, email=, activity=, tool=, device=, or date=.",
+          };
         }
         const partialFieldMatch = normalized.match(/^([a-z]+)\s*(=|:|~)?\s*$/i);
         if (partialFieldMatch) {
@@ -324,6 +422,9 @@
         const clauseStatuses = orGroups.flatMap((group) =>
           splitSmartQuery(group, "and").map((clause) => analyzeSmartLogClause(clause)),
         );
+        if (clauseStatuses.some((item) => item.status === "invalid")) {
+          return clauseStatuses.find((item) => item.status === "invalid");
+        }
         if (clauseStatuses.some((item) => item.status === "partial")) {
           return clauseStatuses.find((item) => item.status === "partial");
         }
@@ -336,9 +437,21 @@
       function matchesSmartLogClause(item, clause) {
         const parsed = parseSmartLogClause(clause);
         if (!parsed || !parsed.value) return true;
+        if (parsed.field === "date" || parsed.field === "time") {
+          const range = parseLogDateRange(parsed.value);
+          if (range === "__invalid_date__") return false;
+          const createdAt = new Date(item.createdAt || 0);
+          if (Number.isNaN(createdAt.getTime())) return false;
+          const result =
+            range.from.toDateString() === range.to.toDateString() && !/\bto\b/i.test(String(parsed.value || ""))
+              ? createdAt.toLocaleDateString() === range.from.toLocaleDateString()
+              : createdAt >= range.from && createdAt <= range.to;
+          return parsed.isNegated ? !result : result;
+        }
         const fields = getLogSearchFields(item);
         const haystack = String(fields[parsed.field] || fields.full || "").toLowerCase();
-        return haystack.includes(parsed.value);
+        const result = haystack.includes(parsed.value);
+        return parsed.isNegated ? !result : result;
       }
 
       function matchesSmartLogQuery(item, query) {
@@ -901,13 +1014,23 @@
         if (!el || !adminAnalytics) return;
         const users = getFilteredAudienceUsers();
         const queryStatus = getAudienceQueryStatus();
-        const queryTone = queryStatus.valid
-          ? "text-emerald-200 border-emerald-400/20 bg-emerald-500/10"
-          : "text-amber-200 border-amber-400/20 bg-amber-500/10";
+        const queryTone = !queryStatus.valid
+          ? "text-rose-200 border-rose-400/20 bg-rose-500/10"
+          : queryStatus.status === "empty"
+            ? "text-amber-200 border-amber-400/20 bg-amber-500/10"
+            : "text-emerald-200 border-emerald-400/20 bg-emerald-500/10";
+        const inputTone = !queryStatus.valid
+          ? "border-rose-400/35 bg-rose-500/10 text-rose-100 focus:border-rose-400"
+          : "border-cyan-500/20 bg-white/5 text-white focus:border-cyan-400";
+        const queryPreview = wrapAdminQueryKeywords(
+          audienceQuery,
+          ["username", "name", "email", "location", "provider", "plan", "any"],
+        );
         if (!users.length) {
           el.innerHTML = `
             <div class="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 mb-4 space-y-2">
-              <input value="${escapeHtml(audienceQuery)}" oninput="updateAudienceQuery(this.value)" placeholder="Try username=amani, email=gmail.com, or provider=/google/i" class="w-full rounded-xl border border-cyan-500/20 bg-white/5 px-3 py-2.5 text-xs text-white outline-none focus:border-cyan-400" />
+              <input value="${escapeHtml(audienceQuery)}" oninput="updateAudienceQuery(this.value)" placeholder="Try username=amani, not email=gmail.com, or provider=/google/i" class="w-full rounded-xl border px-3 py-2.5 text-xs outline-none ${inputTone}" />
+              <div class="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-2 text-[11px] leading-relaxed">${queryPreview}</div>
               <div class="rounded-xl border px-3 py-2 text-[11px] ${queryTone}">${escapeHtml(queryStatus.message)}</div>
             </div>
             <div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No users found yet.</div>`;
@@ -915,7 +1038,8 @@
         }
         el.innerHTML = `
           <div class="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 mb-4 space-y-2">
-            <input value="${escapeHtml(audienceQuery)}" oninput="updateAudienceQuery(this.value)" placeholder="Try username=amani, email=gmail.com, or provider=/google/i" class="w-full rounded-xl border border-cyan-500/20 bg-white/5 px-3 py-2.5 text-xs text-white outline-none focus:border-cyan-400" />
+            <input value="${escapeHtml(audienceQuery)}" oninput="updateAudienceQuery(this.value)" placeholder="Try username=amani, not email=gmail.com, or provider=/google/i" class="w-full rounded-xl border px-3 py-2.5 text-xs outline-none ${inputTone}" />
+            <div class="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-2 text-[11px] leading-relaxed">${queryPreview}</div>
             <div class="rounded-xl border px-3 py-2 text-[11px] ${queryTone}">${escapeHtml(queryStatus.message)}</div>
           </div>
         ` + users
@@ -989,16 +1113,20 @@
       function matchesAudienceClause(user, clause = "") {
         const trimmed = String(clause || "").trim();
         if (!trimmed) return true;
+        const isNegated = /^not\s+/i.test(trimmed);
+        const baseClause = trimmed.replace(/^not\s+/i, "").trim();
         const fields = buildAudienceSearchFields(user);
-        const match = trimmed.match(/^(username|name|email|location|provider|plan|any)\s*(=|:|~)\s*(.+)$/i);
+        const match = baseClause.match(/^(username|name|email|location|provider|plan|any)\s*(=|:|~)\s*(.+)$/i);
         if (!match) {
-          return fields.any.includes(trimmed.toLowerCase());
+          const result = fields.any.includes(baseClause.toLowerCase());
+          return isNegated ? !result : result;
         }
         const field = match[1].toLowerCase();
         const matcher = parseAudienceMatcher(match[3]);
         if (matcher === "__invalid_regex__") return false;
         const target = String(fields[field] || "");
-        return matcher instanceof RegExp ? matcher.test(target) : target.includes(matcher);
+        const result = matcher instanceof RegExp ? matcher.test(target) : target.includes(matcher);
+        return isNegated ? !result : result;
       }
 
       function getFilteredAudienceUsers() {
@@ -1019,8 +1147,22 @@
         if (!raw) {
           return {
             valid: true,
+            status: "empty",
             message:
-              "Use username=, email=, location=, provider=, plan=, plus and/or. Regex works too, for example provider=/google/i.",
+              "Use username=, email=, location=, provider=, plan=, plus and/or/not. Regex works too, for example provider=/google/i.",
+          };
+        }
+        if (
+          raw
+            .split(/\s+\bor\b\s+|\s+\band\b\s+/i)
+            .map((item) => item.trim())
+            .filter(Boolean)
+            .some((clause) => /^not\s*$/i.test(clause))
+        ) {
+          return {
+            valid: false,
+            status: "invalid",
+            message: 'Finish the "not" clause with a field or value.',
           };
         }
         const invalidRegex = raw
@@ -1028,18 +1170,36 @@
           .map((item) => item.trim())
           .filter(Boolean)
           .find((clause) => {
-            const match = clause.match(/^(username|name|email|location|provider|plan|any)\s*(=|:|~)\s*(.+)$/i);
+            const baseClause = String(clause || "").replace(/^not\s+/i, "").trim();
+            const match = baseClause.match(/^(username|name|email|location|provider|plan|any)\s*(=|:|~)\s*(.+)$/i);
             return match && parseAudienceMatcher(match[3]) === "__invalid_regex__";
           });
         if (invalidRegex) {
           return {
             valid: false,
+            status: "invalid",
             message: `Regex looks incomplete in "${invalidRegex}". Close the pattern like /google/i.`,
+          };
+        }
+        const invalidField = raw
+          .split(/\s+\bor\b\s+|\s+\band\b\s+/i)
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .find((clause) => {
+            const baseClause = String(clause || "").replace(/^not\s+/i, "").trim();
+            return /[=:~]/.test(baseClause) && !/^(username|name|email|location|provider|plan|any)\s*(=|:|~)\s*(.+)$/i.test(baseClause);
+          });
+        if (invalidField) {
+          return {
+            valid: false,
+            status: "invalid",
+            message: `Unknown audience field in "${invalidField}". Try username=, email=, location=, provider=, or plan=.`,
           };
         }
         const users = getFilteredAudienceUsers();
         return {
           valid: true,
+          status: "valid",
           message: users.length
             ? `${users.length} audience match${users.length === 1 ? "" : "es"} found.`
             : "Query syntax looks good, but no audience matches were found yet.",
@@ -1116,6 +1276,92 @@
           .join("");
       }
 
+      function updateAdminNotifyMode(value = "all") {
+        adminNotifyMode = String(value || "all");
+        renderNotifyTab();
+      }
+
+      function renderNotifyTab() {
+        const el = document.getElementById("tab-notify");
+        if (!el) return;
+        el.innerHTML = `
+          <div class="rounded-[1.8rem] border border-white/10 bg-white/[0.03] p-5">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div class="text-[11px] font-black uppercase tracking-[0.22em] text-cyan-400">Notify Users</div>
+                <h3 class="mt-2 text-2xl font-semibold text-white">Send a notification</h3>
+                <p class="mt-2 text-sm text-slate-400">Choose a single user or broadcast to everyone.</p>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="updateAdminNotifyMode('individual')" class="mini-tab ${adminNotifyMode === "individual" ? "active" : ""} px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-[0.16em]">Individual</button>
+                <button onclick="updateAdminNotifyMode('all')" class="mini-tab ${adminNotifyMode === "all" ? "active" : ""} px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-[0.16em]">All</button>
+              </div>
+            </div>
+            <div class="mt-5 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+              <div class="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
+                ${adminNotifyMode === "individual" ? `<label class="block">
+                  <span class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">User Email</span>
+                  <input value="${escapeHtml(adminNotifyEmail)}" oninput="adminNotifyEmail=this.value" class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-cyan-400" placeholder="user@example.com" />
+                </label>` : `<div class="rounded-2xl border border-emerald-400/15 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-100">This message will be delivered to every MediaLab user.</div>`}
+                <label class="block mt-4">
+                  <span class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Message</span>
+                  <textarea rows="6" oninput="adminNotifyMessage=this.value" class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none resize-none focus:border-cyan-400" placeholder="Write a clear update for users...">${escapeHtml(adminNotifyMessage)}</textarea>
+                </label>
+                <div class="mt-4 flex gap-3">
+                  <button onclick="sendAdminNotification()" class="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-cyan-300 transition-all">Send</button>
+                  <button onclick="clearAdminNotificationForm()" class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-slate-200 hover:bg-white/10 transition-all">Clear</button>
+                </div>
+              </div>
+              <div class="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
+                <div class="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-400">Recent Notifications</div>
+                <div class="mt-4 space-y-3 max-h-[28rem] overflow-y-auto pr-1">
+                  ${(adminNotifications.length ? adminNotifications : []).map((item) => `
+                    <div class="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                      <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-semibold text-white">${escapeHtml(item.title || "Notification")}</p>
+                        <span class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">${escapeHtml(formatDate(item.createdAt))}</span>
+                      </div>
+                      <p class="mt-2 text-sm leading-6 text-slate-300">${escapeHtml(item.message || "")}</p>
+                    </div>`).join("") || `<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No notifications sent yet.</div>`}
+                </div>
+              </div>
+            </div>
+          </div>`;
+      }
+
+      async function sendAdminNotification() {
+        const message = String(adminNotifyMessage || "").trim();
+        const email = String(adminNotifyEmail || "").trim();
+        if (!message) {
+          showAdminToast("Enter a notification message first.", "error");
+          return;
+        }
+        if (adminNotifyMode === "individual" && !email) {
+          showAdminToast("Enter the target user email first.", "error");
+          return;
+        }
+        const res = await fetch("/api/admin/notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getAdminHeaders() },
+          body: JSON.stringify({ mode: adminNotifyMode, email, message }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          showAdminToast(data.message || "Could not send this notification.", "error");
+          return;
+        }
+        adminNotifyMessage = "";
+        if (adminNotifyMode === "individual") adminNotifyEmail = "";
+        await loadAdminData();
+        showAdminToast(data.message || "Notification sent.", "success");
+      }
+
+      function clearAdminNotificationForm() {
+        adminNotifyEmail = "";
+        adminNotifyMessage = "";
+        renderNotifyTab();
+      }
+
       function setAdminMarketplaceTab(tab = "pending") {
         adminMarketplaceTab = tab;
         renderAdminMarketplace();
@@ -1184,6 +1430,7 @@
                         <div class="flex items-center gap-3">
                           <h4 class="text-lg font-semibold text-white">${escapeHtml(item.title || "Untitled Listing")}</h4>
                           <span class="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">${escapeHtml(item.status || "pending")}</span>
+                          <span class="rounded-full border ${String(item.listingKind || "sale").toLowerCase() === "template" ? "border-fuchsia-400/20 bg-fuchsia-500/10 text-fuchsia-200" : "border-cyan-400/20 bg-cyan-500/10 text-cyan-200"} px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em]">${String(item.listingKind || "sale").toLowerCase() === "template" ? "template" : "sale"}</span>
                         </div>
                         <p class="mt-2 text-sm leading-6 text-slate-400">${escapeHtml(item.description || item.purpose || "")}</p>
                         <div class="mt-3 flex flex-wrap gap-4 text-[11px] font-semibold text-slate-500">
@@ -1242,6 +1489,7 @@
                       <span>Category: ${escapeHtml(data.item.category || "General")}</span>
                       <span>Rating: ${Number(data.item.ratingPercent || 0).toFixed(0)}%</span>
                       <span>Status: ${escapeHtml(data.item.status || "pending")}</span>
+                      <span>Type: ${escapeHtml(String(data.item.listingKind || "sale").toLowerCase() === "template" ? "Template" : "Sale")}</span>
                     </div>
                   </div>
                   <div class="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4">
@@ -1295,9 +1543,16 @@
         const activities = [...getFilteredLogs()].reverse().slice(-140);
         const queryStatus = analyzeSmartLogQuery(logFilters.query);
         const queryTone =
-          queryStatus.status === "partial"
-            ? "border-amber-400/20 bg-amber-500/10 text-amber-200"
-            : "border-emerald-400/20 bg-emerald-500/10 text-emerald-200";
+          queryStatus.status === "invalid"
+            ? "border-rose-400/20 bg-rose-500/10 text-rose-200"
+            : queryStatus.status === "partial" || queryStatus.status === "empty"
+              ? "border-amber-400/20 bg-amber-500/10 text-amber-200"
+              : "border-emerald-400/20 bg-emerald-500/10 text-emerald-200";
+        const inputTone =
+          queryStatus.status === "invalid"
+            ? "border-rose-400/35 bg-rose-500/10 text-rose-100 focus:border-rose-400"
+            : "border-cyan-500/20 bg-white/5 text-white focus:border-cyan-400";
+        const queryPreview = wrapAdminQueryKeywords(logFilters.query, SMART_LOG_FIELDS);
         el.innerHTML = `
           <div id="activity-terminal" class="terminal-shell terminal-shell-window rounded-[1.6rem] border border-cyan-500/12 shadow-[0_25px_80px_rgba(2,6,23,0.35)] overflow-hidden">
             <button onclick="toggleTerminalPane('activity-terminal')" class="w-full flex items-center justify-between gap-3 px-5 py-4 border-b border-white/8">
@@ -1313,18 +1568,24 @@
             </button>
             <div class="border-b border-white/8 px-4 py-3">
               <div class="space-y-2">
-                <input data-log-filter="query" value="${escapeHtml(logFilters.query)}" oninput="updateLogFilter(this.value)" placeholder="Try: username=charles and activity=login or email=gmail.com and tool=builder" class="w-full rounded-xl border border-cyan-500/20 bg-white/5 px-3 py-2.5 text-xs text-white outline-none focus:border-cyan-400" />
+                <input data-log-filter="query" value="${escapeHtml(logFilters.query)}" oninput="updateLogFilter(this.value)" placeholder="Try: username=charles and not activity=login or email=gmail.com and tool=builder" class="w-full rounded-xl border px-3 py-2.5 text-xs outline-none ${inputTone}" />
+                <div class="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-2 text-[11px] leading-relaxed">${queryPreview}</div>
                 <div class="text-[11px] text-slate-400 leading-relaxed">
                   Smart query:
                   <span class="text-slate-300">username=</span>,
                   <span class="text-slate-300">email=</span>,
                   <span class="text-slate-300">activity=</span>,
                   <span class="text-slate-300">tool=</span>,
+                  <span class="text-slate-300">device=</span>,
                   <span class="text-slate-300">date=</span>
                   with
                   <span class="text-cyan-300 font-semibold">and</span>
                   /
-                  <span class="text-cyan-300 font-semibold">or</span>.
+                  <span class="text-cyan-300 font-semibold">or</span>
+                  /
+                  <span class="text-cyan-300 font-semibold">not</span>.
+                  Try:
+                  <span class="text-cyan-300 font-semibold">Today 5:24:20 PM TO 4/4/2026, 5:25:20 PM</span>
                 </div>
                 <div class="rounded-xl border px-3 py-2 text-[11px] leading-relaxed ${queryTone}">
                   ${escapeHtml(queryStatus.message)}
@@ -1592,7 +1853,7 @@
           const previousMarketplacePurchaseIds = new Set(
             (adminMarketplace?.pendingPurchases || []).map((item) => item.purchaseId),
           );
-          const [feedbackRes, analyticsRes, usageLogRes, premiumRes, downloadsRes, withdrawalsRes, payoutUsersRes, marketplaceRes] = await Promise.all([
+          const [feedbackRes, analyticsRes, usageLogRes, premiumRes, downloadsRes, withdrawalsRes, payoutUsersRes, marketplaceRes, notificationsRes] = await Promise.all([
             fetch("/api/admin/feedbacks", { headers }),
             fetch("/api/admin/analytics", { headers }),
             fetch("/api/admin/usage-logs", { headers }),
@@ -1601,6 +1862,7 @@
             fetch("/api/admin/withdrawals", { headers }),
             fetch("/api/admin/payout-users", { headers }),
             fetch("/api/admin/marketplace", { headers }),
+            fetch("/api/admin/notifications", { headers }),
           ]);
           const feedbackData = await feedbackRes.json();
           const analyticsData = await analyticsRes.json();
@@ -1610,6 +1872,7 @@
           const withdrawalsData = await withdrawalsRes.json();
           const payoutUsersData = await payoutUsersRes.json();
           const marketplaceData = await marketplaceRes.json();
+          const notificationsData = await notificationsRes.json();
           adminFeedbacks = feedbackData.feedbacks || [];
           adminAnalytics = analyticsData.analytics || {};
           adminUsageLogs = usageLogData.logs || [];
@@ -1617,6 +1880,7 @@
           adminDownloads = downloadsData.downloads || [];
           adminWithdrawals = withdrawalsData.withdrawals || [];
           adminPayoutUsers = payoutUsersData.users || [];
+          adminNotifications = notificationsData.notifications || [];
           adminMarketplace = marketplaceData.success
             ? {
                 pendingListings: marketplaceData.pendingListings || [],
@@ -1665,6 +1929,7 @@
           renderDownloads();
           renderWithdrawals();
           renderPayouts();
+          renderNotifyTab();
           renderAdminMarketplace();
           connectAdminLiveFeed();
           setLiveStatus(Boolean(adminSocket?.connected));

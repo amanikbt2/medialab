@@ -31,6 +31,7 @@ import UsageLog from "./models/UsageLog.js";
 import Download from "./models/Download.js";
 import WithdrawalRequest from "./models/WithdrawalRequest.js";
 import MarketplaceItem from "./models/MarketplaceItem.js";
+import BuilderTemplate from "./models/BuilderTemplate.js";
 import Notification from "./models/Notification.js";
 import {
   createRenderBlueprintInstance,
@@ -1146,6 +1147,7 @@ function buildMarketplacePublicItem(item = {}, viewerId = "") {
     screenshots: Array.isArray(item.screenshots) ? item.screenshots.slice(0, 4) : [],
     purpose: item.purpose || "",
     sourceType: item.sourceType || "draft",
+    listingKind: item.listingKind || "sale",
     status: item.status || "pending",
     authorName: item.authorName || "",
     authorAvatar: item.authorAvatar || "",
@@ -1326,6 +1328,39 @@ async function syncMarketplaceListingToGithub(user, item) {
   item.updatedAt = new Date();
   await item.save();
   return item;
+}
+
+async function syncMarketplaceItemAsBuilderTemplate(item) {
+  const slugBase = slugifyProjectFolderName(item?.title || "official-template");
+  let slug = slugBase;
+  let suffix = 2;
+  while (await BuilderTemplate.exists({ slug, _id: { $ne: item?.builderTemplateId || null } })) {
+    slug = `${slugBase}-${suffix}`;
+    suffix += 1;
+  }
+  const template = await BuilderTemplate.findOneAndUpdate(
+    { sourceMarketplaceItemId: item._id },
+    {
+      $set: {
+        slug,
+        title: item.title || "Official Template",
+        description: item.description || item.purpose || "Official MediaLab builder template.",
+        category: item.category || "General",
+        html: String(item.sourceHtml || "").trim(),
+        authorId: item.authorId || null,
+        authorName: item.authorName || "MediaLab Creator",
+        isOfficial: true,
+        isActive: true,
+        updatedAt: new Date(),
+      },
+      $setOnInsert: {
+        createdAt: new Date(),
+        sourceMarketplaceItemId: item._id,
+      },
+    },
+    { upsert: true, new: true },
+  ).lean();
+  return template;
 }
 
 async function fetchMarketplaceSourceHtml(author, projectId = "") {
@@ -2146,9 +2181,8 @@ app.use(
     cookie: {
       maxAge: 1000 * 60 * 60 * 24 * 365,
       httpOnly: true,
-      // CRITICAL: On Render, secure must be true and sameSite must be 'none' for Google Auth
       secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      sameSite: "lax",
     },
   }),
 );
@@ -2184,7 +2218,36 @@ const WEBSITE_TEMPLATE_VIEWS = {
   arcade: "templates/arcade",
   studio: "templates/studio",
 };
-app.get("/templates/:slug", (req, res) => {
+app.get("/api/builder/templates", async (_req, res) => {
+  try {
+    const items = await BuilderTemplate.find({ isActive: true })
+      .sort({ createdAt: -1 })
+      .select("slug title description category authorName createdAt")
+      .lean();
+    return res.json({
+      success: true,
+      items: items.map((item) => ({
+        slug: item.slug || "",
+        title: item.title || "Official Template",
+        description: item.description || "Official MediaLab builder template.",
+        category: item.category || "General",
+        authorName: item.authorName || "MediaLab Creator",
+        createdAt: item.createdAt || null,
+      })),
+    });
+  } catch (error) {
+    console.error("Builder templates fetch failed:", error);
+    return res.status(500).json({ success: false, message: "Could not load builder templates." });
+  }
+});
+app.get("/templates/:slug", async (req, res) => {
+  const dynamicTemplate = await BuilderTemplate.findOne({
+    slug: String(req.params.slug || "").trim(),
+    isActive: true,
+  }).lean();
+  if (dynamicTemplate?.html) {
+    return res.type("html").send(String(dynamicTemplate.html || ""));
+  }
   const view = WEBSITE_TEMPLATE_VIEWS[req.params.slug];
   if (!view) {
     return res.status(404).send("Template not found.");
@@ -3265,7 +3328,7 @@ app.get("/api/github/project-monitor", async (req, res) => {
 app.get("/api/marketplace", async (req, res) => {
   try {
     const items = await MarketplaceItem.aggregate([
-      { $match: { status: "approved" } },
+      { $match: { status: "approved", listingKind: "sale" } },
       { $sample: { size: 12 } },
     ]);
     return res.json({
@@ -3368,6 +3431,8 @@ app.post("/api/marketplace", publishRateLimit, express.json({ limit: "15mb" }), 
     const sourceType = ["upload", "draft", "live"].includes(String(req.body?.sourceType || "").trim())
       ? String(req.body.sourceType).trim()
       : "draft";
+    const listingKind =
+      String(req.body?.listingKind || "").trim().toLowerCase() === "template" ? "template" : "sale";
     const projectId = buildMarketplaceProjectId(
       sourceType,
       req.body?.projectId || "",
@@ -3470,6 +3535,7 @@ app.post("/api/marketplace", publishRateLimit, express.json({ limit: "15mb" }), 
       screenshots,
       purpose,
       sourceType,
+      listingKind,
       sourceHtml: resolvedSourceHtml,
       sourceEntryPath,
       sourceFiles,
@@ -3497,7 +3563,7 @@ app.post("/api/marketplace", publishRateLimit, express.json({ limit: "15mb" }), 
       action: "marketplace-listing-create",
       summary: `submitted marketplace listing ${title}`,
       source: "marketplace",
-      metadata: { projectId, title, price, sourceType },
+      metadata: { projectId, title, price, sourceType, listingKind },
     });
     return res.json({
       success: true,
@@ -3862,25 +3928,40 @@ app.patch("/api/marketplace/:id/remove", publishRateLimit, express.json(), async
       return res.status(404).json({ success: false, message: "Marketplace sale not found." });
     }
     const reason = sanitizeMarketplaceText(req.body?.reason || "", 240);
-    item.status = "removed";
-    item.removalReason = reason || "Seller removed the sale.";
-    item.updatedAt = new Date();
-    item.removedAt = new Date();
-    await item.save();
+    await BuilderTemplate.deleteMany({ sourceMarketplaceItemId: item._id });
+    const marketplaceRepo = String(item.marketplaceRepo || "").trim();
+    const marketplaceRepoPath = String(item.marketplaceRepoPath || "").trim();
+    if (req.user.githubUsername && req.user.githubToken && marketplaceRepo && marketplaceRepoPath) {
+      try {
+        const octokit = buildGithubClient(req.user);
+        await deleteGithubPathRecursive(
+          octokit,
+          req.user.githubUsername,
+          marketplaceRepo,
+          marketplaceRepoPath,
+        );
+      } catch (repoError) {
+        const status = repoError?.status || repoError?.response?.status;
+        if (status !== 404) {
+          console.warn("Marketplace repo cleanup skipped:", repoError.message);
+        }
+      }
+    }
+    await MarketplaceItem.deleteOne({ _id: item._id });
     await createUsageLog({
       user: req.user,
       email: req.user.email,
       name: req.user.name,
       isPro: Boolean(req.user.isPro),
-      action: "marketplace-listing-removed",
-      summary: `removed marketplace sale ${item.title}`,
+      action: "marketplace-listing-deleted",
+      summary: `deleted marketplace sale ${item.title}`,
       source: "marketplace",
-      metadata: { marketplaceItemId: String(item._id), reason: item.removalReason },
+      metadata: { marketplaceItemId: String(item._id), reason: reason || "Seller removed the sale." },
     });
     return res.json({
       success: true,
-      message: "Sale removed from the marketplace.",
-      item: buildMarketplacePublicItem(item.toObject(), req.user?._id),
+      message: "Sale deleted from the marketplace.",
+      itemId: String(item._id),
     });
   } catch (error) {
     console.error("Marketplace remove failed:", error);
@@ -3993,6 +4074,13 @@ app.patch("/api/admin/marketplace/:id", adminRateLimit, requireAdminApi, express
     item.updatedAt = new Date();
     item.reviewedAt = new Date();
     await item.save();
+    let builderTemplate = null;
+    if (nextStatus === "approved" && String(item.listingKind || "sale") === "template") {
+      builderTemplate = await syncMarketplaceItemAsBuilderTemplate(item);
+    }
+    if (nextStatus === "disapproved" && String(item.listingKind || "sale") === "template") {
+      await BuilderTemplate.deleteMany({ sourceMarketplaceItemId: item._id });
+    }
     await createUserNotification({
       userId: item.authorId,
       type: `marketplace-${nextStatus}`,
@@ -4005,10 +4093,18 @@ app.patch("/api/admin/marketplace/:id", adminRateLimit, requireAdminApi, express
       message:
         nextStatus === "disapproved"
           ? item.disapprovalReason || "Please review the feedback and submit again."
-          : `${item.title} is now ${nextStatus}. Click to review it in My Sales.`,
+          : String(item.listingKind || "sale") === "template" && builderTemplate?.slug
+            ? `${item.title} was approved as an official MediaLab template. Click to review it in My Sales.`
+            : `${item.title} is now ${nextStatus}. Click to review it in My Sales.`,
       targetType: "marketplace-sale",
       targetId: String(item._id),
-      metadata: { itemId: String(item._id), status: nextStatus, title: item.title },
+      metadata: {
+        itemId: String(item._id),
+        status: nextStatus,
+        title: item.title,
+        listingKind: item.listingKind || "sale",
+        templateSlug: builderTemplate?.slug || "",
+      },
     });
     return res.json({
       success: true,
