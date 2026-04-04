@@ -2829,9 +2829,15 @@
     >
       <div
         onclick="event.stopPropagation()"
-        class="mx-auto w-full max-w-6xl rounded-[2rem] border border-white/10 bg-[#08111f] p-4 sm:p-6 shadow-[0_40px_120px_rgba(2,6,23,0.7)]"
+        class="relative mx-auto w-full max-w-6xl rounded-[2rem] border border-white/10 bg-[#08111f] p-4 sm:p-6 shadow-[0_40px_120px_rgba(2,6,23,0.7)]"
       >
-        <div class="flex items-start justify-between gap-4 mb-6">
+        <button
+          onclick="closeLiveProjectDetail()"
+          class="absolute right-4 top-4 z-30 inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-[#08111f]/95 text-slate-400 hover:text-white hover:bg-white/5 transition-all sm:right-6 sm:top-6"
+        >
+          <i class="fas fa-times"></i>
+        </button>
+        <div class="mb-6 flex items-start justify-between gap-4 pr-14 sm:pr-16">
           <div>
             <div class="feature-gate-badge mb-3">Project Control Center</div>
             <h3 id="live-project-detail-title" class="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
@@ -2841,12 +2847,6 @@
               Smart monitor for your hosted MediaLab page.
             </p>
           </div>
-          <button
-            onclick="closeLiveProjectDetail()"
-            class="w-11 h-11 rounded-2xl border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-all shrink-0"
-          >
-            <i class="fas fa-times"></i>
-          </button>
         </div>
         <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)] gap-5">
           <div class="space-y-5">
@@ -2876,7 +2876,7 @@
             </div>
           </div>
           <div class="space-y-5">
-            <div class="rounded-[1.9rem] border border-cyan-500/10 bg-gray-900/85 p-5">
+            <div class="relative z-20 rounded-[1.9rem] border border-cyan-500/10 bg-gray-900/85 p-5">
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <p class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400">Project Actions</p>
@@ -2899,7 +2899,7 @@
                 <button id="project-monetize-btn" onclick="openMonetizeProjectWizard()" class="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm font-black text-amber-100 text-left hover:bg-amber-500/20 transition-all">
                   <i class="fab fa-google mr-2"></i>Monetize Project
                 </button>
-                <button id="project-delete-btn" onclick="handleDeleteCurrentLiveProject()" class="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-black text-rose-100 text-left hover:bg-rose-500/20 transition-all">
+                <button id="project-delete-btn" onclick="handleDeleteCurrentLiveProject()" class="relative z-30 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-black text-rose-100 text-left hover:bg-rose-500/20 transition-all">
                   <i class="fas fa-trash-can mr-2"></i>Delete
                 </button>
               </div>
