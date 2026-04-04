@@ -17147,6 +17147,16 @@ ${payload.interactionScript ? `\n${payload.interactionScript}` : ""}
           setUniversalProgress({ visible: true, message, percent: current, tone: "cyan" });
         }, 520);
       }
+      function updateUniversalProgress(percent = null, message = "") {
+        const nextPercent =
+          percent == null ? 0 : Math.max(0, Math.min(100, Number(percent) || 0));
+        setUniversalProgress({
+          visible: true,
+          message: message || "Working...",
+          percent: nextPercent,
+          tone: "cyan",
+        });
+      }
       function completeUniversalProgress(message = "Done") {
         clearUniversalProgressPulse();
         setUniversalProgress({ visible: true, message, percent: 100, tone: "success" });

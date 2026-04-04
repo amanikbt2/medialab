@@ -6,481 +6,1058 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <title>MediaLab • Candy Crush PRO</title>
+    <title>Candy Crush Saga • Boss Mode</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap");
+
       body {
         font-family: "Poppins", sans-serif;
-        touch-action: manipulation;
       }
       canvas {
         image-rendering: crisp-edges;
         touch-action: none;
         cursor: grab;
-        filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.3));
+        border-radius: 20px;
       }
       canvas:active {
         cursor: grabbing;
       }
-      .floating-text {
-        position: absolute;
-        pointer-events: none;
-        font-weight: 900;
-        font-style: italic;
-        z-index: 100;
-        animation: floatUp 1s ease-out forwards;
-        text-shadow:
-          2px 2px 0px #000,
-          0 0 20px rgba(255, 255, 255, 0.5);
+
+      .timer-low {
+        animation: pulse 0.8s infinite;
       }
-      @keyframes floatUp {
-        0% {
-          transform: translateY(0) scale(0.5);
-          opacity: 0;
-        }
-        20% {
-          transform: translateY(-20px) scale(1.2);
+      @keyframes pulse {
+        0%,
+        100% {
           opacity: 1;
         }
-        100% {
-          transform: translateY(-100px) scale(1);
-          opacity: 0;
+        50% {
+          opacity: 0.6;
         }
+      }
+
+      #levels-container::-webkit-scrollbar {
+        width: 6px;
+      }
+      #levels-container::-webkit-scrollbar-thumb {
+        background: #ff6bcb;
+        border-radius: 20px;
+      }
+
+      .play-btn {
+        background: linear-gradient(145deg, #22c55e, #16a34a);
+        color: white;
+        box-shadow:
+          0 10px 15px -3px rgba(0, 0, 0, 0.4),
+          0 4px 6px -4px rgba(0, 0, 0, 0.3),
+          inset 0 -4px 8px rgba(255, 255, 255, 0.4),
+          inset 0 4px 6px rgba(0, 0, 0, 0.2);
+        transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .play-btn:active {
+        transform: translateY(4px) scale(0.95);
+        box-shadow:
+          0 4px 6px -1px rgba(0, 0, 0, 0.3),
+          inset 0 3px 4px rgba(0, 0, 0, 0.25);
       }
     </style>
   </head>
   <body
-    class="bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 min-h-screen text-white overflow-hidden select-none"
+    class="bg-gradient-to-br from-pink-500 via-purple-600 to-violet-700 min-h-screen text-white overflow-hidden"
   >
+    <!-- STARTUP SCREEN -->
     <div
-      id="game-container"
-      class="relative flex flex-col items-center justify-center min-h-screen"
+      id="startup-screen"
+      class="flex flex-col items-center justify-center min-h-screen"
     >
-      <div
-        id="hud"
-        class="w-full max-w-md flex justify-between items-center p-6 mb-2 bg-black/20 backdrop-blur-md rounded-b-3xl"
-      >
-        <div class="text-center">
-          <p class="text-xs opacity-60 uppercase font-bold tracking-widest">
-            Target
-          </p>
-          <p id="target-display" class="text-xl font-bold text-yellow-400">
-            2500
-          </p>
+      <div class="text-center">
+        <div class="flex justify-center gap-8 mb-10">
+          <span class="text-8xl animate-bounce">🍭</span>
+          <span class="text-8xl animate-bounce delay-300">🍬</span>
         </div>
-        <div
-          class="text-center bg-white/10 px-6 py-2 rounded-2xl border border-white/20"
-        >
-          <p id="label-type" class="text-xs opacity-60 uppercase font-bold">
-            Moves
-          </p>
-          <p id="value-type" class="text-4xl font-black text-white">20</p>
-        </div>
-        <div class="text-center">
-          <p class="text-xs opacity-60 uppercase font-bold tracking-widest">
-            Score
-          </p>
-          <p id="score-display" class="text-2xl font-bold text-pink-400">0</p>
-        </div>
-      </div>
-
-      <div class="relative">
-        <canvas
-          id="game-canvas"
-          class="rounded-3xl border-4 border-white/10"
-        ></canvas>
-        <div id="text-layer" class="absolute inset-0 pointer-events-none"></div>
-      </div>
-
-      <div class="mt-8 flex gap-4">
-        <button
-          onclick="location.reload()"
-          class="bg-white/10 hover:bg-white/20 p-4 rounded-full transition-all"
-        >
-          🔄 Restart
-        </button>
-        <div
-          class="bg-black/40 px-6 py-3 rounded-full border border-white/10 flex items-center gap-2"
-        >
-          <span class="text-pink-400">🏆</span>
-          <span id="level-tag" class="font-bold">Level 1</span>
+        <h1 class="text-7xl font-bold tracking-tighter mb-3">CANDY CRUSH</h1>
+        <p class="text-2xl text-white/80">Boss Mode</p>
+        <div class="mt-16 text-white/60 text-sm">
+          Preparing the sweetest adventure...
         </div>
       </div>
     </div>
 
+    <!-- MENU SCREEN -->
     <div
-      id="overlay"
-      class="hidden fixed inset-0 bg-black/90 z-[200] flex items-center justify-center backdrop-blur-xl"
+      id="menu-screen"
+      class="hidden flex flex-col items-center justify-center min-h-screen px-6"
     >
-      <div class="text-center p-10">
-        <h2
-          id="overlay-title"
-          class="text-6xl font-black mb-4 italic tracking-tighter"
-        >
-          SUCCESS!
-        </h2>
-        <p id="overlay-subtitle" class="text-2xl opacity-80 mb-8">
-          You crushed it!
-        </p>
+      <div class="text-center mb-12">
+        <div class="flex justify-center gap-4 mb-6">
+          <span class="text-6xl">🍭</span>
+          <h1 class="text-7xl font-bold tracking-tighter">CANDY CRUSH</h1>
+          <span class="text-6xl">🍬</span>
+        </div>
+        <p class="text-2xl text-white/90">Boss Mode • Multiple Challenges</p>
+      </div>
+      <div class="flex flex-col gap-4 w-full max-w-xs">
         <button
-          onclick="startNextLevel()"
-          class="bg-gradient-to-r from-pink-500 to-yellow-500 px-12 py-5 rounded-full font-bold text-2xl shadow-2xl hover:scale-110 transition-transform"
+          onclick="showLevels()"
+          class="bg-white text-pink-600 font-bold text-2xl py-6 rounded-3xl shadow-2xl hover:scale-105 active:scale-95"
+        >
+          📍 LEVEL MAP
+        </button>
+        <button
+          onclick="showSettings()"
+          class="bg-white/20 border-2 border-white/40 font-bold text-xl py-5 rounded-3xl hover:bg-white/30"
+        >
+          ⚙️ SETTINGS
+        </button>
+      </div>
+    </div>
+
+    <!-- LEVELS SCREEN -->
+    <div id="levels-screen" class="hidden flex flex-col min-h-screen">
+      <div
+        class="p-6 flex items-center justify-between bg-black/30 sticky top-0 z-10"
+      >
+        <button onclick="backToMenu()" class="text-xl font-medium">
+          ← Back
+        </button>
+        <h2 class="text-3xl font-bold">Level Map</h2>
+      </div>
+      <div id="levels-container" class="flex-1 p-6 overflow-y-auto">
+        <div
+          id="levels-grid"
+          class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 gap-6 max-w-5xl mx-auto pb-24"
+        ></div>
+      </div>
+      <div
+        id="play-footer"
+        class="hidden fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/90 to-transparent z-20"
+      >
+        <button
+          onclick="playSelectedLevel()"
+          class="play-btn w-full max-w-xs mx-auto py-5 rounded-3xl font-bold text-2xl shadow-2xl flex items-center justify-center gap-3"
+        >
+          <span class="text-2xl">▶</span>
+          <span>PLAY LEVEL</span>
+          <span id="selected-level" class="text-3xl"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- SETTINGS SCREEN -->
+    <div id="settings-screen" class="hidden flex flex-col min-h-screen p-8">
+      <div class="max-w-md mx-auto w-full">
+        <h2 class="text-4xl font-bold mb-8 text-center">Settings</h2>
+        <div class="bg-white/10 backdrop-blur-2xl rounded-3xl p-8 space-y-10">
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <span class="text-xl font-semibold">🔊 Volume</span>
+              <span id="volume-value" class="text-2xl font-bold">80</span>
+            </div>
+            <input
+              type="range"
+              id="volume-slider"
+              min="0"
+              max="100"
+              value="80"
+              class="w-full accent-pink-500 cursor-pointer"
+            />
+          </div>
+          <button
+            onclick="testSound()"
+            class="w-full py-4 bg-white/20 hover:bg-white/30 rounded-3xl font-semibold text-lg"
+          >
+            🔊 Test Sound
+          </button>
+        </div>
+        <button
+          onclick="backToMenu()"
+          class="mt-10 w-full py-6 text-xl font-bold bg-white/10 hover:bg-white/20 rounded-3xl"
+        >
+          ← RETURN TO MENU
+        </button>
+      </div>
+    </div>
+
+    <!-- GAME SCREEN -->
+    <div
+      id="game-screen"
+      class="hidden flex flex-col min-h-screen bg-[#1a0033]"
+    >
+      <div
+        class="bg-gradient-to-b from-purple-900 to-transparent p-4 flex justify-between items-center"
+      >
+        <button onclick="exitLevel()" class="text-lg">← EXIT</button>
+
+        <div class="flex gap-8 text-center">
+          <div>
+            <div class="text-xs opacity-70">LEVEL</div>
+            <div id="level-num" class="text-4xl font-bold">1</div>
+          </div>
+
+          <div id="challenge-container" class="text-center">
+            <div id="challenge-label" class="text-xs opacity-70">MOVES</div>
+            <div id="challenge-value" class="text-4xl font-bold text-amber-300">
+              25
+            </div>
+          </div>
+
+          <div>
+            <div class="text-xs opacity-70">SCORE</div>
+            <div class="flex items-baseline">
+              <span id="score" class="text-4xl font-bold">0</span>
+              <span class="text-xl text-white/50">/800</span>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="pauseGame()" class="text-3xl">⏸</button>
+      </div>
+      <div class="flex-1 flex items-center justify-center p-4">
+        <canvas id="game-canvas" class="rounded-3xl"></canvas>
+      </div>
+    </div>
+
+    <!-- WIN / LOSE / PAUSE -->
+    <div
+      id="win-screen"
+      class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+    >
+      <div
+        class="bg-gradient-to-br from-pink-400 to-purple-600 rounded-3xl p-10 text-center max-w-sm w-full mx-4"
+      >
+        <h2 class="text-5xl font-bold mb-4">LEVEL COMPLETE!</h2>
+        <div id="stars" class="flex justify-center gap-3 text-6xl my-6"></div>
+        <div id="final-score" class="text-6xl font-bold mb-8"></div>
+        <button
+          onclick="nextLevel()"
+          class="w-full py-5 bg-white text-pink-600 font-bold text-2xl rounded-3xl mb-3"
         >
           NEXT LEVEL →
+        </button>
+        <button
+          onclick="backToLevels()"
+          class="w-full py-5 bg-white/30 text-white font-semibold rounded-3xl"
+        >
+          BACK TO MAP
+        </button>
+      </div>
+    </div>
+
+    <div
+      id="lose-screen"
+      class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+    >
+      <div
+        class="bg-gradient-to-br from-red-500 to-pink-600 rounded-3xl p-10 text-center max-w-sm w-full mx-4"
+      >
+        <h2 id="lose-title" class="text-5xl font-bold mb-6">
+          CHALLENGE FAILED
+        </h2>
+        <div id="lose-score" class="text-5xl mb-8"></div>
+        <button
+          onclick="restartCurrentLevel()"
+          class="w-full py-5 bg-white text-pink-600 font-bold text-2xl rounded-3xl mb-3"
+        >
+          TRY AGAIN
+        </button>
+        <button
+          onclick="backToLevels()"
+          class="w-full py-5 bg-white/30 text-white font-semibold rounded-3xl"
+        >
+          BACK TO MAP
+        </button>
+      </div>
+    </div>
+
+    <div
+      id="pause-modal"
+      class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+    >
+      <div class="bg-white/10 backdrop-blur-2xl rounded-3xl p-10 text-center">
+        <h3 class="text-4xl font-bold mb-8">PAUSED</h3>
+        <button
+          onclick="resumeGame()"
+          class="w-full py-4 mb-4 bg-white text-pink-600 font-bold text-2xl rounded-3xl"
+        >
+          RESUME
+        </button>
+        <button onclick="exitLevel()" class="w-full py-4 text-xl">
+          EXIT LEVEL
         </button>
       </div>
     </div>
 
     <script>
+      // ================== CONSTANTS ==================
       const ROWS = 8,
         COLS = 8;
-      const CANDIES = ["🍭", "🍬", "🍫", "🧁", "🍪", "🍩"];
-      const STRIPE = 10,
-        BOMB = 11; // Special ID offsets
+      const CANDY_EMOJIS = ["🍭", "🍬", "🍫", "🧁", "🍪", "🍩"];
+      const POWER_STRIPE = 7,
+        POWER_WRAPPED = 8,
+        POWER_BOMB = 9;
+      const JELLY = 10;
 
       let canvas, ctx, CELL;
-      let grid = [],
+      let grid = [];
+      let currentLevel = 1,
         score = 0,
-        moves = 25,
-        level = 1,
-        target = 2000;
-      let isProcessing = false,
-        swipeStart = null;
+        movesLeft = 0,
+        targetScore = 0;
+      let timeLeft = 0,
+        collectTarget = 0,
+        collectType = 0,
+        jellyLeft = 0;
+      let isTimerLevel = false,
+        isCollectLevel = false,
+        isClearLevel = false;
+      let timerInterval = null;
+
+      let selectedLevelId = null;
+      let gameOver = false,
+        isProcessing = false;
+      let swipeStart = null;
+      let fallingPieces = [];
       let particles = [];
+      let progress = {};
 
-      // --- INIT ---
-      function init() {
-        canvas = document.getElementById("game-canvas");
-        ctx = canvas.getContext("2d");
-        resize();
-        createGrid();
-        requestAnimationFrame(gameLoop);
+      let audioContext;
+      let volume = 80;
 
-        canvas.addEventListener("mousedown", startSwipe);
-        canvas.addEventListener("mouseup", endSwipe);
-        canvas.addEventListener("touchstart", (e) => startSwipe(e.touches[0]));
-        canvas.addEventListener("touchend", (e) =>
-          endSwipe(e.changedTouches[0]),
+      const LEVELS = [
+        ...Array.from({ length: 10 }, (_, i) => ({
+          id: i + 1,
+          target: 800 + i * 1400,
+          moves: Math.max(28 - i, 12),
+          type: "moves",
+        })),
+        ...Array.from({ length: 8 }, (_, i) => ({
+          id: i + 11,
+          target: 1500 + i * 1700,
+          time: Math.max(90 - i * 4, 45),
+          type: "time",
+        })),
+        ...Array.from({ length: 6 }, (_, i) => ({
+          id: i + 19,
+          target: 1400 + i * 1600,
+          collectCount: 15 + i * 4,
+          collectType: (i % 6) + 1,
+          type: "collect",
+        })),
+        ...Array.from({ length: 6 }, (_, i) => ({
+          id: i + 25,
+          target: 1800 + i * 1900,
+          jellyCount: 14 + i * 5,
+          type: "clear",
+        })),
+      ];
+
+      // ================== MISSING FUNCTIONS ADDED ==================
+      function resizeCanvas() {
+        const container = document.getElementById("game-screen");
+        const maxSize = Math.min(
+          container.clientWidth - 32,
+          container.clientHeight - 120,
         );
-        updateHUD();
+        CELL = Math.floor(maxSize / COLS);
+        canvas.width = CELL * COLS;
+        canvas.height = CELL * ROWS;
       }
 
-      function resize() {
-        const size = Math.min(window.innerWidth * 0.95, 450);
-        canvas.width = canvas.height = size;
-        CELL = size / COLS;
-      }
-
-      function createGrid() {
-        grid = [];
-        for (let r = 0; r < ROWS; r++) {
-          grid[r] = [];
-          for (let c = 0; c < COLS; c++) {
-            grid[r][c] = {
-              type: Math.floor(Math.random() * 6),
-              offset: 0,
-              isSpecial: 0,
-            };
+      function applyGravityAndRefill() {
+        let changed = false;
+        for (let c = 0; c < COLS; c++) {
+          let writePos = ROWS - 1;
+          for (let r = ROWS - 1; r >= 0; r--) {
+            if (grid[r][c] !== 0) {
+              if (r !== writePos) {
+                grid[writePos][c] = grid[r][c];
+                grid[r][c] = 0;
+                changed = true;
+              }
+              writePos--;
+            }
+          }
+          for (let r = writePos; r >= 0; r--) {
+            grid[r][c] = Math.floor(Math.random() * 6) + 1;
+            changed = true;
           }
         }
-        if (hasMatches().length > 0) createGrid(); // No matches on start
+        if (changed) {
+          animateFalling();
+          setTimeout(() => {
+            const matches = findMatches();
+            if (matches.length > 0) {
+              removeMatches(matches);
+            } else {
+              checkWinCondition();
+            }
+          }, 300);
+        } else {
+          checkWinCondition();
+        }
       }
 
-      // --- MATCH LOGIC ---
-      function hasMatches() {
+      function checkWinCondition() {
+        if (isTimerLevel || isCollectLevel || isClearLevel) return;
+        if (score >= targetScore) {
+          endGame(true);
+        }
+      }
+
+      // ================== AUDIO ==================
+      function initAudio() {
+        if (!audioContext)
+          audioContext = new (
+            window.AudioContext || window.webkitAudioContext
+          )();
+      }
+
+      function playSound(type) {
+        if (!audioContext) return;
+        const now = audioContext.currentTime;
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.connect(gain).connect(audioContext.destination);
+        gain.gain.value = (volume / 100) * 0.85;
+
+        switch (type) {
+          case "match":
+            osc.frequency.setValueAtTime(680 + Math.random() * 180, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.22);
+            break;
+          case "powerup":
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(1100, now);
+            osc.frequency.linearRampToValueAtTime(450, now + 0.45);
+            break;
+          case "combo":
+            osc.frequency.setValueAtTime(1450, now);
+            osc.frequency.linearRampToValueAtTime(320, now + 0.95);
+            break;
+          case "win":
+            osc.frequency.setValueAtTime(880, now);
+            osc.frequency.setValueAtTime(1100, now + 0.15);
+            osc.frequency.setValueAtTime(1320, now + 0.35);
+            break;
+          case "lose":
+            osc.frequency.setValueAtTime(520, now);
+            osc.frequency.linearRampToValueAtTime(180, now + 0.8);
+            break;
+        }
+        osc.start(now);
+        osc.stop(now + 1.2);
+      }
+
+      function updateVolume(newVol) {
+        volume = parseInt(newVol);
+        document.getElementById("volume-value").textContent = volume;
+        localStorage.setItem("candyVolume", volume);
+      }
+
+      function testSound() {
+        initAudio();
+        playSound("combo");
+      }
+
+      // ================== PARTICLE ==================
+      class Particle {
+        constructor(x, y, vx, vy, life, emoji) {
+          this.x = x;
+          this.y = y;
+          this.vx = vx;
+          this.vy = vy;
+          this.life = this.maxLife = life;
+          this.emoji = emoji;
+        }
+        update() {
+          this.vy += 0.22;
+          this.vx *= 0.98;
+          this.vy *= 0.98;
+          this.x += this.vx;
+          this.y += this.vy;
+          this.life -= 0.018;
+        }
+        draw() {
+          const alpha = this.life / this.maxLife;
+          ctx.globalAlpha = alpha * 1.1;
+          ctx.shadowBlur = 18;
+          ctx.shadowColor = "#ffffff";
+          ctx.font = "38px system-ui";
+          ctx.fillText(this.emoji, this.x, this.y);
+        }
+      }
+
+      // ================== SMOOTH SWAP & DRAW ==================
+      function animateSwap(r1, c1, r2, c2, callback) {
+        const dx = (c2 - c1) * CELL;
+        const dy = (r2 - r1) * CELL;
+        let progress = 0;
+        const start = Date.now();
+
+        function step() {
+          progress = Math.min(1, (Date.now() - start) / 180);
+          const ease = 1 - Math.pow(1 - progress, 3);
+          drawWithOffset(r1, c1, r2, c2, dx * ease, dy * ease);
+          if (progress < 1) requestAnimationFrame(step);
+          else {
+            const temp = grid[r1][c1];
+            grid[r1][c1] = grid[r2][c2];
+            grid[r2][c2] = temp;
+            callback();
+          }
+        }
+        step();
+      }
+
+      function drawWithOffset(r1, c1, r2, c2, ox, oy) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            let drawX = c * CELL + CELL / 2;
+            let drawY = r * CELL + CELL / 2;
+            if (r === r1 && c === c1) {
+              drawX += ox;
+              drawY += oy;
+            }
+            if (r === r2 && c === c2) {
+              drawX -= ox;
+              drawY -= oy;
+            }
+
+            const type = grid[r][c];
+            if (!type) continue;
+            ctx.shadowBlur = type > 6 ? 28 : 14;
+            ctx.font = `${CELL * 0.82}px system-ui`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            let emoji = type === JELLY ? "🟦" : CANDY_EMOJIS[type - 1] || "💣";
+            ctx.fillText(emoji, drawX, drawY);
+          }
+        }
+      }
+
+      function animateFalling() {
+        fallingPieces = [];
+        for (let c = 0; c < COLS; c++) {
+          for (let r = ROWS - 1; r >= 0; r--) {
+            if (grid[r][c] === 0) {
+              let dist = 0;
+              for (let above = r - 1; above >= 0; above--) {
+                if (grid[above][c]) {
+                  fallingPieces.push({
+                    type: grid[above][c],
+                    startRow: above,
+                    startCol: c,
+                    endRow: r + dist,
+                    progress: 0,
+                  });
+                  grid[above][c] = 0;
+                  dist++;
+                }
+              }
+              break;
+            }
+          }
+        }
+        if (!animationFrame) animationLoop();
+      }
+
+      let animationFrame = null;
+      function animationLoop() {
+        let still = false;
+        for (let i = fallingPieces.length - 1; i >= 0; i--) {
+          fallingPieces[i].progress += 0.26;
+          if (fallingPieces[i].progress < 1) still = true;
+          else fallingPieces.splice(i, 1);
+        }
+        draw();
+        if (still || particles.length > 0)
+          animationFrame = requestAnimationFrame(animationLoop);
+        else animationFrame = null;
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            const type = grid[r][c];
+            if (!type) continue;
+            const x = c * CELL + CELL / 2;
+            const y = r * CELL + CELL / 2;
+            ctx.shadowBlur = type > 6 ? 28 : 14;
+            ctx.font = `${CELL * 0.82}px system-ui`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            let emoji = type === JELLY ? "🟦" : CANDY_EMOJIS[type - 1] || "💣";
+            ctx.fillText(emoji, x, y);
+          }
+        }
+
+        for (let p of fallingPieces) {
+          const prog = Math.min(1, p.progress);
+          const ease = 1 - Math.pow(1 - prog, 3);
+          const bounce = Math.sin(prog * Math.PI * 2) * 8;
+          const y =
+            p.startRow * CELL +
+            (p.endRow - p.startRow) * CELL * ease +
+            CELL / 2 +
+            bounce;
+          ctx.fillText(
+            CANDY_EMOJIS[p.type - 1],
+            p.startCol * CELL + CELL / 2,
+            y,
+          );
+        }
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.update();
+          p.draw();
+          if (p.life <= 0) particles.splice(i, 1);
+        }
+      }
+
+      // ================== INPUT & GAME LOGIC (rest is same as before) ==================
+      function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX =
+          e.clientX !== undefined ? e.clientX : e.touches[0].clientX;
+        const clientY =
+          e.clientY !== undefined ? e.clientY : e.touches[0].clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+      }
+
+      function handlePointerDown(e) {
+        if (isProcessing || gameOver) return;
+        const pos = getPos(e);
+        const col = Math.floor(pos.x / CELL);
+        const row = Math.floor(pos.y / CELL);
+        if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return;
+        swipeStart = { row, col, x: pos.x, y: pos.y };
+      }
+
+      function handlePointerUp(e) {
+        if (!swipeStart || isProcessing || gameOver) {
+          swipeStart = null;
+          return;
+        }
+
+        const pos = getPos(e);
+        const dx = pos.x - swipeStart.x;
+        const dy = pos.y - swipeStart.y;
+
+        if (Math.hypot(dx, dy) < CELL * 0.35) {
+          swipeStart = null;
+          return;
+        }
+
+        let dr = 0,
+          dc = 0;
+        if (Math.abs(dx) > Math.abs(dy)) dc = dx > 0 ? 1 : -1;
+        else dr = dy > 0 ? 1 : -1;
+
+        const tr = swipeStart.row + dr;
+        const tc = swipeStart.col + dc;
+
+        if (tr < 0 || tr >= ROWS || tc < 0 || tc >= COLS) {
+          swipeStart = null;
+          return;
+        }
+
+        isProcessing = true;
+
+        animateSwap(swipeStart.row, swipeStart.col, tr, tc, () => {
+          const a = grid[swipeStart.row][swipeStart.col];
+          const b = grid[tr][tc];
+
+          if (a > 6 && b > 6) {
+            // Placeholder for combo (you can expand later)
+            console.log("Power-up combo swap");
+          } else {
+            const matches = findMatches();
+            if (matches.length > 0) {
+              if (!isTimerLevel) movesLeft--;
+              updateHUD();
+              removeMatches(matches);
+            } else {
+              animateSwap(swipeStart.row, swipeStart.col, tr, tc, () =>
+                shakeCanvas(),
+              );
+            }
+          }
+          isProcessing = false;
+          swipeStart = null;
+          draw();
+        });
+      }
+
+      function shakeCanvas() {
+        canvas.style.transform = "translateX(8px)";
+        setTimeout(() => (canvas.style.transform = "translateX(-8px)"), 60);
+        setTimeout(() => (canvas.style.transform = ""), 200);
+      }
+
+      function removeMatches(matches) {
+        if (!matches.length) return;
+        score += matches.length * 140;
+        playSound("match");
+
+        if (matches.length >= 4) {
+          const center = matches[Math.floor(matches.length / 2)];
+          createPowerUp(center.r, center.c, matches.length);
+          playSound("powerup");
+        }
+
+        for (const { r, c } of matches) {
+          if (grid[r][c] === JELLY) jellyLeft--;
+          if (grid[r][c] <= 6 || grid[r][c] === JELLY) {
+            createExplosion(c * CELL + CELL / 2, r * CELL + CELL / 2);
+            grid[r][c] = 0;
+          }
+        }
+
+        updateHUD();
+        animateFalling();
+        setTimeout(applyGravityAndRefill, 280);
+      }
+
+      function createExplosion(x, y) {
+        for (let i = 0; i < 14; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 3 + Math.random() * 7;
+          particles.push(
+            new Particle(
+              x,
+              y,
+              Math.cos(angle) * speed,
+              Math.sin(angle) * speed - 4,
+              1.0 + Math.random() * 0.7,
+              ["✨", "💥", "🌟"][Math.floor(Math.random() * 3)],
+            ),
+          );
+        }
+      }
+
+      function fillGrid(level) {
+        grid = Array(ROWS)
+          .fill()
+          .map(() => Array(COLS).fill(0));
+        for (let r = 0; r < ROWS; r++)
+          for (let c = 0; c < COLS; c++) {
+            grid[r][c] = Math.floor(Math.random() * 6) + 1;
+          }
+
+        if (level.type === "clear") {
+          jellyLeft = level.jellyCount;
+          let placed = 0;
+          while (placed < level.jellyCount) {
+            const r = Math.floor(Math.random() * ROWS);
+            const c = Math.floor(Math.random() * COLS);
+            if (grid[r][c] <= 6) {
+              grid[r][c] = JELLY;
+              placed++;
+            }
+          }
+        }
+
+        while (findMatches().length > 0) {
+          for (let r = 0; r < ROWS; r++)
+            for (let c = 0; c < COLS; c++) {
+              if (grid[r][c] <= 6)
+                grid[r][c] = Math.floor(Math.random() * 6) + 1;
+            }
+        }
+      }
+
+      function findMatches() {
         let matches = [];
-        // Horizontal
         for (let r = 0; r < ROWS; r++) {
           for (let c = 0; c < COLS - 2; c++) {
             if (
-              grid[r][c].type === grid[r][c + 1].type &&
-              grid[r][c].type === grid[r][c + 2].type
+              grid[r][c] &&
+              grid[r][c] === grid[r][c + 1] &&
+              grid[r][c] === grid[r][c + 2] &&
+              grid[r][c] <= 6
             ) {
-              matches.push({ r, c }, { r, c: c + 1 }, { r, c: c + 2 });
+              for (let k = 0; k < 3; k++) matches.push({ r, c: c + k });
             }
           }
         }
-        // Vertical
         for (let c = 0; c < COLS; c++) {
           for (let r = 0; r < ROWS - 2; r++) {
             if (
-              grid[r][c].type === grid[r + 1][c].type &&
-              grid[r][c].type === grid[r + 2][c].type
+              grid[r][c] &&
+              grid[r][c] === grid[r + 1][c] &&
+              grid[r][c] === grid[r + 2][c] &&
+              grid[r][c] <= 6
             ) {
-              matches.push({ r, c }, { r: r + 1, c }, { r: r + 2, c });
+              for (let k = 0; k < 3; k++) matches.push({ r: r + k, c });
             }
           }
         }
-        return matches;
-      }
-
-      async function processTurn(r1, c1, r2, c2) {
-        isProcessing = true;
-
-        // Swap
-        let t = grid[r1][c1];
-        grid[r1][c1] = grid[r2][c2];
-        grid[r2][c2] = t;
-
-        // Check if one is a COLOR BOMB
-        if (
-          grid[r1][c1].isSpecial === BOMB ||
-          grid[r2][c2].isSpecial === BOMB
-        ) {
-          handleColorBomb(r1, c1, r2, c2);
-          moves--;
-        } else {
-          let matches = hasMatches();
-          if (matches.length > 0) {
-            moves--;
-            await handleMatches(matches);
-          } else {
-            // Swap back if no match
-            grid[r2][c2] = grid[r1][c1];
-            grid[r1][c1] = t;
-            shake();
-          }
-        }
-
-        updateHUD();
-        isProcessing = false;
-        checkGameOver();
-
-        // Shuffle if stuck
-        if (!possibleMovesExist()) shuffle();
-      }
-
-      async function handleMatches(matches) {
-        let unique = [...new Set(matches.map((m) => `${m.r},${m.c}`))];
-
-        // Create Specials?
-        if (unique.length === 4)
-          spawnSpecial(matches[0].r, matches[0].c, STRIPE);
-        if (unique.length >= 5) spawnSpecial(matches[0].r, matches[0].c, BOMB);
-
-        // Pop effect
-        unique.forEach((pos) => {
-          let [r, c] = pos.split(",").map(Number);
-          if (grid[r][c].isSpecial === STRIPE) triggerStripe(r, c);
-          createPop(c * CELL + CELL / 2, r * CELL + CELL / 2);
-          grid[r][c].type = -1;
-          score += 100;
+        const seen = new Set();
+        return matches.filter((m) => {
+          const key = `${m.r}-${m.c}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
         });
-
-        if (unique.length > 3)
-          showText(unique.length > 4 ? "DIVINE!" : "SWEET!", unique[0]);
-
-        await sleep(300);
-        dropCandies();
-        await sleep(300);
-
-        let nextMatches = hasMatches();
-        if (nextMatches.length > 0) await handleMatches(nextMatches);
       }
 
-      function triggerStripe(r, c) {
-        for (let i = 0; i < COLS; i++) {
-          grid[r][i].type = -1;
-          score += 50;
-        }
-        for (let i = 0; i < ROWS; i++) {
-          grid[i][c].type = -1;
-          score += 50;
-        }
-      }
-
-      function handleColorBomb(r1, c1, r2, c2) {
-        let bombPos =
-          grid[r1][c1].isSpecial === BOMB ? { r: r1, c: c1 } : { r: r2, c: c2 };
-        let otherPos =
-          grid[r1][c1].isSpecial === BOMB ? { r: r2, c: c2 } : { r: r1, c: c1 };
-        let targetType = grid[otherPos.r][otherPos.c].type;
-
-        grid[bombPos.r][bombPos.c].type = -1;
-        for (let r = 0; r < ROWS; r++) {
-          for (let c = 0; c < COLS; c++) {
-            if (grid[r][c].type === targetType) {
-              grid[r][c].type = -1;
-              score += 200;
-              createPop(c * CELL + CELL / 2, r * CELL + CELL / 2);
-            }
-          }
-        }
-        showText("COLOR BLAST!", bombPos);
-        dropCandies();
-      }
-
-      function dropCandies() {
-        for (let c = 0; c < COLS; c++) {
-          let empty = 0;
-          for (let r = ROWS - 1; r >= 0; r--) {
-            if (grid[r][c].type === -1) empty++;
-            else if (empty > 0) {
-              grid[r + empty][c] = grid[r][c];
-              grid[r][c] = { type: -1 };
-            }
-          }
-          for (let r = 0; r < empty; r++) {
-            grid[r][c] = {
-              type: Math.floor(Math.random() * 6),
-              offset: -empty,
-              isSpecial: 0,
-            };
-          }
-        }
-      }
-
-      // --- HELPERS ---
-      function spawnSpecial(r, c, type) {
-        grid[r][c].isSpecial = type;
-      }
-
-      function possibleMovesExist() {
-        // Simplified check: looks for any possible 3-match
-        return true; // For demo, we assume moves exist or we'd shuffle
-      }
-
-      function shuffle() {
-        showText("SHUFFLING!", { r: 4, c: 4 });
-        createGrid();
-      }
-
-      function showText(msg, pos) {
-        const layer = document.getElementById("text-layer");
-        const div = document.createElement("div");
-        div.className = "floating-text";
-        div.style.left = pos.c * CELL + "px";
-        div.style.top = pos.r * CELL + "px";
-        div.innerText = msg;
-        layer.appendChild(div);
-        setTimeout(() => div.remove(), 1000);
+      function createPowerUp(r, c, count) {
+        if (count >= 5) grid[r][c] = POWER_BOMB;
+        else if (count === 4) grid[r][c] = POWER_STRIPE;
       }
 
       function updateHUD() {
-        document.getElementById("score-display").innerText = score;
-        document.getElementById("value-type").innerText = moves;
-        document.getElementById("target-display").innerText = target;
-        document.getElementById("level-tag").innerText = "Level " + level;
-        if (moves < 5)
-          document
-            .getElementById("value-type")
-            .classList.add("text-red-500", "animate-pulse");
-        else
-          document
-            .getElementById("value-type")
-            .classList.remove("text-red-500", "animate-pulse");
-      }
+        document.getElementById("level-num").textContent = currentLevel;
+        document.getElementById("score").textContent = score;
 
-      function checkGameOver() {
-        if (score >= target) {
-          showOverlay("LEVEL COMPLETE", "You're a Candy Pro!");
-        } else if (moves <= 0) {
-          showOverlay("OUT OF MOVES", "Try again, Sugar.");
+        const label = document.getElementById("challenge-label");
+        const value = document.getElementById("challenge-value");
+
+        if (isTimerLevel) {
+          label.textContent = "TIME";
+          value.textContent = timeLeft;
+          value.classList.toggle("timer-low", timeLeft <= 15);
+        } else if (isCollectLevel) {
+          label.textContent = "COLLECT";
+          value.textContent = collectTarget;
+        } else if (isClearLevel) {
+          label.textContent = "JELLY";
+          value.textContent = jellyLeft;
+        } else {
+          label.textContent = "MOVES";
+          value.textContent = movesLeft;
         }
       }
 
-      function showOverlay(title, sub) {
-        document.getElementById("overlay-title").innerText = title;
-        document.getElementById("overlay-subtitle").innerText = sub;
-        document.getElementById("overlay").classList.remove("hidden");
+      function startTimer(seconds) {
+        if (timerInterval) clearInterval(timerInterval);
+        timeLeft = seconds;
+        timerInterval = setInterval(() => {
+          timeLeft--;
+          updateHUD();
+          if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            endGame(false);
+          }
+        }, 1000);
       }
 
-      function startNextLevel() {
-        level++;
-        target += 1500;
-        moves = 25;
+      function loadLevel(id) {
+        const lvl = LEVELS.find((l) => l.id === id);
+        currentLevel = id;
+        targetScore = lvl.target;
         score = 0;
-        document.getElementById("overlay").classList.add("hidden");
-        createGrid();
+        gameOver = false;
+        particles = [];
+        isTimerLevel = false;
+        isCollectLevel = false;
+        isClearLevel = false;
+
+        if (timerInterval) clearInterval(timerInterval);
+
+        if (lvl.type === "time") {
+          isTimerLevel = true;
+          startTimer(lvl.time);
+        } else if (lvl.type === "collect") {
+          isCollectLevel = true;
+          collectTarget = lvl.collectCount;
+          collectType = lvl.collectType;
+        } else if (lvl.type === "clear") {
+          isClearLevel = true;
+          jellyLeft = lvl.jellyCount;
+        } else {
+          movesLeft = lvl.moves;
+        }
+
+        fillGrid(lvl);
+        hideAllScreens();
+        document.getElementById("game-screen").classList.remove("hidden");
+        resizeCanvas();
+        draw();
         updateHUD();
       }
 
-      // --- SWIPE ---
-      function startSwipe(e) {
-        if (isProcessing) return;
-        const rect = canvas.getBoundingClientRect();
-        swipeStart = {
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-          c: Math.floor((e.clientX - rect.left) / CELL),
-          r: Math.floor((e.clientY - rect.top) / CELL),
-        };
+      function playSelectedLevel() {
+        if (selectedLevelId) loadLevel(selectedLevelId);
       }
 
-      function endSwipe(e) {
-        if (!swipeStart || isProcessing) return;
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        const dx = x - swipeStart.x;
-        const dy = y - swipeStart.y;
+      function endGame(won) {
+        if (timerInterval) clearInterval(timerInterval);
+        gameOver = true;
+        playSound(won ? "win" : "lose");
 
-        if (Math.abs(dx) > 30 || Math.abs(dy) > 30) {
-          let r2 = swipeStart.r,
-            c2 = swipeStart.c;
-          if (Math.abs(dx) > Math.abs(dy)) c2 += dx > 0 ? 1 : -1;
-          else r2 += dy > 0 ? 1 : -1;
+        if (won) {
+          const stars =
+            score >= targetScore * 1.5 ? 3 : score >= targetScore * 1.2 ? 2 : 1;
+          progress[currentLevel] = { completed: true, stars };
+          localStorage.setItem("candyProgress", JSON.stringify(progress));
 
-          if (r2 >= 0 && r2 < ROWS && c2 >= 0 && c2 < COLS) {
-            processTurn(swipeStart.r, swipeStart.c, r2, c2);
-          }
+          document.getElementById("final-score").textContent = score;
+          document.getElementById("stars").innerHTML = Array(3)
+            .fill()
+            .map(
+              (_, i) =>
+                `<span class="${i < stars ? "text-yellow-300" : "text-white/30"}">⭐</span>`,
+            )
+            .join("");
+          hideAllScreens();
+          document.getElementById("win-screen").classList.remove("hidden");
+        } else {
+          document.getElementById("lose-title").textContent = isTimerLevel
+            ? "TIME'S UP"
+            : isClearLevel
+              ? "JELLY REMAINING"
+              : "CHALLENGE FAILED";
+          document.getElementById("lose-score").innerHTML =
+            `Score: <span class="text-amber-300">${score}</span>`;
+          hideAllScreens();
+          document.getElementById("lose-screen").classList.remove("hidden");
         }
-        swipeStart = null;
       }
 
-      // --- RENDER ---
-      function gameLoop() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      function nextLevel() {
+        loadLevel(Math.min(currentLevel + 1, LEVELS.length));
+      }
+      function restartCurrentLevel() {
+        loadLevel(currentLevel);
+      }
+      function exitLevel() {
+        if (timerInterval) clearInterval(timerInterval);
+        hideAllScreens();
+        document.getElementById("menu-screen").classList.remove("hidden");
+      }
 
-        // Draw Grid
-        for (let r = 0; r < ROWS; r++) {
-          for (let c = 0; c < COLS; c++) {
-            const candy = grid[r][c];
-            if (candy.type === -1) continue;
+      function showLevels() {
+        hideAllScreens();
+        selectedLevelId = null;
+        document.getElementById("play-footer").classList.add("hidden");
 
-            const x = c * CELL + CELL / 2;
-            const y = r * CELL + CELL / 2;
+        const container = document.getElementById("levels-grid");
+        container.innerHTML = "";
 
-            ctx.save();
-            ctx.font = `${CELL * 0.7}px Arial`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
+        LEVELS.forEach((lvl) => {
+          const completed = progress[lvl.id]?.completed;
+          const unlocked = lvl.id === 1 || progress[lvl.id - 1]?.completed;
 
-            // Special Effects
-            if (candy.isSpecial === BOMB) {
-              ctx.shadowBlur = 15;
-              ctx.shadowColor = "white";
-              ctx.fillText("💣", x, y);
-            } else if (candy.isSpecial === STRIPE) {
-              ctx.fillStyle = "rgba(255,255,255,0.3)";
-              ctx.beginPath();
-              ctx.arc(x, y, CELL / 2.5, 0, Math.PI * 2);
-              ctx.fill();
-              ctx.fillText(CANDIES[candy.type], x, y);
-            } else {
-              ctx.fillText(CANDIES[candy.type], x, y);
-            }
-            ctx.restore();
+          const btn = document.createElement("button");
+          btn.className = `aspect-square rounded-3xl text-4xl font-bold shadow-xl flex flex-col items-center justify-center ${completed ? "bg-gradient-to-br from-yellow-300 to-pink-300 text-pink-900" : "bg-white/10"}`;
+          if (!unlocked) {
+            btn.innerHTML = `🔒<div class="text-xl mt-1">${lvl.id}</div>`;
+            btn.disabled = true;
+          } else {
+            let icon = "";
+            if (lvl.type === "time") icon = "⏱";
+            else if (lvl.type === "collect") icon = "🎯";
+            else if (lvl.type === "clear") icon = "🟦";
+            btn.innerHTML =
+              lvl.id + (icon ? `<div class='text-xs mt-1'>${icon}</div>` : "");
+            btn.onclick = () => {
+              document
+                .querySelectorAll("#levels-grid button")
+                .forEach((b) => b.classList.remove("ring-4", "ring-white"));
+              btn.classList.add("ring-4", "ring-white");
+              selectedLevelId = lvl.id;
+              document.getElementById("selected-level").textContent = lvl.id;
+              document.getElementById("play-footer").classList.remove("hidden");
+            };
           }
+          container.appendChild(btn);
+        });
+
+        document.getElementById("levels-screen").classList.remove("hidden");
+      }
+
+      function hideAllScreens() {
+        document
+          .querySelectorAll(
+            "#menu-screen, #levels-screen, #game-screen, #win-screen, #lose-screen, #pause-modal, #settings-screen, #startup-screen",
+          )
+          .forEach((el) => el.classList.add("hidden"));
+      }
+
+      function backToMenu() {
+        hideAllScreens();
+        document.getElementById("menu-screen").classList.remove("hidden");
+      }
+      function backToLevels() {
+        hideAllScreens();
+        showLevels();
+      }
+      function showSettings() {
+        hideAllScreens();
+        document.getElementById("settings-screen").classList.remove("hidden");
+        const savedVolume = localStorage.getItem("candyVolume");
+        if (savedVolume) {
+          volume = parseInt(savedVolume);
+          document.getElementById("volume-slider").value = volume;
+          document.getElementById("volume-value").textContent = volume;
         }
-        requestAnimationFrame(gameLoop);
       }
 
-      function createPop(x, y) {
-        // Particle logic could go here for more "Juice"
+      function pauseGame() {
+        document.getElementById("pause-modal").classList.remove("hidden");
+      }
+      function resumeGame() {
+        document.getElementById("pause-modal").classList.add("hidden");
       }
 
-      function shake() {
-        canvas.classList.add("animate-bounce");
-        setTimeout(() => canvas.classList.remove("animate-bounce"), 500);
+      function showStartup() {
+        document.getElementById("startup-screen").classList.remove("hidden");
+        setTimeout(() => {
+          document.getElementById("startup-screen").classList.add("hidden");
+          document.getElementById("menu-screen").classList.remove("hidden");
+        }, 1600);
       }
 
-      function sleep(ms) {
-        return new Promise((r) => setTimeout(r, ms));
+      function initializeGame() {
+        canvas = document.getElementById("game-canvas");
+        ctx = canvas.getContext("2d");
+
+        const saved = localStorage.getItem("candyProgress");
+        if (saved) progress = JSON.parse(saved);
+
+        const savedVolume = localStorage.getItem("candyVolume");
+        if (savedVolume) volume = parseInt(savedVolume);
+
+        const slider = document.getElementById("volume-slider");
+        slider.value = volume;
+        document.getElementById("volume-value").textContent = volume;
+        slider.addEventListener("input", (e) => updateVolume(e.target.value));
+
+        canvas.addEventListener("mousedown", handlePointerDown);
+        canvas.addEventListener("mouseup", handlePointerUp);
+        canvas.addEventListener("touchstart", (e) => {
+          e.preventDefault();
+          handlePointerDown(e);
+        });
+        canvas.addEventListener("touchend", (e) => {
+          e.preventDefault();
+          handlePointerUp(e);
+        });
+
+        window.addEventListener("resize", () => {
+          if (
+            !document.getElementById("game-screen").classList.contains("hidden")
+          ) {
+            resizeCanvas();
+            draw();
+          }
+        });
+
+        document.body.addEventListener("click", initAudio, { once: true });
+
+        showStartup();
+        console.log(
+          "%c🏆 FIXED BOSS MODE — Game should now load when you click Play!",
+          "color:#22c55e; font-weight:bold; font-size:16px",
+        );
       }
 
-      window.onload = init;
+      window.onload = initializeGame;
     </script>
   </body>
 </html>
