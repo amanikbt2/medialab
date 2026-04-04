@@ -3867,6 +3867,8 @@
       // ====================== STATE ======================
       let loggedIn = false;
       let currentUser = null;
+      let authSessionFailureCount = 0;
+      let lastSuccessfulAuthAt = 0;
       let currentPremiumRequest = null;
       let currentStudioToolId = "image-pdf";
       let currentLiveProjectDetail = null;
@@ -7576,6 +7578,19 @@
         if (total <= 0) return "";
         return total > 9 ? "9+" : String(total);
       }
+      function markSessionHealthy() {
+        authSessionFailureCount = 0;
+        lastSuccessfulAuthAt = Date.now();
+      }
+      async function handleAuthSessionFailure(message = "Your session ended. Please sign in again.") {
+        authSessionFailureCount += 1;
+        const withinGracePeriod = Date.now() - Number(lastSuccessfulAuthAt || 0) < 15000;
+        if (withinGracePeriod || authSessionFailureCount < 2) {
+          return false;
+        }
+        await handleSessionExpired(message);
+        return true;
+      }
       function clearClientAuthState() {
         loggedIn = false;
         currentUser = null;
@@ -7591,8 +7606,39 @@
         document.getElementById("profile-menu")?.classList.add("hidden");
         document.getElementById("studio")?.classList.add("hidden");
         document.getElementById("landing")?.classList.remove("hidden");
+        authSessionFailureCount = 0;
+        lastSuccessfulAuthAt = 0;
+      }
+      function markAuthHealthy() {
+        lastSuccessfulAuthAt = Date.now();
+      }
+      async function confirmSessionStillMissing() {
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+          const res = await fetch("/api/auth/me", {
+            credentials: "include",
+            cache: "no-store",
+            headers: { "Cache-Control": "no-store" },
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data?.success && data.user) {
+            loggedIn = true;
+            currentUser = data.user;
+            markAuthHealthy();
+            updateUserProfileUi();
+            return false;
+          }
+          return true;
+        } catch {
+          return true;
+        }
       }
       async function handleSessionExpired(message = "Your session ended. Please sign in again.") {
+        const withinGraceWindow = Date.now() - Number(lastSuccessfulAuthAt || 0) < 15000;
+        if (withinGraceWindow) {
+          const stillMissing = await confirmSessionStillMissing();
+          if (!stillMissing) return;
+        }
         clearClientAuthState();
         showStudioStatusSnackbar(message, "error");
       }
@@ -7638,12 +7684,13 @@
           const res = await fetch("/api/notifications", { credentials: "include" });
           const data = await res.json();
           if (res.status === 401) {
-            await handleSessionExpired(data.message || "Your session ended. Please sign in again.");
+            await handleAuthSessionFailure(data.message || "Your session ended. Please sign in again.");
             return [];
           }
           if (!res.ok || !data.success) {
             throw new Error(data.message || "Could not load notifications.");
           }
+          markSessionHealthy();
           notificationsList = Array.isArray(data.notifications) ? data.notifications : [];
           unreadNotificationCount = Number(data.unreadCount || 0);
           renderNotificationsUi();
@@ -7664,10 +7711,11 @@
           });
           const data = await res.json();
           if (res.status === 401) {
-            await handleSessionExpired(data.message || "Your session ended. Please sign in again.");
+            await handleAuthSessionFailure(data.message || "Your session ended. Please sign in again.");
             return;
           }
           if (!res.ok || !data.success) throw new Error(data.message || "Could not mark notifications as read.");
+          markSessionHealthy();
           notificationsList = notificationsList.map((item) => ({ ...item, isRead: true, readAt: new Date().toISOString() }));
           unreadNotificationCount = Number(data.unreadCount || 0);
           renderNotificationsUi();
@@ -7711,9 +7759,10 @@
           });
           if (res.status === 401) {
             const data = await res.json().catch(() => ({}));
-            await handleSessionExpired(data.message || "Your session ended. Please sign in again.");
+            await handleAuthSessionFailure(data.message || "Your session ended. Please sign in again.");
             return;
           }
+          markSessionHealthy();
         } catch {}
         notificationsList = notificationsList.map((item) =>
           String(item._id || "") === String(notificationId || "")
@@ -8337,11 +8386,12 @@
             const res = await fetch("/api/auth/me", { credentials: "include" });
             const data = await res.json();
             if (res.ok && data?.success && data.user) {
+              markSessionHealthy();
               currentUser = { ...(currentUser || {}), ...(data.user || {}) };
               updateUserProfileUi();
               updateReferralUi();
             } else if (res.status === 401 || !data?.success) {
-              await handleSessionExpired(data?.message || "Your session ended. Please sign in again.");
+              await handleAuthSessionFailure(data?.message || "Your session ended. Please sign in again.");
             }
           } catch {}
         }, 60 * 1000);
@@ -8362,13 +8412,14 @@
           });
           const data = await res.json();
           if (res.ok && data?.success && data.user) {
+            markSessionHealthy();
             loggedIn = true;
             currentUser = data.user;
             updateUserProfileUi();
             return true;
           }
           if (loggedIn || currentUser) {
-            await handleSessionExpired(
+            await handleAuthSessionFailure(
               silent ? "Your session has ended." : "Your session ended. Please sign in again.",
             );
           }
@@ -9401,6 +9452,7 @@
           const res = await fetch("/api/auth/me", { credentials: "include" });
           const data = await res.json();
           if (data.success && data.user) {
+            markSessionHealthy();
             loggedIn = true;
             currentUser = data.user;
             await fetchPremiumRequestStatus();
@@ -9426,7 +9478,7 @@
             setTimeout(() => maybePromptRenderHostingOnboarding(), 600);
           } else {
             if (loggedIn || currentUser) {
-              clearClientAuthState();
+              await handleAuthSessionFailure("Your session ended. Please sign in again.");
             }
             currentPremiumRequest = null;
           }
