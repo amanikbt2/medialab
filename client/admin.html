@@ -583,7 +583,9 @@
       }
 
       function formatLogSummary(item) {
-        return item.summary || item.action || "activity";
+        const base = item.summary || item.action || "activity";
+        const device = String(item?.metadata?.device || "").trim();
+        return device ? `${base} [${device}]` : base;
       }
 
       function updateLogFilter(value) {
@@ -629,6 +631,7 @@
         const email = String(item.email || "").toLowerCase();
         const location = String(item.location || item.metadata?.location || "").toLowerCase();
         const ip = String(item.ip || item.metadata?.ip || "").toLowerCase();
+        const device = String(item.metadata?.device || "").toLowerCase();
         const activity = [action, summary, source, metadataText].filter(Boolean).join(" ");
         const full = [
           name,
@@ -639,6 +642,7 @@
           created,
           location,
           ip,
+          device,
           metadataText,
         ]
           .filter(Boolean)
@@ -657,6 +661,7 @@
           time: created,
           location,
           ip,
+          device,
           text: full,
           any: full,
           full,
@@ -668,6 +673,31 @@
           .split(new RegExp(`\\s+${operator}\\s+`, "i"))
           .map((part) => part.trim())
           .filter(Boolean);
+      }
+
+      function wrapAdminQueryKeywords(query = "", fields = []) {
+        const escaped = escapeHtml(String(query || ""));
+        if (!escaped.trim()) {
+          return `<span class="text-slate-500">Smart query preview will appear here.</span>`;
+        }
+        let html = escaped;
+        const operators = ["and", "or", "not"];
+        operators.forEach((keyword) => {
+          const regex = new RegExp(`(^|\\s)(${keyword})(?=\\s|$)`, "gi");
+          html = html.replace(
+            regex,
+            (_match, prefix, word) =>
+              `${prefix}<span class="font-black text-cyan-300">${word}</span>`,
+          );
+        });
+        fields.forEach((field) => {
+          const regex = new RegExp(`\\b(${field})\\s*(=|:|~)`, "gi");
+          html = html.replace(
+            regex,
+            '<span class="font-black text-sky-300">$1</span><span class="font-black text-cyan-300">$2</span>',
+          );
+        });
+        return html;
       }
 
       const SMART_LOG_FIELDS = [
@@ -684,25 +714,70 @@
         "time",
         "location",
         "ip",
+        "device",
         "text",
         "any",
       ];
 
+      function normalizeLogDateToken(value = "") {
+        const raw = String(value || "").trim();
+        if (!raw) return "";
+        const now = new Date();
+        const lower = raw.toLowerCase();
+        if (lower.startsWith("today")) {
+          return `${now.toLocaleDateString()} ${raw.slice(5).trim()}`.trim();
+        }
+        if (lower.startsWith("yesterday")) {
+          const yesterday = new Date(now);
+          yesterday.setDate(now.getDate() - 1);
+          return `${yesterday.toLocaleDateString()} ${raw.slice(9).trim()}`.trim();
+        }
+        return raw;
+      }
+
+      function parseLogDateValue(value = "") {
+        const normalized = normalizeLogDateToken(value);
+        if (!normalized) return null;
+        const parsed = new Date(normalized);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+      }
+
+      function parseLogDateRange(raw = "") {
+        const value = String(raw || "").trim();
+        if (!value) return null;
+        const parts = value.split(/\s+to\s+/i).map((part) => part.trim()).filter(Boolean);
+        if (parts.length === 2) {
+          const from = parseLogDateValue(parts[0]);
+          const to = parseLogDateValue(parts[1]);
+          if (!from || !to) return "__invalid_date__";
+          return { from, to };
+        }
+        const point = parseLogDateValue(value);
+        if (!point) return "__invalid_date__";
+        return { from: point, to: point };
+      }
+
       function parseSmartLogClause(clause) {
         const normalized = String(clause || "").trim();
         if (!normalized) return null;
-        const match = normalized.match(
-          /^(username|name|user|email|activity|action|summary|tool|source|date|time|location|ip|text|any)\s*(=|:|~)\s*(.+)$/i,
+        const isNegated = /^not\s+/i.test(normalized);
+        const baseClause = normalized.replace(/^not\s+/i, "").trim();
+        const match = baseClause.match(
+          /^(username|name|user|email|activity|action|summary|tool|source|date|time|location|ip|device|text|any)\s*(=|:|~)\s*(.+)$/i,
         );
         if (match) {
+          const field = match[1].toLowerCase();
+          const rawValue = match[3].trim().replace(/^["']|["']$/g, "");
           return {
-            field: match[1].toLowerCase(),
-            value: match[3].trim().replace(/^["']|["']$/g, "").toLowerCase(),
+            field,
+            isNegated,
+            value: field === "date" || field === "time" ? rawValue : rawValue.toLowerCase(),
           };
         }
         return {
           field: "full",
-          value: normalized.replace(/^["']|["']$/g, "").toLowerCase(),
+          isNegated,
+          value: baseClause.replace(/^["']|["']$/g, "").toLowerCase(),
         };
       }
       function analyzeSmartLogClause(clause) {
@@ -710,14 +785,33 @@
         if (!normalized) {
           return { status: "empty", message: "Type a query to filter logs." };
         }
+        if (/^not\s*$/i.test(normalized)) {
+          return { status: "invalid", message: 'Finish the "not" clause with a field or value.' };
+        }
         const parsed = parseSmartLogClause(normalized);
         if (parsed?.field !== "full") {
+          if (
+            (parsed.field === "date" || parsed.field === "time") &&
+            parseLogDateRange(parsed.value) === "__invalid_date__"
+          ) {
+            return {
+              status: "partial",
+              message:
+                "Use a date like 4/4/2026, 5:24:20 PM or a range like Today 5:24:20 PM TO 4/4/2026, 5:25:20 PM.",
+            };
+          }
           return parsed.value
-            ? { status: "valid", message: `Filtering by ${parsed.field}.` }
+            ? { status: "valid", message: `${parsed.isNegated ? "Excluding" : "Filtering by"} ${parsed.field}.` }
             : {
                 status: "partial",
                 message: `Add a value after ${parsed.field}= to finish this filter.`,
               };
+        }
+        if (/[=:~]/.test(normalized)) {
+          return {
+            status: "invalid",
+            message: "Unknown log field. Try username=, email=, activity=, tool=, device=, or date=.",
+          };
         }
         const partialFieldMatch = normalized.match(/^([a-z]+)\s*(=|:|~)?\s*$/i);
         if (partialFieldMatch) {
@@ -748,6 +842,9 @@
         const clauseStatuses = orGroups.flatMap((group) =>
           splitSmartQuery(group, "and").map((clause) => analyzeSmartLogClause(clause)),
         );
+        if (clauseStatuses.some((item) => item.status === "invalid")) {
+          return clauseStatuses.find((item) => item.status === "invalid");
+        }
         if (clauseStatuses.some((item) => item.status === "partial")) {
           return clauseStatuses.find((item) => item.status === "partial");
         }
@@ -760,9 +857,21 @@
       function matchesSmartLogClause(item, clause) {
         const parsed = parseSmartLogClause(clause);
         if (!parsed || !parsed.value) return true;
+        if (parsed.field === "date" || parsed.field === "time") {
+          const range = parseLogDateRange(parsed.value);
+          if (range === "__invalid_date__") return false;
+          const createdAt = new Date(item.createdAt || 0);
+          if (Number.isNaN(createdAt.getTime())) return false;
+          const result =
+            range.from.toDateString() === range.to.toDateString() && !/\bto\b/i.test(String(parsed.value || ""))
+              ? createdAt.toLocaleDateString() === range.from.toLocaleDateString()
+              : createdAt >= range.from && createdAt <= range.to;
+          return parsed.isNegated ? !result : result;
+        }
         const fields = getLogSearchFields(item);
         const haystack = String(fields[parsed.field] || fields.full || "").toLowerCase();
-        return haystack.includes(parsed.value);
+        const result = haystack.includes(parsed.value);
+        return parsed.isNegated ? !result : result;
       }
 
       function matchesSmartLogQuery(item, query) {
@@ -1325,13 +1434,23 @@
         if (!el || !adminAnalytics) return;
         const users = getFilteredAudienceUsers();
         const queryStatus = getAudienceQueryStatus();
-        const queryTone = queryStatus.valid
-          ? "text-emerald-200 border-emerald-400/20 bg-emerald-500/10"
-          : "text-amber-200 border-amber-400/20 bg-amber-500/10";
+        const queryTone = !queryStatus.valid
+          ? "text-rose-200 border-rose-400/20 bg-rose-500/10"
+          : queryStatus.status === "empty"
+            ? "text-amber-200 border-amber-400/20 bg-amber-500/10"
+            : "text-emerald-200 border-emerald-400/20 bg-emerald-500/10";
+        const inputTone = !queryStatus.valid
+          ? "border-rose-400/35 bg-rose-500/10 text-rose-100 focus:border-rose-400"
+          : "border-cyan-500/20 bg-white/5 text-white focus:border-cyan-400";
+        const queryPreview = wrapAdminQueryKeywords(
+          audienceQuery,
+          ["username", "name", "email", "location", "provider", "plan", "any"],
+        );
         if (!users.length) {
           el.innerHTML = `
             <div class="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 mb-4 space-y-2">
-              <input value="${escapeHtml(audienceQuery)}" oninput="updateAudienceQuery(this.value)" placeholder="Try username=amani, email=gmail.com, or provider=/google/i" class="w-full rounded-xl border border-cyan-500/20 bg-white/5 px-3 py-2.5 text-xs text-white outline-none focus:border-cyan-400" />
+              <input value="${escapeHtml(audienceQuery)}" oninput="updateAudienceQuery(this.value)" placeholder="Try username=amani, not email=gmail.com, or provider=/google/i" class="w-full rounded-xl border px-3 py-2.5 text-xs outline-none ${inputTone}" />
+              <div class="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-2 text-[11px] leading-relaxed">${queryPreview}</div>
               <div class="rounded-xl border px-3 py-2 text-[11px] ${queryTone}">${escapeHtml(queryStatus.message)}</div>
             </div>
             <div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No users found yet.</div>`;
@@ -1339,7 +1458,8 @@
         }
         el.innerHTML = `
           <div class="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 mb-4 space-y-2">
-            <input value="${escapeHtml(audienceQuery)}" oninput="updateAudienceQuery(this.value)" placeholder="Try username=amani, email=gmail.com, or provider=/google/i" class="w-full rounded-xl border border-cyan-500/20 bg-white/5 px-3 py-2.5 text-xs text-white outline-none focus:border-cyan-400" />
+            <input value="${escapeHtml(audienceQuery)}" oninput="updateAudienceQuery(this.value)" placeholder="Try username=amani, not email=gmail.com, or provider=/google/i" class="w-full rounded-xl border px-3 py-2.5 text-xs outline-none ${inputTone}" />
+            <div class="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-2 text-[11px] leading-relaxed">${queryPreview}</div>
             <div class="rounded-xl border px-3 py-2 text-[11px] ${queryTone}">${escapeHtml(queryStatus.message)}</div>
           </div>
         ` + users
@@ -1413,16 +1533,20 @@
       function matchesAudienceClause(user, clause = "") {
         const trimmed = String(clause || "").trim();
         if (!trimmed) return true;
+        const isNegated = /^not\s+/i.test(trimmed);
+        const baseClause = trimmed.replace(/^not\s+/i, "").trim();
         const fields = buildAudienceSearchFields(user);
-        const match = trimmed.match(/^(username|name|email|location|provider|plan|any)\s*(=|:|~)\s*(.+)$/i);
+        const match = baseClause.match(/^(username|name|email|location|provider|plan|any)\s*(=|:|~)\s*(.+)$/i);
         if (!match) {
-          return fields.any.includes(trimmed.toLowerCase());
+          const result = fields.any.includes(baseClause.toLowerCase());
+          return isNegated ? !result : result;
         }
         const field = match[1].toLowerCase();
         const matcher = parseAudienceMatcher(match[3]);
         if (matcher === "__invalid_regex__") return false;
         const target = String(fields[field] || "");
-        return matcher instanceof RegExp ? matcher.test(target) : target.includes(matcher);
+        const result = matcher instanceof RegExp ? matcher.test(target) : target.includes(matcher);
+        return isNegated ? !result : result;
       }
 
       function getFilteredAudienceUsers() {
@@ -1443,8 +1567,22 @@
         if (!raw) {
           return {
             valid: true,
+            status: "empty",
             message:
-              "Use username=, email=, location=, provider=, plan=, plus and/or. Regex works too, for example provider=/google/i.",
+              "Use username=, email=, location=, provider=, plan=, plus and/or/not. Regex works too, for example provider=/google/i.",
+          };
+        }
+        if (
+          raw
+            .split(/\s+\bor\b\s+|\s+\band\b\s+/i)
+            .map((item) => item.trim())
+            .filter(Boolean)
+            .some((clause) => /^not\s*$/i.test(clause))
+        ) {
+          return {
+            valid: false,
+            status: "invalid",
+            message: 'Finish the "not" clause with a field or value.',
           };
         }
         const invalidRegex = raw
@@ -1452,18 +1590,36 @@
           .map((item) => item.trim())
           .filter(Boolean)
           .find((clause) => {
-            const match = clause.match(/^(username|name|email|location|provider|plan|any)\s*(=|:|~)\s*(.+)$/i);
+            const baseClause = String(clause || "").replace(/^not\s+/i, "").trim();
+            const match = baseClause.match(/^(username|name|email|location|provider|plan|any)\s*(=|:|~)\s*(.+)$/i);
             return match && parseAudienceMatcher(match[3]) === "__invalid_regex__";
           });
         if (invalidRegex) {
           return {
             valid: false,
+            status: "invalid",
             message: `Regex looks incomplete in "${invalidRegex}". Close the pattern like /google/i.`,
+          };
+        }
+        const invalidField = raw
+          .split(/\s+\bor\b\s+|\s+\band\b\s+/i)
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .find((clause) => {
+            const baseClause = String(clause || "").replace(/^not\s+/i, "").trim();
+            return /[=:~]/.test(baseClause) && !/^(username|name|email|location|provider|plan|any)\s*(=|:|~)\s*(.+)$/i.test(baseClause);
+          });
+        if (invalidField) {
+          return {
+            valid: false,
+            status: "invalid",
+            message: `Unknown audience field in "${invalidField}". Try username=, email=, location=, provider=, or plan=.`,
           };
         }
         const users = getFilteredAudienceUsers();
         return {
           valid: true,
+          status: "valid",
           message: users.length
             ? `${users.length} audience match${users.length === 1 ? "" : "es"} found.`
             : "Query syntax looks good, but no audience matches were found yet.",
@@ -1805,9 +1961,16 @@
         const activities = [...getFilteredLogs()].reverse().slice(-140);
         const queryStatus = analyzeSmartLogQuery(logFilters.query);
         const queryTone =
-          queryStatus.status === "partial"
-            ? "border-amber-400/20 bg-amber-500/10 text-amber-200"
-            : "border-emerald-400/20 bg-emerald-500/10 text-emerald-200";
+          queryStatus.status === "invalid"
+            ? "border-rose-400/20 bg-rose-500/10 text-rose-200"
+            : queryStatus.status === "partial" || queryStatus.status === "empty"
+              ? "border-amber-400/20 bg-amber-500/10 text-amber-200"
+              : "border-emerald-400/20 bg-emerald-500/10 text-emerald-200";
+        const inputTone =
+          queryStatus.status === "invalid"
+            ? "border-rose-400/35 bg-rose-500/10 text-rose-100 focus:border-rose-400"
+            : "border-cyan-500/20 bg-white/5 text-white focus:border-cyan-400";
+        const queryPreview = wrapAdminQueryKeywords(logFilters.query, SMART_LOG_FIELDS);
         el.innerHTML = `
           <div id="activity-terminal" class="terminal-shell terminal-shell-window rounded-[1.6rem] border border-cyan-500/12 shadow-[0_25px_80px_rgba(2,6,23,0.35)] overflow-hidden">
             <button onclick="toggleTerminalPane('activity-terminal')" class="w-full flex items-center justify-between gap-3 px-5 py-4 border-b border-white/8">
@@ -1823,18 +1986,24 @@
             </button>
             <div class="border-b border-white/8 px-4 py-3">
               <div class="space-y-2">
-                <input data-log-filter="query" value="${escapeHtml(logFilters.query)}" oninput="updateLogFilter(this.value)" placeholder="Try: username=charles and activity=login or email=gmail.com and tool=builder" class="w-full rounded-xl border border-cyan-500/20 bg-white/5 px-3 py-2.5 text-xs text-white outline-none focus:border-cyan-400" />
+                <input data-log-filter="query" value="${escapeHtml(logFilters.query)}" oninput="updateLogFilter(this.value)" placeholder="Try: username=charles and not activity=login or email=gmail.com and tool=builder" class="w-full rounded-xl border px-3 py-2.5 text-xs outline-none ${inputTone}" />
+                <div class="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-2 text-[11px] leading-relaxed">${queryPreview}</div>
                 <div class="text-[11px] text-slate-400 leading-relaxed">
                   Smart query:
                   <span class="text-slate-300">username=</span>,
                   <span class="text-slate-300">email=</span>,
                   <span class="text-slate-300">activity=</span>,
                   <span class="text-slate-300">tool=</span>,
+                  <span class="text-slate-300">device=</span>,
                   <span class="text-slate-300">date=</span>
                   with
                   <span class="text-cyan-300 font-semibold">and</span>
                   /
-                  <span class="text-cyan-300 font-semibold">or</span>.
+                  <span class="text-cyan-300 font-semibold">or</span>
+                  /
+                  <span class="text-cyan-300 font-semibold">not</span>.
+                  Try:
+                  <span class="text-cyan-300 font-semibold">Today 5:24:20 PM TO 4/4/2026, 5:25:20 PM</span>
                 </div>
                 <div class="rounded-xl border px-3 py-2 text-[11px] leading-relaxed ${queryTone}">
                   ${escapeHtml(queryStatus.message)}

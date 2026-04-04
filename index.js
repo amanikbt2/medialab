@@ -128,6 +128,7 @@ async function createUsageLog({
   summary,
   source = "web",
   kind = "activity",
+  usageMetadata = {},
   metadata = {},
 } = {}) {
   if (!action || !summary) return null;
@@ -142,7 +143,10 @@ async function createUsageLog({
       summary: String(summary).trim(),
       source: String(source || "web").trim(),
       kind,
-      metadata,
+      metadata: {
+        ...(usageMetadata && typeof usageMetadata === "object" ? usageMetadata : {}),
+        ...(metadata && typeof metadata === "object" ? metadata : {}),
+      },
     });
     const totalLogs = await UsageLog.countDocuments();
     if (totalLogs > 1000) {
@@ -203,6 +207,7 @@ async function createUserNotification({
       isRead: false,
       createdAt: notification.createdAt,
     });
+    await trimUserNotifications(notification.userId);
     return notification;
   } catch (error) {
     console.error("Notification create failed:", error);
@@ -239,10 +244,25 @@ async function createBulkNotifications(userIds = [], payload = {}) {
         createdAt: notification.createdAt,
       });
     });
+    await Promise.all(
+      notifications.map((notification) => trimUserNotifications(notification.userId)),
+    );
     return notifications;
   } catch (error) {
     console.error("Bulk notification create failed:", error);
     return [];
+  }
+}
+
+async function trimUserNotifications(userId) {
+  if (!userId) return;
+  const keep = await Notification.find({ userId })
+    .sort({ createdAt: -1 })
+    .skip(10)
+    .select("_id")
+    .lean();
+  if (keep.length) {
+    await Notification.deleteMany({ _id: { $in: keep.map((item) => item._id) } });
   }
 }
 
@@ -1318,6 +1338,7 @@ async function refreshAdsenseSiteStatusIfNeeded(user, { force = false } = {}) {
   });
 
   const previousStatus = String(user.adsenseSiteStatus || "").trim();
+  const previousReviewState = normalizeAdsenseReviewState(previousStatus);
   const nextStatus = String(
     matchedSite?.state || matchedSite?.status || matchedSite?.platformType || previousStatus,
   ).trim();
@@ -1334,9 +1355,40 @@ async function refreshAdsenseSiteStatusIfNeeded(user, { force = false } = {}) {
   const changed =
     previousStatus !== nextStatus ||
     !lastCheckedAt ||
-    normalizeAdsenseReviewState(previousStatus) !== nextReviewState;
+    previousReviewState !== nextReviewState;
   if (changed || force) {
     await user.save();
+  }
+
+  if (changed && user?._id) {
+    if (nextReviewState === "approved" && previousReviewState !== "approved") {
+      await createUserNotification({
+        userId: user._id,
+        type: "adsense-approved",
+        title: "AdSense approved",
+        message: "Your AdSense account is approved. You can now monetize eligible MediaLab projects.",
+        targetType: "console",
+        metadata: {
+          siteStatus: nextStatus,
+          siteUrl: user.adsenseSiteUrl || "",
+        },
+      });
+    } else if (
+      ["pending", "review"].includes(nextReviewState) &&
+      previousReviewState !== nextReviewState
+    ) {
+      await createUserNotification({
+        userId: user._id,
+        type: "adsense-review",
+        title: "AdSense verification started",
+        message: "Google has started reviewing your AdSense site. MediaLab will keep checking the status for you.",
+        targetType: "console",
+        metadata: {
+          siteStatus: nextStatus,
+          siteUrl: user.adsenseSiteUrl || "",
+        },
+      });
+    }
   }
 
   return {
@@ -1460,13 +1512,49 @@ function detectAdsenseScript(html = "", adsenseId = "") {
   return source.includes(String(adsenseId).trim());
 }
 
+function detectDeviceLabel(userAgent = "") {
+  const ua = String(userAgent || "").toLowerCase();
+  if (!ua) return "Unknown Device";
+  const device =
+    /android/.test(ua)
+      ? "Android"
+      : /(iphone|ipad|ipod)/.test(ua)
+        ? "iPhone"
+        : /windows/.test(ua)
+          ? "Windows"
+          : /macintosh|mac os x/.test(ua)
+            ? "Mac"
+            : /linux/.test(ua)
+              ? "Linux"
+              : "Web";
+  const browser =
+    /edg\//.test(ua)
+      ? "Edge"
+      : /chrome\//.test(ua)
+        ? "Chrome"
+        : /safari\//.test(ua) && !/chrome\//.test(ua)
+          ? "Safari"
+          : /firefox\//.test(ua)
+            ? "Firefox"
+            : /opr\//.test(ua) || /opera/.test(ua)
+              ? "Opera"
+              : "Browser";
+  return `${device} • ${browser}`;
+}
+
 function buildUsageIdentity(req) {
+  const userAgent = String(req.headers["user-agent"] || "").trim();
   return {
     user: req.user || null,
     email: req.user?.email || "",
     name: req.user?.name || "",
     isAnonymous: !req.user,
     isPro: Boolean(req.user?.isPro),
+    usageMetadata: {
+      device: detectDeviceLabel(userAgent),
+      userAgent,
+      ip: extractClientIp(req),
+    },
   };
 }
 
@@ -1623,6 +1711,18 @@ app.post("/api/downloads", async (req, res) => {
                 summary: `earned 0.01 from referral install by ${installedUser.email || "a new user"}`,
                 source: "referral",
                 metadata: { referredUserId: installedUser._id, downloadId: record._id, amount: 0.01 },
+              });
+              await createUserNotification({
+                userId: referrer._id,
+                type: "wallet-credit",
+                title: "You have received $0.01 from MediaLab",
+                message: `${installedUser.email || "A new user"} installed MediaLab with your referral link.`,
+                targetType: "wallet",
+                metadata: {
+                  amount: 0.01,
+                  reason: "referral-install",
+                  referredUserId: installedUser._id,
+                },
               });
             }
           }
@@ -2227,6 +2327,15 @@ app.post("/api/github/publish", publishRateLimit, express.json({ limit: "10mb" }
       summary: `published ${repoFilePath} to GitHub Pages`,
       source: "github",
       metadata: { projectName, filename: repoFilePath, liveUrl },
+    });
+    await createUserNotification({
+      userId: user._id,
+      type: "project-live",
+      title: "Your project is live",
+      message: `${projectName} is now published. Click to check it out.`,
+      targetType: "live-project",
+      targetId: repoFilePath,
+      metadata: { liveUrl, projectName, fileName: repoFilePath },
     });
 
     return res.json({
@@ -4402,6 +4511,23 @@ app.post("/api/adsense/link-site", express.json(), async (req, res) => {
       user.adsenseAdCode = adCode;
     }
     await user.save();
+    const siteState = String(user.adsenseSiteStatus || "").toUpperCase();
+    const reviewPending =
+      siteState === "REQUIRES_REVIEW" || siteState === "GETTING_READY";
+    await createUserNotification({
+      userId: user._id,
+      type: reviewPending ? "adsense-review" : "adsense-linked",
+      title: reviewPending ? "AdSense verification started" : "AdSense connected",
+      message: reviewPending
+        ? "Google is reviewing your AdSense site. MediaLab will keep checking the status for you."
+        : "Your AdSense account is linked and ready for monetization checks.",
+      targetType: "console",
+      metadata: {
+        siteStatus: user.adsenseSiteStatus || "",
+        siteUrl: user.adsenseSiteUrl || "",
+        adsenseId: user.adsenseId || "",
+      },
+    });
 
     let adsTxtDetected = false;
     for (const candidateUrl of buildAdsTxtCandidateUrls(user)) {
@@ -4417,10 +4543,6 @@ app.post("/api/adsense/link-site", express.json(), async (req, res) => {
         }
       } catch {}
     }
-
-    const siteState = String(user.adsenseSiteStatus || "").toUpperCase();
-    const reviewPending =
-      siteState === "REQUIRES_REVIEW" || siteState === "GETTING_READY";
 
     return res.json({
       success: true,
@@ -5634,6 +5756,14 @@ app.post("/api/admin/users/:id/reward", adminRateLimit, requireAdminApi, async (
     }
     user.accountBalance = Number((Number(user.accountBalance || 0) + amount).toFixed(2));
     await user.save();
+    await createUserNotification({
+      userId: user._id,
+      type: "wallet-credit",
+      title: `You've received $${amount.toFixed(2)} from MediaLab`,
+      message: "Your MediaLab wallet balance has been updated.",
+      targetType: "wallet",
+      metadata: { amount, reason: "admin-reward" },
+    });
 
     await createUsageLog({
       user,
@@ -5842,7 +5972,40 @@ app.patch("/api/admin/withdrawals/:id", adminRateLimit, requireAdminApi, async (
           (Number(user.accountBalance || 0) + Number(request.amount || 0)).toFixed(2),
         );
         await user.save();
+        await createUserNotification({
+          userId: user._id,
+          type: "withdrawal-failed",
+          title: "Withdrawal was not approved",
+          message: request.deniedReason
+            ? `Reason: ${request.deniedReason}`
+            : "Please review your withdrawal details in your wallet.",
+          targetType: "wallet",
+          metadata: {
+            amount: Number(request.amount || 0),
+            status: nextStatus,
+            deniedReason: request.deniedReason || "",
+          },
+        });
       }
+    }
+    if (nextStatus === "paid") {
+      await createUserNotification({
+        userId: request.userId,
+        type: "withdrawal-paid",
+        title: "Withdrawal approved",
+        message: `Your ${Number(request.amount || 0).toFixed(2)} payout has been marked as paid.`,
+        targetType: "wallet",
+        metadata: { amount: Number(request.amount || 0), status: nextStatus },
+      });
+    } else if (nextStatus === "processing") {
+      await createUserNotification({
+        userId: request.userId,
+        type: "withdrawal-processing",
+        title: "Withdrawal is processing",
+        message: "Your payout request is being reviewed by MediaLab.",
+        targetType: "wallet",
+        metadata: { amount: Number(request.amount || 0), status: nextStatus },
+      });
     }
 
     await createUsageLog({

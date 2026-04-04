@@ -1597,18 +1597,23 @@
             </button>
             <div
               id="notification-dropdown"
-              class="hidden absolute right-0 mt-3 w-[22rem] max-w-[calc(100vw-1.5rem)] rounded-[1.7rem] border border-white/10 bg-slate-950/96 p-4 shadow-[0_25px_70px_rgba(2,6,23,0.5)] backdrop-blur-xl"
+              class="hidden fixed inset-y-0 right-0 z-[120] w-full max-w-[24rem] border-l border-white/10 bg-slate-950 p-5 shadow-[-20px_0_60px_rgba(2,6,23,0.5)]"
             >
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <p class="text-[10px] font-black uppercase tracking-[0.22em] text-rose-300">Notifications</p>
-                  <p class="mt-1 text-sm text-slate-400">Updates about your projects, sales, and hosting.</p>
+                  <p class="mt-1 text-sm text-slate-400">Latest 10 updates about your projects, sales, wallet, and hosting.</p>
                 </div>
-                <button onclick="markAllNotificationsRead()" class="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300 hover:text-cyan-200">
-                  Mark all read
-                </button>
+                <div class="flex items-center gap-3">
+                  <button onclick="markAllNotificationsRead()" class="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300 hover:text-cyan-200">
+                    Mark all read
+                  </button>
+                  <button onclick="closeNotificationsDrawer()" class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
               </div>
-              <div id="notification-list" class="mt-4 max-h-[24rem] space-y-3 overflow-y-auto pr-1"></div>
+              <div id="notification-list" class="mt-4 h-[calc(100vh-7rem)] space-y-3 overflow-y-auto pr-1"></div>
             </div>
           </div>
           <div id="more-features-shell" class="relative">
@@ -1795,6 +1800,10 @@
           >
             <i class="fas fa-gauge-high text-cyan-400"></i>
             <span class="font-medium text-sm text-gray-200">Console</span>
+            <span
+              class="text-[7px] font-black bg-cyan-500 text-gray-950 px-1.5 py-0.5 rounded ml-1 uppercase"
+              >New</span
+            >
           </div>
           <div
             data-tool-switch="web-builder"
@@ -1815,6 +1824,10 @@
           >
             <i class="fas fa-store text-cyan-400"></i>
             <span class="font-medium text-sm text-gray-200">Marketplace</span>
+            <span
+              class="text-[7px] font-black bg-cyan-500 text-gray-950 px-1.5 py-0.5 rounded ml-1 uppercase"
+              >New</span
+            >
           </div>
           <div
             data-tool-switch="image-pdf"
@@ -2079,6 +2092,10 @@
               >
                 <i class="fas fa-gauge-high text-cyan-400"></i
                 ><span class="font-medium text-sm text-gray-200">Console</span>
+                <span
+                  class="text-[7px] font-black bg-cyan-500 text-gray-950 px-1.5 py-0.5 rounded ml-1 uppercase"
+                  >New</span
+                >
               </button>
               <button
                 data-tool-switch="web-builder"
@@ -2089,6 +2106,10 @@
                 ><span class="font-medium text-sm text-gray-200"
                   >Web Builder</span
                 >
+                <span
+                  class="text-[7px] font-black bg-cyan-500 text-gray-950 px-1.5 py-0.5 rounded ml-1 uppercase"
+                  >New</span
+                >
               </button>
               <button
                 data-tool-switch="marketplace"
@@ -2098,6 +2119,10 @@
                 <i class="fas fa-store text-cyan-400"></i
                 ><span class="font-medium text-sm text-gray-200"
                   >Marketplace</span
+                >
+                <span
+                  class="text-[7px] font-black bg-cyan-500 text-gray-950 px-1.5 py-0.5 rounded ml-1 uppercase"
+                  >New</span
                 >
               </button>
               <button
@@ -2703,17 +2728,37 @@
           <div class="flex gap-3">
             <button
               id="btn-pwa-install"
-              class="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-cyan-900/20"
+              class="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-cyan-900/20"
             >
               Install App
             </button>
             <button
               onclick="hideInstallBanner()"
-              class="px-6 py-3 bg-gray-800 text-gray-400 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-gray-700 transition-all"
+              class="px-5 py-2.5 bg-gray-800 text-gray-400 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-gray-700 transition-all"
             >
               Later
             </button>
           </div>
+        </div>
+      </div>
+
+      <div
+        id="builder-draft-chooser-modal"
+        class="hidden fixed inset-0 z-[130] items-center justify-center bg-slate-950/78 px-4 py-6 backdrop-blur-sm"
+        onclick="if (event.target === this) closeBuilderDraftChooser();"
+      >
+        <div class="w-full max-w-2xl rounded-[2rem] border border-white/10 bg-slate-950 shadow-[0_30px_90px_rgba(2,6,23,0.55)]">
+          <div class="flex items-start justify-between gap-4 border-b border-white/6 px-5 py-5 sm:px-6">
+            <div>
+              <p class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400">Builder Drafts</p>
+              <h3 class="mt-2 text-2xl font-semibold text-white">Choose a saved project</h3>
+              <p id="builder-draft-chooser-meta" class="mt-2 text-sm text-slate-400">Your saved drafts appear here.</p>
+            </div>
+            <button onclick="closeBuilderDraftChooser()" class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div id="builder-draft-chooser-list" class="max-h-[70vh] space-y-3 overflow-y-auto px-5 py-5 sm:px-6"></div>
         </div>
       </div>
     </footer>
@@ -4064,6 +4109,19 @@
             "active",
             node.dataset.toolSwitch === currentStudioToolId,
           );
+          if (node.dataset.toolSwitch === currentStudioToolId) {
+            const track = node.closest(".studio-tool-ribbon-track");
+            try {
+              node.scrollIntoView({
+                behavior: "smooth",
+                block: "nearest",
+                inline: "center",
+              });
+            } catch {}
+            if (track) {
+              track.dataset.activeTool = currentStudioToolId;
+            }
+          }
         });
       }
       function renderPremiumFeatureGate(id) {
@@ -5119,6 +5177,8 @@
         return `<div id="marketplace-pane" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">${renderMarketplaceCards(getFilteredMarketplaceItems(marketplaceItems))}</div>`;
       }
       function renderMarketplaceTool() {
+        const selectStyles = `style="color:#020617;background-color:#ffffff;"`;
+        const darkOptionStyle = `style="color:#020617;background-color:#ffffff;"`;
         return `<div class="animate-fadeIn relative space-y-8">
           <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -7516,6 +7576,26 @@
         if (total <= 0) return "";
         return total > 9 ? "9+" : String(total);
       }
+      function clearClientAuthState() {
+        loggedIn = false;
+        currentUser = null;
+        currentPremiumRequest = null;
+        currentReferralStatus = null;
+        notificationsList = [];
+        unreadNotificationCount = 0;
+        stopAdsenseStatusSyncLoop();
+        stopUserWalletRefreshLoop();
+        updateUserProfileUi();
+        updateSidebarHistory([]);
+        renderBuilderDrafts();
+        document.getElementById("profile-menu")?.classList.add("hidden");
+        document.getElementById("studio")?.classList.add("hidden");
+        document.getElementById("landing")?.classList.remove("hidden");
+      }
+      async function handleSessionExpired(message = "Your session ended. Please sign in again.") {
+        clearClientAuthState();
+        showStudioStatusSnackbar(message, "error");
+      }
       function renderNotificationsUi() {
         const badge = document.getElementById("notification-badge");
         const list = document.getElementById("notification-list");
@@ -7557,6 +7637,10 @@
         try {
           const res = await fetch("/api/notifications", { credentials: "include" });
           const data = await res.json();
+          if (res.status === 401) {
+            await handleSessionExpired(data.message || "Your session ended. Please sign in again.");
+            return [];
+          }
           if (!res.ok || !data.success) {
             throw new Error(data.message || "Could not load notifications.");
           }
@@ -7579,6 +7663,10 @@
             body: JSON.stringify({}),
           });
           const data = await res.json();
+          if (res.status === 401) {
+            await handleSessionExpired(data.message || "Your session ended. Please sign in again.");
+            return;
+          }
           if (!res.ok || !data.success) throw new Error(data.message || "Could not mark notifications as read.");
           notificationsList = notificationsList.map((item) => ({ ...item, isRead: true, readAt: new Date().toISOString() }));
           unreadNotificationCount = Number(data.unreadCount || 0);
@@ -7590,8 +7678,13 @@
       function queueNotificationAutoHide() {
         clearTimeout(notificationDropdownTimer);
         notificationDropdownTimer = setTimeout(() => {
-          document.getElementById("notification-dropdown")?.classList.add("hidden");
+          closeNotificationsDrawer();
         }, 15000);
+      }
+      function closeNotificationsDrawer() {
+        const dropdown = document.getElementById("notification-dropdown");
+        if (!dropdown) return;
+        dropdown.classList.add("hidden");
       }
       function toggleNotifications(event) {
         event?.stopPropagation();
@@ -7610,12 +7703,17 @@
         const notification = notificationsList.find((item) => String(item._id || "") === String(notificationId || ""));
         if (!notification) return;
         try {
-          await fetch("/api/notifications/read", {
+          const res = await fetch("/api/notifications/read", {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ notificationId }),
           });
+          if (res.status === 401) {
+            const data = await res.json().catch(() => ({}));
+            await handleSessionExpired(data.message || "Your session ended. Please sign in again.");
+            return;
+          }
         } catch {}
         notificationsList = notificationsList.map((item) =>
           String(item._id || "") === String(notificationId || "")
@@ -7627,7 +7725,7 @@
           notificationsList.filter((item) => !item.isRead).length,
         );
         renderNotificationsUi();
-        document.getElementById("notification-dropdown")?.classList.add("hidden");
+        closeNotificationsDrawer();
         const targetType = String(notification.targetType || "").trim();
         const targetId = String(notification.targetId || "").trim();
         if (targetType === "marketplace-sale") {
@@ -7640,6 +7738,18 @@
           marketplaceActiveTab = "purchased";
           await switchTool("marketplace");
           if (targetId) setTimeout(() => openMarketplaceDetail(targetId), 120);
+          return;
+        }
+        if (targetType === "wallet") {
+          await switchTool("console");
+          setTimeout(() => openAccountModal(), 100);
+          return;
+        }
+        if (targetType === "live-project") {
+          await switchTool("history");
+          if (targetId) {
+            setTimeout(() => openLiveProjectDetail(encodeURIComponent(String(targetId || ""))), 140);
+          }
           return;
         }
         if (targetType === "console") {
@@ -8230,6 +8340,8 @@
               currentUser = { ...(currentUser || {}), ...(data.user || {}) };
               updateUserProfileUi();
               updateReferralUi();
+            } else if (res.status === 401 || !data?.success) {
+              await handleSessionExpired(data?.message || "Your session ended. Please sign in again.");
             }
           } catch {}
         }, 60 * 1000);
@@ -8238,6 +8350,31 @@
         if (userWalletRefreshTimer) {
           clearInterval(userWalletRefreshTimer);
           userWalletRefreshTimer = null;
+        }
+      }
+      async function syncServerSessionState(options = {}) {
+        const { silent = true } = options;
+        try {
+          const res = await fetch("/api/auth/me", {
+            credentials: "include",
+            cache: "no-store",
+            headers: { "Cache-Control": "no-store" },
+          });
+          const data = await res.json();
+          if (res.ok && data?.success && data.user) {
+            loggedIn = true;
+            currentUser = data.user;
+            updateUserProfileUi();
+            return true;
+          }
+          if (loggedIn || currentUser) {
+            await handleSessionExpired(
+              silent ? "Your session has ended." : "Your session ended. Please sign in again.",
+            );
+          }
+          return false;
+        } catch {
+          return Boolean(loggedIn && currentUser);
         }
       }
       function hasAdsenseStats(report) {
@@ -9090,18 +9227,7 @@
           await logUsageActivity("logout", "logged out", "auth");
           await fetch("/api/auth/logout", { credentials: "include" });
         } catch (e) {}
-        loggedIn = false;
-        currentUser = null;
-        currentPremiumRequest = null;
-        currentReferralStatus = null;
-        stopAdsenseStatusSyncLoop();
-        stopUserWalletRefreshLoop();
-        updateUserProfileUi();
-        updateSidebarHistory([]);
-        renderBuilderDrafts();
-        document.getElementById("profile-menu").classList.add("hidden");
-        document.getElementById("studio").classList.add("hidden");
-        document.getElementById("landing").classList.remove("hidden");
+        clearClientAuthState();
       }
       // Login Functions
       function showLogin() {
@@ -9299,6 +9425,9 @@
             goToStudio();
             setTimeout(() => maybePromptRenderHostingOnboarding(), 600);
           } else {
+            if (loggedIn || currentUser) {
+              clearClientAuthState();
+            }
             currentPremiumRequest = null;
           }
         } catch (e) {
@@ -10703,6 +10832,7 @@
                                         <button onclick="requestNewBuilderProject(); hideStudioMenu();" class="builder-cmd"><i class="fas fa-file-circle-plus text-cyan-400"></i><span>New Project<small>Clear canvas and start fresh</small></span></button>
                                         <button onclick="saveBuilderDraft(); hideStudioMenu();" class="builder-cmd"><i class="fas fa-floppy-disk text-cyan-400"></i><span>Save Draft<small>Store current project locally</small></span></button>
                                     </div>
+                                    <button onclick="openBuilderDraftChooser(); hideStudioMenu();" class="builder-cmd"><i class="fas fa-folder-open text-cyan-400"></i><span>Draft Projects <small id="builder-drafts-count-label">0 saved projects</small></span></button>
                                     <button onclick="restartBuilderTutorial(); hideStudioMenu();" class="builder-cmd"><i class="fas fa-person-chalkboard text-cyan-400"></i><span>Start Tutorial<small>Replay the Workflow AI guide</small></span></button>
                                     <button onclick="switchTool('history'); exitStudio(); hideStudioMenu();" class="builder-cmd"><i class="fas fa-clock-rotate-left text-cyan-400"></i><span>Project History<small>Open MediaLab history library</small></span></button>
                                     <div>
@@ -12182,14 +12312,16 @@
           notificationShell &&
           notificationDropdown &&
           !notificationDropdown.classList.contains("hidden") &&
-          !notificationShell.contains(event.target)
+          !notificationShell.contains(event.target) &&
+          !notificationDropdown.contains(event.target)
         ) {
-          notificationDropdown.classList.add("hidden");
+          closeNotificationsDrawer();
         } else if (
           notificationShell &&
           notificationDropdown &&
           !notificationDropdown.classList.contains("hidden") &&
-          notificationShell.contains(event.target)
+          (notificationShell.contains(event.target) ||
+            notificationDropdown.contains(event.target))
         ) {
           queueNotificationAutoHide();
         }
@@ -12208,7 +12340,8 @@
           notificationShell &&
           notificationDropdown &&
           !notificationDropdown.classList.contains("hidden") &&
-          notificationShell.contains(event.target)
+          (notificationShell.contains(event.target) ||
+            notificationDropdown.contains(event.target))
         ) {
           queueNotificationAutoHide();
         }
@@ -12232,6 +12365,14 @@
         if (profileMenu && !profileMenu.classList.contains("hidden")) {
           queueProfileMenuAutoHide();
         }
+      });
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+          syncServerSessionState({ silent: true });
+        }
+      });
+      window.addEventListener("focus", () => {
+        syncServerSessionState({ silent: true });
       });
       document.addEventListener("mousedown", (event) => {
         const userSection = document.getElementById("user-section");
@@ -13496,10 +13637,47 @@
       }
       function renderBuilderDrafts() {
         const list = document.getElementById("builder-drafts-list");
+        const drafts = getBuilderDrafts();
+        const countLabel = document.getElementById("builder-drafts-count-label");
+        if (countLabel) {
+          countLabel.textContent = drafts.length
+            ? `${drafts.length} saved project${drafts.length === 1 ? "" : "s"}`
+            : loggedIn
+              ? "No saved projects yet"
+              : "Sign in to save projects";
+        }
+        if (!list) return;
+        if (!drafts.length) {
+          list.innerHTML = `<button onclick="openBuilderDraftChooser(); hideStudioMenu();" class="w-full rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-4 text-left text-[11px] text-slate-400 hover:border-cyan-400/20 hover:bg-white/[0.05] transition-all">${loggedIn ? "No saved drafts yet. Open Draft Projects to manage them." : "Sign in to save builder drafts."}</button>`;
+          renderBuilderDraftChooser();
+          return;
+        }
+        const latest = drafts[drafts.length - 1];
+        list.innerHTML = `<button onclick="openBuilderDraftChooser(); hideStudioMenu();" class="w-full rounded-2xl border border-cyan-400/15 bg-cyan-500/[0.07] px-4 py-4 text-left hover:border-cyan-400/25 transition-all">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <div class="text-sm font-bold text-white">${drafts.length} saved project${drafts.length === 1 ? "" : "s"}</div>
+                <div class="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-400">Latest: ${latest?.name ? latest.name : "Untitled Draft"}</div>
+              </div>
+              <i class="fas fa-chevron-right text-cyan-300"></i>
+            </div>
+          </button>`;
+        renderBuilderDraftChooser();
+      }
+      function renderBuilderDraftChooser() {
+        const list = document.getElementById("builder-draft-chooser-list");
+        const meta = document.getElementById("builder-draft-chooser-meta");
         if (!list) return;
         const drafts = getBuilderDrafts();
+        if (meta) {
+          meta.textContent = drafts.length
+            ? `${drafts.length} draft project${drafts.length === 1 ? "" : "s"} ready to reopen in the builder.`
+            : loggedIn
+              ? "No saved drafts yet."
+              : "Sign in to save and reopen builder drafts.";
+        }
         if (!drafts.length) {
-          list.innerHTML = `<div class="text-[11px] text-slate-500 px-2 py-3">${loggedIn ? "No saved drafts yet." : "Sign in to save builder drafts."}</div>`;
+          list.innerHTML = `<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">${loggedIn ? "No saved drafts yet." : "Sign in to save builder drafts."}</div>`;
           return;
         }
         list.innerHTML = drafts
@@ -13507,17 +13685,28 @@
           .reverse()
           .map(
             (draft, index) => `
-            <button class="draft-card" onclick="loadBuilderDraftByIndex(${drafts.length - 1 - index}); hideStudioMenu();">
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <div class="text-sm font-bold text-white">${draft.name}</div>
-                  <div class="text-[10px] uppercase tracking-[0.18em] text-slate-500 mt-1">${new Date(draft.savedAt).toLocaleString()}</div>
+              <button onclick="switchTool('web-builder'); closeBuilderDraftChooser(); setTimeout(() => { loadBuilderDraftByIndex(${drafts.length - 1 - index}); launchBossMode(); }, 120);" class="w-full rounded-[1.6rem] border border-white/10 bg-white/[0.03] px-4 py-4 text-left transition-all hover:border-cyan-400/25 hover:bg-white/[0.05]">
+                <div class="flex items-start justify-between gap-4">
+                  <div class="min-w-0">
+                    <p class="truncate text-base font-semibold text-white">${draft.name}</p>
+                    <p class="mt-2 text-[10px] uppercase tracking-[0.18em] text-slate-500">${new Date(draft.savedAt || Date.now()).toLocaleString()}</p>
+                  </div>
+                  <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-500/10 text-cyan-300"><i class="fas fa-arrow-up-right-from-square"></i></span>
                 </div>
-                <i class="fas fa-chevron-right text-slate-500"></i>
-              </div>
-            </button>`,
+              </button>`,
           )
           .join("");
+      }
+      function openBuilderDraftChooser() {
+        renderBuilderDraftChooser();
+        const modal = document.getElementById("builder-draft-chooser-modal");
+        modal?.classList.remove("hidden");
+        modal?.classList.add("flex");
+      }
+      function closeBuilderDraftChooser() {
+        const modal = document.getElementById("builder-draft-chooser-modal");
+        modal?.classList.add("hidden");
+        modal?.classList.remove("flex");
       }
       async function saveBuilderDraft(options = {}) {
         const canvas = document.getElementById("web-canvas");

@@ -6,6 +6,7 @@ import crypto from "crypto";
 import axios from "axios";
 import { Octokit } from "@octokit/rest";
 import User from "../models/User.js";
+import Notification from "../models/Notification.js";
 import { Resend } from "resend";
 import dotenv from "dotenv";
 
@@ -36,6 +37,28 @@ const buildGithubEncryptionKey = () =>
   crypto.createHash("sha256").update(String(githubEncryptionSecret)).digest();
 const buildGoogleEncryptionKey = () =>
   crypto.createHash("sha256").update(String(googleTokenSecret)).digest();
+
+const createWelcomeNotification = async (user = null) => {
+  if (!user?._id) return null;
+  try {
+    return await Notification.create({
+      userId: user._id,
+      type: "welcome",
+      title: `Hello ${String(user.name || "Creator").trim()}`,
+      message:
+        "Welcome to MediaLab. Explore different tools to monetize or sell your projects as a developer.",
+      targetType: "console",
+      targetId: "",
+      metadata: {
+        source: "login",
+      },
+      isRead: false,
+    });
+  } catch (error) {
+    console.error("Welcome notification failed:", error.message);
+    return null;
+  }
+};
 
 const slugifyRepoName = (value = "") =>
   String(value || "")
@@ -573,6 +596,9 @@ router.get(
   async (req, res) => {
     await updateUserLocationOnLogin(req, req.user);
     const authMode = String(req.session?.googleAuthMode || "").trim();
+    if (authMode !== "adsense") {
+      await createWelcomeNotification(req.user);
+    }
     if (req.session) delete req.session.googleAuthMode;
     // Manually force session save before redirecting (Fixes Render "Session Lag")
     req.session.save((err) => {
@@ -623,12 +649,14 @@ router.post("/dev-login", express.json(), async (req, res) => {
       return res.status(500).json({ success: false, message: "Could not start developer session." });
     }
 
-    req.session.save((saveErr) => {
-      if (saveErr) {
-        console.error("Developer session save failed:", saveErr);
-        return res.status(500).json({ success: false, message: "Could not persist developer session." });
-      }
-      return res.json({ success: true, user: toSafeUser(user) });
+    createWelcomeNotification(user).finally(() => {
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.error("Developer session save failed:", saveErr);
+          return res.status(500).json({ success: false, message: "Could not persist developer session." });
+        }
+        return res.json({ success: true, user: toSafeUser(user) });
+      });
     });
   });
 });
