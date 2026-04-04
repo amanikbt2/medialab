@@ -663,7 +663,7 @@ app.use(express.static(publicDir));
 
 app.get("*", (req, res) => {
   const requestPath = String(req.path || "/").replace(/^\\/+/, "");
-  const safePath = requestPath.replace(/\\/g, "/");
+  const safePath = requestPath.replace(/\\\\/g, "/");
   const directFile = path.join(publicDir, safePath);
   const htmlFile = safePath.endsWith(".html") ? directFile : path.join(publicDir, safePath + ".html");
   const folderIndex = path.join(publicDir, safePath, "index.html");
