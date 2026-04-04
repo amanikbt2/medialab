@@ -17,6 +17,7 @@
       let renderServiceIdStepVisible = false;
       let renderPopupMode = false;
       let renderDeployWindow = null;
+      let pendingRenderLiveSuccessTimers = new Map();
       let currentAdsenseConsoleReport = null;
       let adsensePortalBlocked = true;
       let adsensePortalPopup = null;
@@ -452,6 +453,23 @@
         } catch (error) {
           console.warn("Usage activity log skipped:", error);
         }
+      }
+      const recentUsageLogEvents = new Map();
+      async function logUsageActivityOnce(
+        key,
+        action,
+        summary,
+        source = "web",
+        metadata = {},
+        ttlMs = 15000,
+      ) {
+        const eventKey = String(key || action || summary || "").trim();
+        if (!eventKey) return;
+        const now = Date.now();
+        const lastSeenAt = Number(recentUsageLogEvents.get(eventKey) || 0);
+        if (now - lastSeenAt < Math.max(0, Number(ttlMs || 0))) return;
+        recentUsageLogEvents.set(eventKey, now);
+        await logUsageActivity(action, summary, source, metadata);
       }
       async function recordDownloadActivity(
         type = "pwa",
@@ -1546,6 +1564,13 @@
       }
       function setMarketplaceTab(tab = "sale") {
         marketplaceActiveTab = tab;
+        logUsageActivityOnce(
+          `marketplace-tab:${tab}`,
+          "marketplace-tab-open",
+          `opened marketplace ${tab} tab`,
+          "marketplace",
+          { tab },
+        );
         if (["sale", "mine"].includes(String(tab || ""))) startMarketplacePreviewRotation();
         else stopMarketplacePreviewRotation();
         mountMarketplaceTool();
@@ -2371,6 +2396,17 @@
           currentMarketplaceItem = data.item;
           marketplacePreviewVisible = false;
           renderMarketplaceDetail(currentMarketplaceItem);
+          await logUsageActivityOnce(
+            `marketplace-detail:${id}`,
+            "marketplace-detail-open",
+            `opened marketplace project ${data.item?.title || id}`,
+            "marketplace",
+            {
+              listingId: id,
+              title: data.item?.title || "",
+              status: data.item?.status || "",
+            },
+          );
         } catch (error) {
           closeMarketplaceDetail();
           showBuilderSnackbar(error.message || "Could not open this marketplace item.", "error");
@@ -3338,6 +3374,11 @@
         currentAppDialogResolver = null;
         if (resolver) resolver(Boolean(result));
       }
+      function dismissAppDialogIfOpen() {
+        const modal = document.getElementById("app-dialog-modal");
+        if (!modal || modal.classList.contains("hidden")) return;
+        closeAppDialog(false);
+      }
       function openAppDialog({
         chip = "Notice",
         title = "Action Required",
@@ -3525,6 +3566,31 @@
         if (text) text.textContent = liveUrl;
         document.getElementById("render-live-modal")?.classList.remove("hidden");
       }
+      function getRenderProjectTimerKey(project = {}) {
+        return String(project?.fileName || project?.filename || project?.name || "").trim();
+      }
+      function clearScheduledRenderLiveSuccess(project = {}) {
+        const timerKey = getRenderProjectTimerKey(project);
+        if (!timerKey) return;
+        const existingTimer = pendingRenderLiveSuccessTimers.get(timerKey);
+        if (existingTimer) {
+          clearTimeout(existingTimer);
+          pendingRenderLiveSuccessTimers.delete(timerKey);
+        }
+      }
+      function scheduleRenderLiveSuccess(project) {
+        const liveUrl = getProjectPrimaryUrl(project || {});
+        const timerKey = getRenderProjectTimerKey(project);
+        if (!liveUrl || !timerKey) return;
+        clearScheduledRenderLiveSuccess(project);
+        const timer = setTimeout(() => {
+          pendingRenderLiveSuccessTimers.delete(timerKey);
+          dismissAppDialogIfOpen();
+          showRenderLiveSuccess(project);
+          showBuilderSnackbar("Your site is live.", "success");
+        }, 20000);
+        pendingRenderLiveSuccessTimers.set(timerKey, timer);
+      }
       function hasRenderProjectTransitionedLive(previousProject, nextProject) {
         const previousLive = Boolean(previousProject?.renderHostedConfirmed);
         const nextLive = Boolean(nextProject?.renderHostedConfirmed && nextProject?.renderUrl);
@@ -3552,6 +3618,7 @@
           ),
         );
         if (newlyErrored) {
+          clearScheduledRenderLiveSuccess(newlyErrored);
           const projectName =
             newlyErrored?.projectName ||
             newlyErrored?.displayName ||
@@ -3577,8 +3644,7 @@
         ) {
           closeRenderHostingOnboarding();
         }
-        showRenderLiveSuccess(newlyLive);
-        showBuilderSnackbar("Your site is live.", "success");
+        scheduleRenderLiveSuccess(newlyLive);
         if (
           currentLiveProjectDetail &&
           String(currentLiveProjectDetail.fileName || currentLiveProjectDetail.filename).trim() ===
@@ -3848,7 +3914,7 @@
           updateUserProfileUi();
           showBuilderSnackbar("Render hosting verified. Project is fully live.", "success");
           if (data.project?.renderUrl) {
-            showRenderLiveSuccess(data.project);
+            scheduleRenderLiveSuccess(data.project);
           }
           if (
             currentLiveProjectDetail &&
@@ -3874,6 +3940,13 @@
       async function openLiveProjectDetail(filename) {
         const normalizedFilename = decodeURIComponent(String(filename || "").trim());
         if (!normalizedFilename) return;
+        logUsageActivityOnce(
+          `project-dashboard:${normalizedFilename}`,
+          "project-dashboard-open",
+          `opened project dashboard ${normalizedFilename}`,
+          "project-dashboard",
+          { filename: normalizedFilename },
+        );
         document
           .getElementById("live-project-detail-modal")
           ?.classList.remove("hidden");
@@ -4977,6 +5050,9 @@
           showLogin();
           return;
         }
+        logUsageActivityOnce("wallet-open", "wallet-open", "opened wallet", "wallet", {
+          toolId: currentStudioToolId || "console",
+        });
         document.getElementById("profile-menu")?.classList.add("hidden");
         updateAccountModalUi();
         document.getElementById("account-modal")?.classList.remove("hidden");
@@ -5028,6 +5104,13 @@
         document.getElementById("withdraw-success-modal")?.classList.remove("flex");
       }
       async function openWithdrawalStatusModal() {
+        logUsageActivityOnce(
+          "wallet-withdrawal-status-open",
+          "wallet-withdrawal-status-open",
+          "opened withdrawal status",
+          "wallet",
+          { toolId: currentStudioToolId || "console" },
+        );
         await fetchWithdrawalRequests();
         renderWithdrawalStatusModal();
         document.getElementById("withdraw-status-modal")?.classList.remove("hidden");
@@ -7144,7 +7227,7 @@
                                     </div>
                                     <div class="rounded-[1.2rem] border border-white/10 bg-slate-950/50 p-4">
                                       <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Publisher ID</p>
-                                      <p class="mt-2 text-base font-semibold text-white">${currentUser?.adsenseId || "Waiting"}</p>
+                                      <p class="mt-2 break-all text-sm leading-6 font-semibold text-white sm:text-base">${currentUser?.adsenseId || "Waiting"}</p>
                                     </div>
                                   </div>
                                   <p class="mt-4 text-sm leading-6 text-slate-400">${adsenseReport.message || "No current AdSense data yet. Once Google starts returning live stats for your hosted domain, they will appear here automatically."}</p>

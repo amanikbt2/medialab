@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <title>Candy Crush Saga • Boss Mode</title>
+    <title>Candy Crush Saga • Super Boss Mode</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap");
@@ -66,7 +66,7 @@
   <body
     class="bg-gradient-to-br from-pink-500 via-purple-600 to-violet-700 min-h-screen text-white overflow-hidden"
   >
-    <!-- STARTUP SCREEN -->
+    <!-- STARTUP -->
     <div
       id="startup-screen"
       class="flex flex-col items-center justify-center min-h-screen"
@@ -77,14 +77,11 @@
           <span class="text-8xl animate-bounce delay-300">🍬</span>
         </div>
         <h1 class="text-7xl font-bold tracking-tighter mb-3">CANDY CRUSH</h1>
-        <p class="text-2xl text-white/80">Boss Mode</p>
-        <div class="mt-16 text-white/60 text-sm">
-          Preparing the sweetest adventure...
-        </div>
+        <p class="text-2xl text-white/80">Super Boss Mode</p>
       </div>
     </div>
 
-    <!-- MENU SCREEN -->
+    <!-- MENU -->
     <div
       id="menu-screen"
       class="hidden flex flex-col items-center justify-center min-h-screen px-6"
@@ -95,7 +92,7 @@
           <h1 class="text-7xl font-bold tracking-tighter">CANDY CRUSH</h1>
           <span class="text-6xl">🍬</span>
         </div>
-        <p class="text-2xl text-white/90">Boss Mode • Multiple Challenges</p>
+        <p class="text-2xl text-white/90">Super Boss Mode</p>
       </div>
       <div class="flex flex-col gap-4 w-full max-w-xs">
         <button
@@ -113,7 +110,7 @@
       </div>
     </div>
 
-    <!-- LEVELS SCREEN -->
+    <!-- LEVELS -->
     <div id="levels-screen" class="hidden flex flex-col min-h-screen">
       <div
         class="p-6 flex items-center justify-between bg-black/30 sticky top-0 z-10"
@@ -144,7 +141,7 @@
       </div>
     </div>
 
-    <!-- SETTINGS SCREEN -->
+    <!-- SETTINGS -->
     <div id="settings-screen" class="hidden flex flex-col min-h-screen p-8">
       <div class="max-w-md mx-auto w-full">
         <h2 class="text-4xl font-bold mb-8 text-center">Settings</h2>
@@ -188,20 +185,17 @@
         class="bg-gradient-to-b from-purple-900 to-transparent p-4 flex justify-between items-center"
       >
         <button onclick="exitLevel()" class="text-lg">← EXIT</button>
-
         <div class="flex gap-8 text-center">
           <div>
             <div class="text-xs opacity-70">LEVEL</div>
             <div id="level-num" class="text-4xl font-bold">1</div>
           </div>
-
           <div id="challenge-container" class="text-center">
             <div id="challenge-label" class="text-xs opacity-70">MOVES</div>
             <div id="challenge-value" class="text-4xl font-bold text-amber-300">
               25
             </div>
           </div>
-
           <div>
             <div class="text-xs opacity-70">SCORE</div>
             <div class="flex items-baseline">
@@ -210,7 +204,6 @@
             </div>
           </div>
         </div>
-
         <button onclick="pauseGame()" class="text-3xl">⏸</button>
       </div>
       <div class="flex-1 flex items-center justify-center p-4">
@@ -294,7 +287,6 @@
         COLS = 8;
       const CANDY_EMOJIS = ["🍭", "🍬", "🍫", "🧁", "🍪", "🍩"];
       const POWER_STRIPE = 7,
-        POWER_WRAPPED = 8,
         POWER_BOMB = 9;
       const JELLY = 10;
 
@@ -352,7 +344,7 @@
         })),
       ];
 
-      // ================== AUDIO (Realistic Candy Crush style) ==================
+      // ================== AUDIO - Standard Candy Crush style ==================
       function initAudio() {
         if (!audioContext)
           audioContext = new (
@@ -366,19 +358,19 @@
         const osc = audioContext.createOscillator();
         const gain = audioContext.createGain();
         osc.connect(gain).connect(audioContext.destination);
-        gain.gain.value = (volume / 100) * 0.7;
+        gain.gain.value = (volume / 100) * 0.75;
 
         switch (type) {
-          case "match":
+          case "match": // Classic pop sound
             osc.type = "sine";
-            osc.frequency.setValueAtTime(620, now);
-            osc.frequency.linearRampToValueAtTime(880, now + 0.15);
+            osc.frequency.setValueAtTime(820, now);
+            osc.frequency.linearRampToValueAtTime(1240, now + 0.12);
             gain.gain.linearRampToValueAtTime(0, now + 0.25);
             break;
-          case "powerup":
+          case "powerup": // Higher swipe / special candy sound
             osc.type = "triangle";
-            osc.frequency.setValueAtTime(920, now);
-            osc.frequency.linearRampToValueAtTime(520, now + 0.4);
+            osc.frequency.setValueAtTime(1100, now);
+            osc.frequency.linearRampToValueAtTime(680, now + 0.35);
             break;
           case "win":
             osc.frequency.setValueAtTime(880, now);
@@ -387,11 +379,11 @@
             break;
           case "lose":
             osc.frequency.setValueAtTime(520, now);
-            osc.frequency.linearRampToValueAtTime(180, now + 0.8);
+            osc.frequency.linearRampToValueAtTime(220, now + 0.8);
             break;
         }
         osc.start(now);
-        osc.stop(now + 1.2);
+        osc.stop(now + 1.1);
       }
 
       function updateVolume(newVol) {
@@ -402,33 +394,33 @@
 
       function testSound() {
         initAudio();
-        playSound("powerup");
+        playSound("match");
       }
 
-      // ================== LIGHT PARTICLES (Tiny splash only) ==================
+      // ================== TINY SPLASH PARTICLES ==================
       class Particle {
         constructor(x, y) {
           this.x = x;
           this.y = y;
-          this.vx = (Math.random() - 0.5) * 5;
-          this.vy = (Math.random() - 0.5) * 5 - 2;
-          this.life = 0.6 + Math.random() * 0.4;
-          this.emoji = ["✨", "💥"][Math.floor(Math.random() * 2)];
+          this.vx = (Math.random() - 0.5) * 4.5;
+          this.vy = (Math.random() - 0.5) * 4.5 - 2;
+          this.life = 0.55 + Math.random() * 0.35;
+          this.emoji = "✨";
         }
         update() {
-          this.vy += 0.25;
+          this.vy += 0.28;
           this.x += this.vx;
           this.y += this.vy;
-          this.life -= 0.035;
+          this.life -= 0.038;
         }
         draw() {
           ctx.globalAlpha = this.life;
-          ctx.font = "22px system-ui";
+          ctx.font = "20px system-ui";
           ctx.fillText(this.emoji, this.x, this.y);
         }
       }
 
-      // ================== RESIZE & GRAVITY ==================
+      // ================== CANVAS & GRAVITY ==================
       function resizeCanvas() {
         const container = document.getElementById("game-screen");
         const maxSize = Math.min(
@@ -454,17 +446,22 @@
               writePos--;
             }
           }
+          // Refill from top
           for (let r = writePos; r >= 0; r--) {
             grid[r][c] = Math.floor(Math.random() * 6) + 1;
             changed = true;
           }
         }
+
         if (changed) {
           animateFalling();
           setTimeout(() => {
             const matches = findMatches();
-            if (matches.length > 0) removeMatches(matches);
-            else checkWinCondition();
+            if (matches.length > 0) {
+              removeMatches(matches);
+            } else {
+              checkWinCondition();
+            }
           }, 280);
         } else {
           checkWinCondition();
@@ -476,7 +473,7 @@
         if (score >= targetScore) endGame(true);
       }
 
-      // ================== SMOOTH SWAP & FALLING ==================
+      // ================== SMOOTH ANIMATIONS ==================
       function animateSwap(r1, c1, r2, c2, callback) {
         const dx = (c2 - c1) * CELL;
         const dy = (r2 - r1) * CELL;
@@ -677,10 +674,10 @@
         setTimeout(() => (canvas.style.transform = ""), 180);
       }
 
-      // ================== REMOVE WITH TINY SPLASH ==================
+      // ================== REMOVE & TINY SPLASH ==================
       function removeMatches(matches) {
         if (!matches.length) return;
-        score += matches.length * 120;
+        score += matches.length * 130;
         playSound("match");
 
         if (matches.length >= 4) {
@@ -703,7 +700,7 @@
       }
 
       function createTinySplash(x, y) {
-        for (let i = 0; i < 7; i++) {
+        for (let i = 0; i < 8; i++) {
           particles.push(new Particle(x, y));
         }
       }
@@ -735,6 +732,7 @@
           }
         }
 
+        // Remove initial matches
         while (findMatches().length > 0) {
           for (let r = 0; r < ROWS; r++)
             for (let c = 0; c < COLS; c++) {
@@ -746,6 +744,7 @@
 
       function findMatches() {
         let matches = [];
+        // Horizontal
         for (let r = 0; r < ROWS; r++) {
           for (let c = 0; c < COLS - 2; c++) {
             if (
@@ -758,6 +757,7 @@
             }
           }
         }
+        // Vertical
         for (let c = 0; c < COLS; c++) {
           for (let r = 0; r < ROWS - 2; r++) {
             if (
@@ -1021,7 +1021,7 @@
 
         showStartup();
         console.log(
-          "%c🏆 OPTIMIZED BOSS MODE — Smooth & Lightweight!",
+          "%c🏆 SUPER BOSS MODE — Fully Fixed & Optimized!",
           "color:#22c55e; font-weight:bold; font-size:16px",
         );
       }
