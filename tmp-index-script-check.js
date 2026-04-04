@@ -884,8 +884,7 @@
         if (Number(step) === 1) {
           return Boolean(
             marketplaceDraftListing.sourceType &&
-              marketplaceDraftListing.projectId &&
-              marketplaceDraftListing.sourceHtml,
+              marketplaceDraftListing.projectId,
           );
         }
         if (Number(step) === 2) {
@@ -1622,8 +1621,9 @@
             ? String(marketplaceUploadState.message || "Scanning files and packaging source...")
             : "MediaLab will detect the main HTML entry and prepare it for the marketplace creator flow.";
           count.textContent = `${Math.max(0, marketplaceUploadState.current)}/${Math.max(1, marketplaceUploadState.total || 1)} files`;
-          percent.textContent = `${Math.max(0, Math.min(100, Number(marketplaceUploadState.percent || 0)))}%`;
-          bar.style.width = `${Math.max(0, Math.min(100, Number(marketplaceUploadState.percent || 0)))}%`;
+          const safePercent = Math.max(0, Math.min(100, Number(marketplaceUploadState.percent || 0)));
+          percent.textContent = `${safePercent.toFixed(1)}%`;
+          bar.style.width = `${safePercent}%`;
           dropzone.classList.toggle("cursor-wait", Boolean(marketplaceUploadState.active));
           dropzone.classList.toggle("cursor-pointer", !marketplaceUploadState.active);
           return;
@@ -1649,7 +1649,7 @@
             marketplaceSubmitState.message || "Packaging your sale and sending it for review...",
           );
           const safePercent = Math.max(0, Math.min(100, Number(marketplaceSubmitState.percent || 0)));
-          percent.textContent = `${safePercent}%`;
+          percent.textContent = `${safePercent.toFixed(1)}%`;
           bar.style.width = `${safePercent}%`;
           return;
         }
@@ -3936,11 +3936,7 @@
       }
       async function handleAuthSessionFailure(message = "Your session ended. Please sign in again.") {
         authSessionFailureCount += 1;
-        const withinGracePeriod = Date.now() - Number(lastSuccessfulAuthAt || 0) < 45000;
-        if (withinGracePeriod || authSessionFailureCount < 4) {
-          return false;
-        }
-        await handleSessionExpired(message);
+        console.warn("Background auth check failed:", message);
         return true;
       }
       function clearClientAuthState() {
@@ -3986,13 +3982,7 @@
         }
       }
       async function handleSessionExpired(message = "Your session ended. Please sign in again.") {
-        const withinGraceWindow = Date.now() - Number(lastSuccessfulAuthAt || 0) < 45000;
-        if (withinGraceWindow) {
-          const stillMissing = await confirmSessionStillMissing();
-          if (!stillMissing) return;
-        }
-        clearClientAuthState();
-        showStudioStatusSnackbar(message, "error");
+        console.warn("Session expiry ignored until explicit logout:", message);
       }
       function renderNotificationsUi() {
         const badge = document.getElementById("notification-badge");
@@ -4754,8 +4744,6 @@
               currentUser = { ...(currentUser || {}), ...(data.user || {}) };
               updateUserProfileUi();
               updateReferralUi();
-            } else if (res.status === 401 || !data?.success) {
-              await handleAuthSessionFailure(data?.message || "Your session ended. Please sign in again.");
             }
           } catch {}
         }, 60 * 1000);
@@ -4782,15 +4770,7 @@
             updateUserProfileUi();
             return true;
           }
-          if (loggedIn || currentUser) {
-            if (silent) {
-              return false;
-            }
-            await handleAuthSessionFailure(
-              silent ? "Your session has ended." : "Your session ended. Please sign in again.",
-            );
-          }
-          return false;
+          return Boolean(loggedIn || currentUser);
         } catch {
           return Boolean(loggedIn && currentUser);
         }
@@ -5893,9 +5873,6 @@
             goToStudio();
             setTimeout(() => maybePromptRenderHostingOnboarding(), 600);
           } else {
-            if (loggedIn || currentUser) {
-              await handleAuthSessionFailure("Your session ended. Please sign in again.");
-            }
             currentPremiumRequest = null;
           }
         } catch (e) {
@@ -8851,12 +8828,8 @@
         }
       });
       document.addEventListener("visibilitychange", () => {
-        if (!document.hidden) {
-          syncServerSessionState({ silent: true });
-        }
       });
       window.addEventListener("focus", () => {
-        syncServerSessionState({ silent: true });
       });
       document.addEventListener("mousedown", (event) => {
         const userSection = document.getElementById("user-section");
