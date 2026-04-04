@@ -30,6 +30,7 @@ import UsageLog from "./models/UsageLog.js";
 import Download from "./models/Download.js";
 import WithdrawalRequest from "./models/WithdrawalRequest.js";
 import MarketplaceItem from "./models/MarketplaceItem.js";
+import Notification from "./models/Notification.js";
 import {
   createRenderBlueprintInstance,
   extractRenderDeploySuccessPayload,
@@ -167,6 +168,111 @@ async function createUsageLog({
     console.warn("Usage log save failed:", error.message);
     return null;
   }
+}
+
+async function createUserNotification({
+  userId,
+  type = "general",
+  title = "",
+  message = "",
+  targetType = "",
+  targetId = "",
+  metadata = {},
+} = {}) {
+  if (!userId || !String(title || "").trim()) return null;
+  try {
+    const notification = await Notification.create({
+      userId,
+      type: String(type || "general").trim(),
+      title: String(title || "").trim(),
+      message: String(message || "").trim(),
+      targetType: String(targetType || "").trim(),
+      targetId: String(targetId || "").trim(),
+      metadata: metadata && typeof metadata === "object" ? metadata : {},
+      isRead: false,
+    });
+    io.emit("user:notification", {
+      _id: String(notification._id),
+      userId: String(notification.userId),
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      targetType: notification.targetType,
+      targetId: notification.targetId,
+      metadata: notification.metadata || {},
+      isRead: false,
+      createdAt: notification.createdAt,
+    });
+    return notification;
+  } catch (error) {
+    console.error("Notification create failed:", error);
+    return null;
+  }
+}
+
+async function createBulkNotifications(userIds = [], payload = {}) {
+  const uniqueIds = [...new Set((Array.isArray(userIds) ? userIds : []).map((id) => String(id || "").trim()).filter(Boolean))];
+  if (!uniqueIds.length || !String(payload?.title || "").trim()) return [];
+  const docs = uniqueIds.map((userId) => ({
+    userId,
+    type: String(payload.type || "general").trim(),
+    title: String(payload.title || "").trim(),
+    message: String(payload.message || "").trim(),
+    targetType: String(payload.targetType || "").trim(),
+    targetId: String(payload.targetId || "").trim(),
+    metadata: payload.metadata && typeof payload.metadata === "object" ? payload.metadata : {},
+    isRead: false,
+  }));
+  try {
+    const notifications = await Notification.insertMany(docs, { ordered: false });
+    notifications.forEach((notification) => {
+      io.emit("user:notification", {
+        _id: String(notification._id),
+        userId: String(notification.userId),
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        targetType: notification.targetType,
+        targetId: notification.targetId,
+        metadata: notification.metadata || {},
+        isRead: false,
+        createdAt: notification.createdAt,
+      });
+    });
+    return notifications;
+  } catch (error) {
+    console.error("Bulk notification create failed:", error);
+    return [];
+  }
+}
+
+function computeSellerRatingMeta(user = {}) {
+  const ratings = Array.isArray(user?.sellerRatings) ? user.sellerRatings : [];
+  const count = ratings.length;
+  const average = count
+    ? ratings.reduce((sum, entry) => sum + Number(entry?.value || 0), 0) / count
+    : 0;
+  return {
+    sellerRatingCount: count,
+    sellerRatingPercent: count ? Number((((average / 5) * 100) || 0).toFixed(1)) : 0,
+  };
+}
+
+async function syncAuthorSellerRatingToListings(authorId) {
+  if (!authorId) return;
+  const author = await User.findById(authorId).select("sellerRatings");
+  if (!author) return;
+  const ratingMeta = computeSellerRatingMeta(author);
+  await MarketplaceItem.updateMany(
+    { authorId },
+    {
+      $set: {
+        sellerRatingCount: ratingMeta.sellerRatingCount,
+        sellerRatingPercent: ratingMeta.sellerRatingPercent,
+        updatedAt: new Date(),
+      },
+    },
+  );
 }
 
 function scoreUsageLogWeight(log = {}) {
@@ -889,6 +995,8 @@ function buildMarketplacePublicItem(item = {}, viewerId = "") {
     status: item.status || "pending",
     authorName: item.authorName || "",
     authorAvatar: item.authorAvatar || "",
+    sellerRatingCount: Number(item.sellerRatingCount || 0),
+    sellerRatingPercent: Number(item.sellerRatingPercent || 0),
     liveUrl: item.liveUrl || "",
     disapprovalReason: item.disapprovalReason || "",
     removalReason: item.removalReason || "",
@@ -1622,6 +1730,121 @@ app.post("/api/referrals/claim", async (req, res) => {
   }
 });
 
+app.get("/api/notifications", accountRateLimit, async (req, res) => {
+  try {
+    if (!req.user?._id) {
+      return res.status(401).json({ success: false, message: "Login required." });
+    }
+    const notifications = await Notification.find({ userId: req.user._id })
+      .sort({ createdAt: -1 })
+      .limit(40)
+      .lean();
+    const unreadCount = await Notification.countDocuments({
+      userId: req.user._id,
+      isRead: false,
+    });
+    return res.json({
+      success: true,
+      notifications,
+      unreadCount,
+    });
+  } catch (error) {
+    console.error("Notifications fetch failed:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Could not load notifications right now.",
+    });
+  }
+});
+
+app.post("/api/notifications/read", accountRateLimit, express.json(), async (req, res) => {
+  try {
+    if (!req.user?._id) {
+      return res.status(401).json({ success: false, message: "Login required." });
+    }
+    const notificationId = String(req.body?.notificationId || "").trim();
+    if (notificationId) {
+      await Notification.updateOne(
+        { _id: notificationId, userId: req.user._id },
+        { $set: { isRead: true, readAt: new Date() } },
+      );
+    } else {
+      await Notification.updateMany(
+        { userId: req.user._id, isRead: false },
+        { $set: { isRead: true, readAt: new Date() } },
+      );
+    }
+    const unreadCount = await Notification.countDocuments({
+      userId: req.user._id,
+      isRead: false,
+    });
+    return res.json({ success: true, unreadCount });
+  } catch (error) {
+    console.error("Notification read failed:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Could not update notifications right now.",
+    });
+  }
+});
+
+app.get("/api/admin/notifications", adminRateLimit, requireAdminApi, async (_req, res) => {
+  try {
+    const recent = await Notification.find({})
+      .sort({ createdAt: -1 })
+      .limit(120)
+      .lean();
+    return res.json({ success: true, notifications: recent });
+  } catch (error) {
+    console.error("Admin notifications fetch failed:", error);
+    return res.status(500).json({ success: false, message: "Could not load notifications." });
+  }
+});
+
+app.post("/api/admin/notifications", adminRateLimit, requireAdminApi, express.json(), async (req, res) => {
+  try {
+    const mode = String(req.body?.mode || "all").trim().toLowerCase();
+    const message = String(req.body?.message || "").trim();
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    if (!message) {
+      return res.status(400).json({ success: false, message: "Notification message is required." });
+    }
+    if (mode === "individual") {
+      if (!email) {
+        return res.status(400).json({ success: false, message: "Enter the user email first." });
+      }
+      const user = await User.findOne({ email });
+      if (!user) {
+        return res.status(404).json({ success: false, message: "User not found for that email." });
+      }
+      await createUserNotification({
+        userId: user._id,
+        type: "admin",
+        title: "New admin message",
+        message,
+        targetType: "console",
+        metadata: { scope: "individual", email },
+      });
+      return res.json({ success: true, message: "Notification sent to the selected user." });
+    }
+    const users = await User.find({}).select("_id").lean();
+    await createBulkNotifications(
+      users.map((user) => user._id),
+      {
+        type: "admin",
+        title: "New admin announcement",
+        message,
+        targetType: "console",
+        metadata: { scope: "all" },
+      },
+    );
+    return res.json({ success: true, message: "Notification sent to all users." });
+  } catch (error) {
+    console.error("Admin notification send failed:", error);
+    return res.status(500).json({ success: false, message: "Could not send notifications." });
+  }
+});
+
 app.post("/api/history-projects", async (req, res) => {
   try {
     const project = req.body?.project || {};
@@ -1797,6 +2020,14 @@ app.post("/api/github/setup-repository", publishRateLimit, async (req, res) => {
     req.user.githubRepoCreated = true;
     req.user.githubUsername = user.githubUsername;
     req.user.githubId = user.githubId;
+    await createUserNotification({
+      userId: user._id,
+      type: "github-storage-ready",
+      title: "Cloud storage is online",
+      message: `MediaLab created the ${user.githubRepoName || "GitHub"} repository and activated hosting for your projects.`,
+      targetType: "console",
+      metadata: { repo: user.githubRepoName || "", pagesUrl: storage?.pagesUrl || "" },
+    });
 
     return res.json({
       success: true,
@@ -1815,6 +2046,15 @@ app.post("/api/github/setup-repository", publishRateLimit, async (req, res) => {
       error?.response?.data?.message ||
       error?.message ||
       "GitHub hosting could not be initialized.";
+    if (req.user?._id) {
+      await createUserNotification({
+        userId: req.user._id,
+        type: "github-storage-error",
+        title: "GitHub storage needs attention",
+        message: apiMessage,
+        targetType: "console",
+      });
+    }
     return res.status(error?.status || error?.response?.status || 500).json({
       success: false,
       message: apiMessage,
@@ -2964,6 +3204,7 @@ app.post("/api/marketplace", publishRateLimit, express.json({ limit: "15mb" }), 
       });
     }
 
+    const sellerRatingMeta = computeSellerRatingMeta(user);
     const item = await MarketplaceItem.create({
       projectId,
       authorId: user._id,
@@ -2980,6 +3221,8 @@ app.post("/api/marketplace", publishRateLimit, express.json({ limit: "15mb" }), 
       status: "pending",
       authorName: user.name || user.email || "MediaLab Creator",
       authorAvatar: user.profilePicture || "",
+      sellerRatingCount: sellerRatingMeta.sellerRatingCount,
+      sellerRatingPercent: sellerRatingMeta.sellerRatingPercent,
       liveUrl,
     });
 
@@ -3001,7 +3244,6 @@ app.post("/api/marketplace", publishRateLimit, express.json({ limit: "15mb" }), 
       source: "marketplace",
       metadata: { projectId, title, price, sourceType },
     });
-
     return res.json({
       success: true,
       message: "Project submitted for marketplace review.",
@@ -3046,6 +3288,15 @@ app.post("/api/marketplace/:id/comment", publishRateLimit, express.json(), async
     });
     item.updatedAt = new Date();
     await item.save();
+    await createUserNotification({
+      userId: item.authorId,
+      type: "marketplace-comment",
+      title: `${req.user.name || "Someone"} commented on your sale`,
+      message: `${req.user.name || "A buyer"} commented on ${item.title}. Click to open the listing.`,
+      targetType: "marketplace-sale",
+      targetId: String(item._id),
+      metadata: { itemId: String(item._id), title: item.title },
+    });
     return res.json({
       success: true,
       message: "Comment posted.",
@@ -3098,6 +3349,15 @@ app.post(
       });
       item.updatedAt = new Date();
       await item.save();
+      await createUserNotification({
+        userId: item.authorId,
+        type: "marketplace-reply",
+        title: `${req.user.name || "Someone"} replied on your sale`,
+        message: `${req.user.name || "A buyer"} replied in the discussion for ${item.title}.`,
+        targetType: "marketplace-sale",
+        targetId: String(item._id),
+        metadata: { itemId: String(item._id), title: item.title, commentId: String(comment._id || "") },
+      });
       return res.json({
         success: true,
         message: "Reply posted.",
@@ -3146,6 +3406,15 @@ app.post("/api/marketplace/:id/rate", publishRateLimit, express.json(), async (r
     });
     item.updatedAt = new Date();
     await item.save();
+    await createUserNotification({
+      userId: item.authorId,
+      type: "marketplace-rating",
+      title: `${req.user.name || "Someone"} rated your project`,
+      message: `${req.user.name || "A buyer"} rated ${item.title}. Click to open the listing.`,
+      targetType: "marketplace-sale",
+      targetId: String(item._id),
+      metadata: { itemId: String(item._id), title: item.title, value },
+    });
     return res.json({
       success: true,
       message: "Rating saved.",
@@ -3156,6 +3425,69 @@ app.post("/api/marketplace/:id/rate", publishRateLimit, express.json(), async (r
     return res.status(500).json({
       success: false,
       message: error?.message || "Could not save that marketplace rating.",
+    });
+  }
+});
+
+app.post("/api/marketplace/:id/rate-seller", publishRateLimit, express.json(), async (req, res) => {
+  if (!req.isAuthenticated() || !req.user) {
+    return res.status(401).json({ success: false, message: "Sign in first to rate." });
+  }
+
+  try {
+    const item = await MarketplaceItem.findById(req.params.id);
+    if (!item || item.status !== "approved") {
+      return res.status(404).json({ success: false, message: "Marketplace listing not found." });
+    }
+    if (String(item.authorId || "") === String(req.user._id || "")) {
+      return res.status(403).json({
+        success: false,
+        message: "You cannot rate your own seller profile.",
+      });
+    }
+    const author = await User.findById(item.authorId);
+    if (!author) {
+      return res.status(404).json({ success: false, message: "Seller account not found." });
+    }
+    author.sellerRatings = Array.isArray(author.sellerRatings) ? author.sellerRatings : [];
+    const alreadyRated = author.sellerRatings.some(
+      (entry) => String(entry?.userId || "") === String(req.user._id),
+    );
+    if (alreadyRated) {
+      return res.status(400).json({
+        success: false,
+        message: "You have already rated this seller.",
+      });
+    }
+    const value = Math.max(1, Math.min(5, Number(req.body?.value || 5)));
+    author.sellerRatings.push({
+      userId: req.user._id,
+      value,
+      date: new Date(),
+      marketplaceItemId: item._id,
+    });
+    await author.save();
+    await syncAuthorSellerRatingToListings(author._id);
+    const refreshedItem = await MarketplaceItem.findById(item._id).lean();
+    await createUserNotification({
+      userId: author._id,
+      type: "marketplace-seller-rating",
+      title: `${req.user.name || "Someone"} rated you as a seller`,
+      message: `${req.user.name || "A buyer"} rated your seller profile from ${item.title}.`,
+      targetType: "marketplace-sale",
+      targetId: String(item._id),
+      metadata: { itemId: String(item._id), title: item.title, value },
+    });
+    return res.json({
+      success: true,
+      message: "Seller rating saved.",
+      item: buildMarketplacePublicItem(refreshedItem || item.toObject(), req.user?._id),
+    });
+  } catch (error) {
+    console.error("Seller rating failed:", error);
+    return res.status(500).json({
+      success: false,
+      message: error?.message || "Could not save that seller rating.",
     });
   }
 });
@@ -3220,6 +3552,21 @@ app.post("/api/marketplace/:id/purchase", publishRateLimit, express.json(), asyn
     }
 
     await item.save();
+    await createUserNotification({
+      userId: item.authorId,
+      type: "marketplace-purchase",
+      title:
+        Number(item.price || 0) <= 0
+          ? `${req.user.name || "A buyer"} claimed your project`
+          : `${req.user.name || "A buyer"} purchased your project`,
+      message:
+        Number(item.price || 0) <= 0
+          ? `${item.title} was claimed and approved automatically.`
+          : `${item.title} now has a pending purchase request. Click to review it.`,
+      targetType: "marketplace-sale",
+      targetId: String(item._id),
+      metadata: { itemId: String(item._id), title: item.title },
+    });
 
     await createUsageLog({
       user: req.user,
@@ -3391,6 +3738,23 @@ app.patch("/api/admin/marketplace/:id", adminRateLimit, requireAdminApi, express
     item.updatedAt = new Date();
     item.reviewedAt = new Date();
     await item.save();
+    await createUserNotification({
+      userId: item.authorId,
+      type: `marketplace-${nextStatus}`,
+      title:
+        nextStatus === "approved"
+          ? "Your marketplace project was approved"
+          : nextStatus === "disapproved"
+            ? "Your marketplace project was disapproved"
+            : "Your marketplace project was updated",
+      message:
+        nextStatus === "disapproved"
+          ? item.disapprovalReason || "Please review the feedback and submit again."
+          : `${item.title} is now ${nextStatus}. Click to review it in My Sales.`,
+      targetType: "marketplace-sale",
+      targetId: String(item._id),
+      metadata: { itemId: String(item._id), status: nextStatus, title: item.title },
+    });
     return res.json({
       success: true,
       message:
@@ -3446,11 +3810,47 @@ app.patch(
         purchase.approvedUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
         transfer = await transferMarketplaceProjectToBuyer(item, buyer);
         item.status = "sold";
+        await createUserNotification({
+          userId: buyer._id,
+          type: "marketplace-purchase-approved",
+          title: "Purchase approved",
+          message: `Your purchase for ${item.title} was approved. You now own the project.`,
+          targetType: "marketplace-purchased",
+          targetId: String(item._id),
+          metadata: { itemId: String(item._id), title: item.title, purchaseId: String(purchase._id) },
+        });
+        await createUserNotification({
+          userId: item.authorId,
+          type: "marketplace-sale-approved",
+          title: "Purchase approved for your sale",
+          message: `${item.title} was approved for ${purchase.buyerName || "the buyer"}.`,
+          targetType: "marketplace-sale",
+          targetId: String(item._id),
+          metadata: { itemId: String(item._id), title: item.title, purchaseId: String(purchase._id) },
+        });
       } else {
         purchase.message =
           "Your purchase failed, please verify your payment details.";
         purchase.approvedUntil = null;
         item.status = "approved";
+        await createUserNotification({
+          userId: purchase.buyerId,
+          type: "marketplace-purchase-failed",
+          title: "Purchase failed",
+          message: "Your purchase failed, please verify your payment details.",
+          targetType: "marketplace-purchased",
+          targetId: String(item._id),
+          metadata: { itemId: String(item._id), title: item.title, purchaseId: String(purchase._id) },
+        });
+        await createUserNotification({
+          userId: item.authorId,
+          type: "marketplace-sale-failed",
+          title: "Purchase request failed",
+          message: `The purchase request for ${item.title} was marked as failed.`,
+          targetType: "marketplace-sale",
+          targetId: String(item._id),
+          metadata: { itemId: String(item._id), title: item.title, purchaseId: String(purchase._id) },
+        });
       }
       await item.save();
       return res.json({

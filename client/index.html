@@ -1584,7 +1584,33 @@
             >MediaLab</span
           >
         </div>
-        <div class="flex items-center gap-x-6">
+        <div class="flex items-center gap-x-4 sm:gap-x-6">
+          <div id="notification-shell" class="relative">
+            <button
+              id="notification-bell-btn"
+              onclick="toggleNotifications(event)"
+              class="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-slate-200 hover:border-cyan-400/25 hover:text-cyan-200 transition-all"
+              aria-label="Notifications"
+            >
+              <i class="fas fa-bell text-sm"></i>
+              <span id="notification-badge" class="hidden absolute -right-1 -top-1 min-w-[1.3rem] rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-black text-white shadow-[0_10px_20px_rgba(244,63,94,0.35)]"></span>
+            </button>
+            <div
+              id="notification-dropdown"
+              class="hidden absolute right-0 mt-3 w-[22rem] max-w-[calc(100vw-1.5rem)] rounded-[1.7rem] border border-white/10 bg-slate-950/96 p-4 shadow-[0_25px_70px_rgba(2,6,23,0.5)] backdrop-blur-xl"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-[10px] font-black uppercase tracking-[0.22em] text-rose-300">Notifications</p>
+                  <p class="mt-1 text-sm text-slate-400">Updates about your projects, sales, and hosting.</p>
+                </div>
+                <button onclick="markAllNotificationsRead()" class="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300 hover:text-cyan-200">
+                  Mark all read
+                </button>
+              </div>
+              <div id="notification-list" class="mt-4 max-h-[24rem] space-y-3 overflow-y-auto pr-1"></div>
+            </div>
+          </div>
           <div id="more-features-shell" class="relative">
             <button
               id="more-features-toggle"
@@ -3837,6 +3863,9 @@
       let marketplacePreviewTick = 0;
       let marketplacePreviewTimer = null;
       let studioToolSwitchToken = 0;
+      let notificationsList = [];
+      let unreadNotificationCount = 0;
+      let notificationDropdownTimer = null;
       function createEmptyMarketplaceDraftListing() {
         return {
           sourceType: "",
@@ -4151,6 +4180,16 @@
       socket.on("connect", () => {
         clientSocketId = socket.id;
         console.log("Connected to AI Engine. ID:", clientSocketId);
+      });
+      socket.on("user:notification", (payload) => {
+        if (!loggedIn || !currentUser?._id) return;
+        if (String(payload?.userId || "") !== String(currentUser._id || "")) return;
+        notificationsList = [
+          { ...payload, isRead: false },
+          ...notificationsList.filter((item) => String(item._id || "") !== String(payload?._id || "")),
+        ].slice(0, 40);
+        unreadNotificationCount = notificationsList.filter((item) => !item.isRead).length;
+        renderNotificationsUi();
       });
       // UNIVERSAL PROGRESS LISTENER
       socket.on("conversion-progress", (data) => {
@@ -4768,8 +4807,14 @@
             <p class="mt-3 text-sm leading-6 text-slate-400">Use the Add New Sale flow to turn one of your hosted projects into a marketplace listing.</p>
           </div>`;
         }
+        const orderedItems = [...items].sort((left, right) => {
+          const leftSold = String(left?.status || "").toLowerCase() === "sold" ? 1 : 0;
+          const rightSold = String(right?.status || "").toLowerCase() === "sold" ? 1 : 0;
+          if (leftSold !== rightSold) return leftSold - rightSold;
+          return new Date(right?.createdAt || right?.updatedAt || 0) - new Date(left?.createdAt || left?.updatedAt || 0);
+        });
         return `<div class="space-y-4">
-          ${items.map((item) => `
+          ${orderedItems.map((item) => `
             <div class="rounded-[1.8rem] border border-white/10 bg-slate-900/80 p-5 shadow-[0_16px_40px_rgba(2,6,23,0.28)]">
               <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div class="w-full max-w-[220px] overflow-hidden rounded-[1.5rem] border border-white/10 bg-slate-950/70 shadow-[0_18px_40px_rgba(2,6,23,0.28)]">
@@ -5746,6 +5791,14 @@
                     <p class="text-sm text-slate-400">${escapeHtmlText(item.category || "General")}</p>
                   </div>
                 </div>
+                <div class="mt-4 flex flex-wrap items-center gap-3 text-sm">
+                  <span class="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-slate-200">${Number(item.sellerRatingPercent || 0).toFixed(0)}% seller rating</span>
+                  <span class="text-slate-400">${item.sellerRatingCount || 0} seller reviews</span>
+                </div>
+                <button onclick="rateMarketplaceSeller('${item._id}')" class="mt-4 inline-flex items-center gap-2 rounded-2xl border ${access.approved && !access.isOwner ? "border-cyan-400/20 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/15" : "border-white/10 bg-white/[0.04] text-slate-500 cursor-not-allowed"} px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em]">
+                  <i class="fas fa-user-star"></i>
+                  Rate Seller
+                </button>
               </div>
               <div class="rounded-[1.8rem] border border-white/10 bg-slate-900/85 p-5">
                 <div class="flex items-center justify-between gap-4">
@@ -6004,6 +6057,46 @@
         } catch (error) {
           failUniversalProgress("Purchase failed.");
           showBuilderSnackbar(error.message || "Could not process this purchase.", "error");
+        }
+      }
+      async function rateMarketplaceSeller(id) {
+        if (!loggedIn) {
+          showLogin();
+          return;
+        }
+        const sourceItem =
+          (currentMarketplaceItem?._id === id ? currentMarketplaceItem : null) ||
+          marketplaceItems.find((item) => item._id === id) ||
+          marketplaceMySales.find((item) => item._id === id) ||
+          null;
+        const access = canInteractWithMarketplaceItem(sourceItem);
+        if (!access.approved) {
+          showBuilderSnackbar("Seller rating unlocks after the project is approved.", "error");
+          return;
+        }
+        if (access.isOwner) {
+          showBuilderSnackbar("You cannot rate your own seller profile.", "error");
+          return;
+        }
+        const value = 5;
+        try {
+          const res = await fetch(`/api/marketplace/${encodeURIComponent(id)}/rate-seller`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ value }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || "Could not save that seller rating.");
+          }
+          currentMarketplaceItem = data.item;
+          renderMarketplaceDetail(currentMarketplaceItem);
+          await refreshMarketplaceData();
+          if (currentStudioToolId === "marketplace") refreshMarketplacePaneOnly();
+          showBuilderSnackbar("Seller rating saved.", "success");
+        } catch (error) {
+          showBuilderSnackbar(error.message || "Could not save that seller rating.", "error");
         }
       }
       async function fetchGithubProjects(options = {}) {
@@ -7418,6 +7511,143 @@
         if (!menu.classList.contains("hidden")) queueProfileMenuAutoHide();
         else clearTimeout(profileMenuTimer);
       }
+      function formatNotificationCount(value = 0) {
+        const total = Number(value || 0);
+        if (total <= 0) return "";
+        return total > 9 ? "9+" : String(total);
+      }
+      function renderNotificationsUi() {
+        const badge = document.getElementById("notification-badge");
+        const list = document.getElementById("notification-list");
+        if (badge) {
+          const label = formatNotificationCount(unreadNotificationCount);
+          badge.textContent = label;
+          badge.classList.toggle("hidden", !label);
+        }
+        if (!list) return;
+        if (!loggedIn || !currentUser) {
+          list.innerHTML = `<div class="rounded-[1.3rem] border border-dashed border-white/10 p-5 text-center text-sm text-slate-400">Sign in to view your notifications.</div>`;
+          return;
+        }
+        if (!notificationsList.length) {
+          list.innerHTML = `<div class="rounded-[1.3rem] border border-dashed border-white/10 p-5 text-center text-sm text-slate-400">No notifications yet.</div>`;
+          return;
+        }
+        list.innerHTML = notificationsList
+          .map((item) => `
+            <button onclick="openNotificationTarget('${String(item._id || "")}')" class="w-full rounded-[1.3rem] border ${item.isRead ? "border-white/8 bg-white/[0.03]" : "border-rose-400/20 bg-rose-500/10"} px-4 py-4 text-left transition-all hover:border-cyan-400/25 hover:bg-white/[0.05]">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-white">${escapeHtmlText(item.title || "Notification")}</p>
+                  <p class="mt-2 text-sm leading-6 text-slate-300">${escapeHtmlText(item.message || "")}</p>
+                </div>
+                ${item.isRead ? "" : `<span class="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-rose-400"></span>`}
+              </div>
+              <p class="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">${escapeHtmlText(formatDate(item.createdAt || item.date || new Date()))}</p>
+            </button>`)
+          .join("");
+      }
+      async function fetchNotifications() {
+        if (!loggedIn || !currentUser) {
+          notificationsList = [];
+          unreadNotificationCount = 0;
+          renderNotificationsUi();
+          return [];
+        }
+        try {
+          const res = await fetch("/api/notifications", { credentials: "include" });
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || "Could not load notifications.");
+          }
+          notificationsList = Array.isArray(data.notifications) ? data.notifications : [];
+          unreadNotificationCount = Number(data.unreadCount || 0);
+          renderNotificationsUi();
+          return notificationsList;
+        } catch (error) {
+          console.warn("Notification fetch skipped:", error.message);
+          return notificationsList;
+        }
+      }
+      async function markAllNotificationsRead() {
+        if (!loggedIn || !currentUser) return;
+        try {
+          const res = await fetch("/api/notifications/read", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.message || "Could not mark notifications as read.");
+          notificationsList = notificationsList.map((item) => ({ ...item, isRead: true, readAt: new Date().toISOString() }));
+          unreadNotificationCount = Number(data.unreadCount || 0);
+          renderNotificationsUi();
+        } catch (error) {
+          showBuilderSnackbar(error.message || "Could not update notifications.", "error");
+        }
+      }
+      function queueNotificationAutoHide() {
+        clearTimeout(notificationDropdownTimer);
+        notificationDropdownTimer = setTimeout(() => {
+          document.getElementById("notification-dropdown")?.classList.add("hidden");
+        }, 15000);
+      }
+      function toggleNotifications(event) {
+        event?.stopPropagation();
+        const dropdown = document.getElementById("notification-dropdown");
+        if (!dropdown) return;
+        const shouldOpen = dropdown.classList.contains("hidden");
+        dropdown.classList.toggle("hidden", !shouldOpen);
+        if (shouldOpen) {
+          queueNotificationAutoHide();
+          fetchNotifications();
+        } else {
+          clearTimeout(notificationDropdownTimer);
+        }
+      }
+      async function openNotificationTarget(notificationId = "") {
+        const notification = notificationsList.find((item) => String(item._id || "") === String(notificationId || ""));
+        if (!notification) return;
+        try {
+          await fetch("/api/notifications/read", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ notificationId }),
+          });
+        } catch {}
+        notificationsList = notificationsList.map((item) =>
+          String(item._id || "") === String(notificationId || "")
+            ? { ...item, isRead: true, readAt: new Date().toISOString() }
+            : item,
+        );
+        unreadNotificationCount = Math.max(
+          0,
+          notificationsList.filter((item) => !item.isRead).length,
+        );
+        renderNotificationsUi();
+        document.getElementById("notification-dropdown")?.classList.add("hidden");
+        const targetType = String(notification.targetType || "").trim();
+        const targetId = String(notification.targetId || "").trim();
+        if (targetType === "marketplace-sale") {
+          marketplaceActiveTab = "mine";
+          await switchTool("marketplace");
+          if (targetId) setTimeout(() => openMarketplaceDetail(targetId), 120);
+          return;
+        }
+        if (targetType === "marketplace-purchased") {
+          marketplaceActiveTab = "purchased";
+          await switchTool("marketplace");
+          if (targetId) setTimeout(() => openMarketplaceDetail(targetId), 120);
+          return;
+        }
+        if (targetType === "console") {
+          await switchTool("console");
+          return;
+        }
+        await switchTool("marketplace");
+      }
       async function fetchPremiumRequestStatus() {
         if (!loggedIn) {
           currentPremiumRequest = null;
@@ -7455,6 +7685,9 @@
         if (!loggedIn || !currentUser) {
           userSection?.classList.add("hidden");
           startBtn?.classList.remove("hidden");
+          notificationsList = [];
+          unreadNotificationCount = 0;
+          renderNotificationsUi();
           stopRenderProjectSyncPolling();
           stopAdsenseStatusSyncLoop();
           renderGithubStorageStatus();
@@ -7494,6 +7727,7 @@
             : "fas fa-crown text-cyan-300";
         }
         renderGithubStorageStatus();
+        fetchNotifications();
         updateAccountModalUi();
         maybePromptRenderHostingOnboarding();
         startRenderProjectSyncPolling();
@@ -10040,6 +10274,9 @@
       async function switchTool(id) {
         const switchToken = ++studioToolSwitchToken;
         currentStudioToolId = id;
+        try {
+          sessionStorage.setItem("medialab:lastTool", String(id || "console"));
+        } catch {}
         updateStudioToolSwitches();
         logUsageActivity("tool-open", `opened tool ${id}`, "tool-switch", {
           toolId: id,
@@ -11939,6 +12176,23 @@
         else clearTimeout(moreDropdownTimer);
       }
       document.addEventListener("mousedown", (event) => {
+        const notificationShell = document.getElementById("notification-shell");
+        const notificationDropdown = document.getElementById("notification-dropdown");
+        if (
+          notificationShell &&
+          notificationDropdown &&
+          !notificationDropdown.classList.contains("hidden") &&
+          !notificationShell.contains(event.target)
+        ) {
+          notificationDropdown.classList.add("hidden");
+        } else if (
+          notificationShell &&
+          notificationDropdown &&
+          !notificationDropdown.classList.contains("hidden") &&
+          notificationShell.contains(event.target)
+        ) {
+          queueNotificationAutoHide();
+        }
         const shell = document.getElementById("more-features-shell");
         if (shell && !shell.contains(event.target)) {
           hideMoreDropdown();
@@ -11948,6 +12202,16 @@
         }
       });
       document.addEventListener("mousemove", (event) => {
+        const notificationShell = document.getElementById("notification-shell");
+        const notificationDropdown = document.getElementById("notification-dropdown");
+        if (
+          notificationShell &&
+          notificationDropdown &&
+          !notificationDropdown.classList.contains("hidden") &&
+          notificationShell.contains(event.target)
+        ) {
+          queueNotificationAutoHide();
+        }
         const shell = document.getElementById("more-features-shell");
         const dd = document.getElementById("more-dropdown");
         if (
@@ -12050,6 +12314,12 @@
           }
           window.history.replaceState({}, document.title, "/");
         }
+        try {
+          const lastTool = String(sessionStorage.getItem("medialab:lastTool") || "").trim();
+          if (lastTool && lastTool !== currentStudioToolId) {
+            await switchTool(lastTool);
+          }
+        } catch {}
         console.log(
           "%c✅ MediaLab - Full Final Script with Independent Vertical Tools Scroll",
           "color:#22d3ee; font-weight:bold",

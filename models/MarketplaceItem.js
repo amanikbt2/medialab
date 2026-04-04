@@ -79,6 +79,8 @@ const MarketplaceItemSchema = new mongoose.Schema({
   reviewedAt: { type: Date, default: null },
   authorName: { type: String, default: "", trim: true },
   authorAvatar: { type: String, default: "", trim: true },
+  sellerRatingCount: { type: Number, default: 0, min: 0 },
+  sellerRatingPercent: { type: Number, default: 0, min: 0 },
   liveUrl: { type: String, default: "", trim: true },
   comments: { type: [MarketplaceCommentSchema], default: [] },
   ratings: { type: [MarketplaceRatingSchema], default: [] },

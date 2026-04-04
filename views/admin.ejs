@@ -367,6 +367,13 @@
                 <span id="badge-payouts" class="hidden ml-2 rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-black text-rose-200"></span>
               </button>
               <button
+                data-tab="notify"
+                class="top-tab px-4 py-3 rounded-2xl text-sm font-bold transition-all"
+                onclick="showAdminTab('notify', this)"
+              >
+                Notify
+              </button>
+              <button
                 data-tab="marketplace"
                 class="top-tab px-4 py-3 rounded-2xl text-sm font-bold transition-all"
                 onclick="showAdminTab('marketplace', this)"
@@ -387,6 +394,7 @@
       <section id="tab-downloads" class="mt-6 space-y-4 hidden"></section>
       <section id="tab-withdrawals" class="mt-6 space-y-4 hidden"></section>
       <section id="tab-payouts" class="mt-6 space-y-4 hidden"></section>
+      <section id="tab-notify" class="mt-6 space-y-4 hidden"></section>
       <section id="tab-marketplace" class="mt-6 space-y-4 hidden"></section>
     </main>
 
@@ -418,6 +426,7 @@
       let adminDownloads = [];
       let adminWithdrawals = [];
       let adminPayoutUsers = [];
+      let adminNotifications = [];
       let adminMarketplace = { pendingListings: [], approvedListings: [], pendingPurchases: [], completedPurchases: [] };
       let adminMarketplaceTab = "pending";
       let currentAdminMarketplaceItem = null;
@@ -438,6 +447,9 @@
       let feedbackView = "all";
       let audienceQuery = "";
       let payoutAmounts = {};
+      let adminNotifyMode = "all";
+      let adminNotifyEmail = "";
+      let adminNotifyMessage = "";
       let withdrawalFilterTab = "pending";
       let pendingWithdrawalFailureId = "";
       let feedbackFilters = {
@@ -534,7 +546,7 @@
         document
           .querySelectorAll(`.top-tab[data-tab="${name}"]`)
           .forEach((tab) => tab.classList.add("active"));
-        ["analytics", "feedbacks", "logs", "users", "premium", "downloads", "withdrawals", "payouts", "marketplace"].forEach((tabName) => {
+        ["analytics", "feedbacks", "logs", "users", "premium", "downloads", "withdrawals", "payouts", "notify", "marketplace"].forEach((tabName) => {
           document
             .getElementById(`tab-${tabName}`)
             ?.classList.toggle("hidden", tabName !== name);
@@ -1528,6 +1540,92 @@
           .join("");
       }
 
+      function updateAdminNotifyMode(value = "all") {
+        adminNotifyMode = String(value || "all");
+        renderNotifyTab();
+      }
+
+      function renderNotifyTab() {
+        const el = document.getElementById("tab-notify");
+        if (!el) return;
+        el.innerHTML = `
+          <div class="rounded-[1.8rem] border border-white/10 bg-white/[0.03] p-5">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div class="text-[11px] font-black uppercase tracking-[0.22em] text-cyan-400">Notify Users</div>
+                <h3 class="mt-2 text-2xl font-semibold text-white">Send a notification</h3>
+                <p class="mt-2 text-sm text-slate-400">Choose a single user or broadcast to everyone.</p>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="updateAdminNotifyMode('individual')" class="mini-tab ${adminNotifyMode === "individual" ? "active" : ""} px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-[0.16em]">Individual</button>
+                <button onclick="updateAdminNotifyMode('all')" class="mini-tab ${adminNotifyMode === "all" ? "active" : ""} px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-[0.16em]">All</button>
+              </div>
+            </div>
+            <div class="mt-5 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+              <div class="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
+                ${adminNotifyMode === "individual" ? `<label class="block">
+                  <span class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">User Email</span>
+                  <input value="${escapeHtml(adminNotifyEmail)}" oninput="adminNotifyEmail=this.value" class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-cyan-400" placeholder="user@example.com" />
+                </label>` : `<div class="rounded-2xl border border-emerald-400/15 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-100">This message will be delivered to every MediaLab user.</div>`}
+                <label class="block mt-4">
+                  <span class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Message</span>
+                  <textarea rows="6" oninput="adminNotifyMessage=this.value" class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none resize-none focus:border-cyan-400" placeholder="Write a clear update for users...">${escapeHtml(adminNotifyMessage)}</textarea>
+                </label>
+                <div class="mt-4 flex gap-3">
+                  <button onclick="sendAdminNotification()" class="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-cyan-300 transition-all">Send</button>
+                  <button onclick="clearAdminNotificationForm()" class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-slate-200 hover:bg-white/10 transition-all">Clear</button>
+                </div>
+              </div>
+              <div class="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
+                <div class="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-400">Recent Notifications</div>
+                <div class="mt-4 space-y-3 max-h-[28rem] overflow-y-auto pr-1">
+                  ${(adminNotifications.length ? adminNotifications : []).map((item) => `
+                    <div class="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                      <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-semibold text-white">${escapeHtml(item.title || "Notification")}</p>
+                        <span class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">${escapeHtml(formatDate(item.createdAt))}</span>
+                      </div>
+                      <p class="mt-2 text-sm leading-6 text-slate-300">${escapeHtml(item.message || "")}</p>
+                    </div>`).join("") || `<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No notifications sent yet.</div>`}
+                </div>
+              </div>
+            </div>
+          </div>`;
+      }
+
+      async function sendAdminNotification() {
+        const message = String(adminNotifyMessage || "").trim();
+        const email = String(adminNotifyEmail || "").trim();
+        if (!message) {
+          showAdminToast("Enter a notification message first.", "error");
+          return;
+        }
+        if (adminNotifyMode === "individual" && !email) {
+          showAdminToast("Enter the target user email first.", "error");
+          return;
+        }
+        const res = await fetch("/api/admin/notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getAdminHeaders() },
+          body: JSON.stringify({ mode: adminNotifyMode, email, message }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          showAdminToast(data.message || "Could not send this notification.", "error");
+          return;
+        }
+        adminNotifyMessage = "";
+        if (adminNotifyMode === "individual") adminNotifyEmail = "";
+        await loadAdminData();
+        showAdminToast(data.message || "Notification sent.", "success");
+      }
+
+      function clearAdminNotificationForm() {
+        adminNotifyEmail = "";
+        adminNotifyMessage = "";
+        renderNotifyTab();
+      }
+
       function setAdminMarketplaceTab(tab = "pending") {
         adminMarketplaceTab = tab;
         renderAdminMarketplace();
@@ -2004,7 +2102,7 @@
           const previousMarketplacePurchaseIds = new Set(
             (adminMarketplace?.pendingPurchases || []).map((item) => item.purchaseId),
           );
-          const [feedbackRes, analyticsRes, usageLogRes, premiumRes, downloadsRes, withdrawalsRes, payoutUsersRes, marketplaceRes] = await Promise.all([
+          const [feedbackRes, analyticsRes, usageLogRes, premiumRes, downloadsRes, withdrawalsRes, payoutUsersRes, marketplaceRes, notificationsRes] = await Promise.all([
             fetch("/api/admin/feedbacks", { headers }),
             fetch("/api/admin/analytics", { headers }),
             fetch("/api/admin/usage-logs", { headers }),
@@ -2013,6 +2111,7 @@
             fetch("/api/admin/withdrawals", { headers }),
             fetch("/api/admin/payout-users", { headers }),
             fetch("/api/admin/marketplace", { headers }),
+            fetch("/api/admin/notifications", { headers }),
           ]);
           const feedbackData = await feedbackRes.json();
           const analyticsData = await analyticsRes.json();
@@ -2022,6 +2121,7 @@
           const withdrawalsData = await withdrawalsRes.json();
           const payoutUsersData = await payoutUsersRes.json();
           const marketplaceData = await marketplaceRes.json();
+          const notificationsData = await notificationsRes.json();
           adminFeedbacks = feedbackData.feedbacks || [];
           adminAnalytics = analyticsData.analytics || {};
           adminUsageLogs = usageLogData.logs || [];
@@ -2029,6 +2129,7 @@
           adminDownloads = downloadsData.downloads || [];
           adminWithdrawals = withdrawalsData.withdrawals || [];
           adminPayoutUsers = payoutUsersData.users || [];
+          adminNotifications = notificationsData.notifications || [];
           adminMarketplace = marketplaceData.success
             ? {
                 pendingListings: marketplaceData.pendingListings || [],
@@ -2077,6 +2178,7 @@
           renderDownloads();
           renderWithdrawals();
           renderPayouts();
+          renderNotifyTab();
           renderAdminMarketplace();
           connectAdminLiveFeed();
           setLiveStatus(Boolean(adminSocket?.connected));

@@ -82,6 +82,7 @@ const UserSchema = new mongoose.Schema({
   referralInstallCount: { type: Number, default: 0, min: 0 },
   referralEarnings: { type: Number, default: 0, min: 0 },
   referralRewards: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  sellerRatings: { type: [mongoose.Schema.Types.Mixed], default: [] },
   lastWithdrawalRequestedAt: { type: Date, default: null },
   activityWeight: { type: Number, default: 0, min: 0 },
   activityStats: { type: mongoose.Schema.Types.Mixed, default: {} },
