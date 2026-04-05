@@ -4830,6 +4830,15 @@
           return "Unknown";
         }
       }
+      function formatDate(value) {
+        if (!value) return "Unknown";
+        try {
+          const date = value instanceof Date ? value : new Date(value);
+          return Number.isNaN(date.getTime()) ? "Unknown" : date.toLocaleString();
+        } catch {
+          return "Unknown";
+        }
+      }
       function escapeInlineJsString(value = "") {
         return String(value || "")
           .replace(/\\/g, "\\\\")
@@ -5938,9 +5947,15 @@
         }
       }
       function updateMarketplaceDraftField(field, value) {
+        const normalizedValue = String(value ?? "").trim();
         marketplaceDraftListing = {
           ...marketplaceDraftListing,
-          [field]: field === "price" ? Number(value || 0) : String(value || ""),
+          [field]:
+            field === "price"
+              ? normalizedValue === ""
+                ? 0
+                : Number(normalizedValue.replace(/,/g, ""))
+              : String(value || ""),
         };
       }
       async function toggleMarketplaceTemplateMode(enabled = false) {
@@ -5980,7 +5995,7 @@
       function handleMarketplaceLiveInput(event, field) {
         updateMarketplaceDraftField(field, event?.target?.value ?? "");
         if (currentStudioToolId === "marketplace" && marketplaceActiveTab === "create") {
-          syncMarketplaceCreateActions();
+          mountMarketplaceTool();
         }
       }
       function handleMarketplaceSearchInput(event) {

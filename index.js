@@ -2005,6 +2005,29 @@ function detectDeviceLabel(userAgent = "") {
   return `${device} • ${browser}`;
 }
 
+function extractClientIp(req = null) {
+  if (!req) return "";
+  const forwardedFor = req.headers?.["x-forwarded-for"];
+  if (typeof forwardedFor === "string" && forwardedFor.trim()) {
+    return (
+      forwardedFor
+        .split(",")
+        .map((entry) => String(entry || "").trim())
+        .find(Boolean) || ""
+    );
+  }
+  if (Array.isArray(forwardedFor) && forwardedFor.length) {
+    return String(forwardedFor[0] || "").trim();
+  }
+  return String(
+    req.ip ||
+      req.socket?.remoteAddress ||
+      req.connection?.remoteAddress ||
+      req.info?.ip ||
+      "",
+  ).trim();
+}
+
 function buildUsageIdentity(req) {
   const userAgent = String(req.headers["user-agent"] || "").trim();
   return {

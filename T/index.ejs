@@ -4959,60 +4959,6 @@
       </div>
     </div>
     <script>
-      function formatDate(value) {
-        if (!value) return "Unknown";
-        return new Date(value).toLocaleString("en-US", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-        });
-      }
-      function getMarketplaceStepIssues(stepIndex) {
-  const issues = [];
-
-  if (stepIndex === 0) {  // Basic Info step
-    // Read elements safely first - declare variables in correct order
-    const titleEl = document.getElementById("marketplace-title");
-    const descEl = document.getElementById("marketplace-description");
-    const priceEl = document.getElementById("marketplace-price");
-
-    const title = titleEl ? titleEl.value.trim() : "";
-    const description = descEl ? descEl.value.trim() : "";   // ← declared BEFORE any use
-    const price = priceEl ? parseFloat(priceEl.value || "0") : 0;
-
-    if (!title) issues.push("Title is required");
-    if (!description) issues.push("Description is required");
-    if (price < 0) issues.push("Price cannot be negative");
-  } 
-  else if (stepIndex === 1) {  // Screenshots step
-    const screenshots = (window.marketplaceDraft && window.marketplaceDraft.screenshots) || [];
-    if (screenshots.length === 0) {
-      issues.push("Add at least one screenshot");
-    }
-  } 
-  else if (stepIndex === 2) {  // Purpose / Category
-    const purpose = document.getElementById("marketplace-purpose")?.value?.trim() || "";
-    const category = document.getElementById("marketplace-category")?.value || "";
-    if (!purpose) issues.push("Purpose / use case is required");
-    if (!category) issues.push("Choose a category");
-  }
-
-  return issues;
-}
-
-function canAdvanceMarketplaceStep(stepIndex) {
-  const issues = getMarketplaceStepIssues(stepIndex);
-  
-  if (issues.length > 0) {
-    // Show the problems to the user
-    const message = "Please fix these before continuing:\n• " + issues.join("\n• ");
-    showMarketplaceToast(message, "error");   // or alert(message) if you don't have the toast yet
-    return false;
-  }
-  return true;
-}
       // ====================== STATE ======================
       let loggedIn = false;
       let currentUser = null;
@@ -5708,6 +5654,15 @@ function canAdvanceMarketplaceStep(stepIndex) {
           return "Unknown";
         }
       }
+      function formatDate(value) {
+        if (!value) return "Unknown";
+        try {
+          const date = value instanceof Date ? value : new Date(value);
+          return Number.isNaN(date.getTime()) ? "Unknown" : date.toLocaleString();
+        } catch {
+          return "Unknown";
+        }
+      }
       function escapeInlineJsString(value = "") {
         return String(value || "")
           .replace(/\\/g, "\\\\")
@@ -6107,10 +6062,10 @@ function canAdvanceMarketplaceStep(stepIndex) {
         const title = String(marketplaceDraftListing.title || "").trim();
         const category = String(marketplaceDraftListing.category || "").trim();
         const purpose = String(marketplaceDraftListing.purpose || "").trim();
-        const effectivePurpose = purpose || description.slice(0, 180);
         const description = String(
           marketplaceDraftListing.description || "",
         ).trim();
+        const effectivePurpose = purpose || description.slice(0, 180);
         const screenshots = Array.isArray(marketplaceDraftListing.screenshots)
           ? marketplaceDraftListing.screenshots.filter(Boolean)
           : [];
@@ -6152,10 +6107,80 @@ function canAdvanceMarketplaceStep(stepIndex) {
         }
         return issues;
       }
-
+      function getMarketplaceStepIssues(step = marketplaceCreateStep) {
+        const sourceType = String(
+          marketplaceDraftListing.sourceType || "",
+        ).trim();
+        const projectId = String(
+          marketplaceDraftListing.projectId || "",
+        ).trim();
+        const sourceFiles = Array.isArray(marketplaceDraftListing.sourceFiles)
+          ? marketplaceDraftListing.sourceFiles.filter(Boolean)
+          : [];
+        const sourceHtml =
+          sourceType === "draft"
+            ? resolveMarketplaceDraftHtml(
+                getMarketplaceDraftProjects().find(
+                  (item) => String(item?.name || "").trim() === projectId,
+                ) || marketplaceDraftListing,
+              )
+            : sourceType === "upload"
+              ? resolveMarketplaceUploadHtml(marketplaceDraftListing)
+              : String(marketplaceDraftListing.sourceHtml || "").trim();
+        const title = String(marketplaceDraftListing.title || "").trim();
+        const category = String(marketplaceDraftListing.category || "").trim();
+        const purpose = String(marketplaceDraftListing.purpose || "").trim();
+        const description = String(
+          marketplaceDraftListing.description || "",
+        ).trim();
+        const effectivePurpose = purpose || description.slice(0, 180);
+        const screenshots = Array.isArray(marketplaceDraftListing.screenshots)
+          ? marketplaceDraftListing.screenshots.filter(Boolean)
+          : [];
+        if (Number(step) === 1) {
+          const issues = [];
+          if (!sourceType) issues.push("Choose a project source type.");
+          if (!projectId) issues.push("Select a project source first.");
+          if (sourceType === "upload" && !sourceHtml && !sourceFiles.length) {
+            issues.push("Upload a project folder with an HTML entry file.");
+          }
+          if (sourceType === "draft" && !projectId) {
+            issues.push("Choose one of your MediaLab drafts.");
+          }
+          if (sourceType === "live" && !projectId) {
+            issues.push("Choose one of your live projects.");
+          }
+          return issues;
+        }
+        if (Number(step) === 2) {
+          const issues = [];
+          if (title.length < 3)
+            issues.push(
+              "Enter a marketplace title with at least 3 characters.",
+            );
+          if (!category) issues.push("Enter a project category.");
+          if (effectivePurpose.length < 5) issues.push("Purpose is too short.");
+          if (description.length < 8)
+            issues.push("Professional description is too short.");
+          if (
+            Number(marketplaceDraftListing.price) < 0 ||
+            Number.isNaN(Number(marketplaceDraftListing.price))
+          ) {
+            issues.push("Price must be 0 or more.");
+          }
+          return issues;
+        }
+        if (Number(step) === 3) {
+          return screenshots.length < 4 ? ["Upload 4 preview images."] : [];
+        }
+        return [];
+      }
       function hasMarketplaceIssues(messages = []) {
         const issues = getMarketplaceValidationIssues();
         return messages.some((message) => issues.includes(message));
+      }
+      function canAdvanceMarketplaceStep(step = marketplaceCreateStep) {
+        return getMarketplaceStepIssues(step).length === 0;
       }
       function setMarketplaceSourceType(type = "") {
         marketplaceDraftListing = {

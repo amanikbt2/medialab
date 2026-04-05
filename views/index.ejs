@@ -4830,6 +4830,15 @@
           return "Unknown";
         }
       }
+      function formatDate(value) {
+        if (!value) return "Unknown";
+        try {
+          const date = value instanceof Date ? value : new Date(value);
+          return Number.isNaN(date.getTime()) ? "Unknown" : date.toLocaleString();
+        } catch {
+          return "Unknown";
+        }
+      }
       function escapeInlineJsString(value = "") {
         return String(value || "")
           .replace(/\\/g, "\\\\")
@@ -5170,8 +5179,8 @@
         const title = String(marketplaceDraftListing.title || "").trim();
         const category = String(marketplaceDraftListing.category || "").trim();
         const purpose = String(marketplaceDraftListing.purpose || "").trim();
-        const effectivePurpose = purpose || description.slice(0, 180);
         const description = String(marketplaceDraftListing.description || "").trim();
+        const effectivePurpose = purpose || description.slice(0, 180);
         const screenshots = Array.isArray(marketplaceDraftListing.screenshots)
           ? marketplaceDraftListing.screenshots.filter(Boolean)
           : [];
@@ -5229,8 +5238,8 @@
         const title = String(marketplaceDraftListing.title || "").trim();
         const category = String(marketplaceDraftListing.category || "").trim();
         const purpose = String(marketplaceDraftListing.purpose || "").trim();
-        const effectivePurpose = purpose || description.slice(0, 180);
         const description = String(marketplaceDraftListing.description || "").trim();
+        const effectivePurpose = purpose || description.slice(0, 180);
         const screenshots = Array.isArray(marketplaceDraftListing.screenshots)
           ? marketplaceDraftListing.screenshots.filter(Boolean)
           : [];
@@ -5940,7 +5949,13 @@
         }
       }
       function updateMarketplaceDraftField(field, value) {
-        const nextValue = field === "price" ? Number(value || 0) : String(value || "");
+        const normalizedValue = String(value ?? "").trim();
+        const nextValue =
+          field === "price"
+            ? normalizedValue === ""
+              ? 0
+              : Number(normalizedValue.replace(/,/g, ""))
+            : String(value || "");
         marketplaceDraftListing = {
           ...marketplaceDraftListing,
           [field]: nextValue,
@@ -5989,7 +6004,7 @@
       function handleMarketplaceLiveInput(event, field) {
         updateMarketplaceDraftField(field, event?.target?.value ?? "");
         if (currentStudioToolId === "marketplace" && marketplaceActiveTab === "create") {
-          syncMarketplaceCreateActions();
+          mountMarketplaceTool();
         }
       }
       function handleMarketplaceSearchInput(event) {
