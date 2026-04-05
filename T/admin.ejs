@@ -1,0 +1,2426 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ML Community</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="icon" href="/favicon.png" type="image/png" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Space Grotesk", sans-serif;
+      }
+      .glass {
+        background: rgba(7, 12, 22, 0.8);
+        backdrop-filter: blur(18px);
+      }
+      .top-tab {
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+        color: #cbd5e1;
+      }
+      .top-tab.active {
+        background: linear-gradient(135deg, #67e8f9, #22d3ee);
+        border-color: rgba(103, 232, 249, 0.45);
+        color: #052330;
+        box-shadow: 0 16px 36px rgba(34, 211, 238, 0.16);
+      }
+      .feedback-row.open .feedback-detail,
+      .audience-row.open .audience-detail,
+      .premium-row.open .premium-detail {
+        display: block;
+      }
+      .feedback-row.open .feedback-chevron,
+      .audience-row.open .audience-chevron,
+      .premium-row.open .premium-chevron {
+        transform: rotate(180deg);
+      }
+      .feedback-detail,
+      .audience-detail,
+      .premium-detail {
+        display: none;
+      }
+      .live-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: #22c55e;
+        box-shadow: 0 0 0 rgba(34, 197, 94, 0.5);
+        animation: pulseLive 1.8s infinite;
+      }
+      .live-dot.offline {
+        background: #f97316;
+        animation: none;
+      }
+      @keyframes pulseLive {
+        0% {
+          box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
+        }
+        70% {
+          box-shadow: 0 0 0 12px rgba(34, 197, 94, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+        }
+      }
+      .terminal-shell {
+        background:
+          linear-gradient(180deg, rgba(2, 6, 23, 0.98), rgba(9, 13, 20, 0.98)),
+          radial-gradient(
+            circle at top,
+            rgba(34, 211, 238, 0.08),
+            transparent 35%
+          );
+      }
+      .terminal-shell-window {
+        max-height: min(72vh, calc(100vh - 240px));
+      }
+      .terminal-shell.collapsed .terminal-body {
+        display: none;
+      }
+      .terminal-shell.collapsed .terminal-chevron {
+        transform: rotate(-90deg);
+      }
+      .terminal-line {
+        display: grid;
+        grid-template-columns: 58px 1fr;
+        gap: 12px;
+        align-items: start;
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Courier New", monospace;
+      }
+      .terminal-body::-webkit-scrollbar {
+        width: 8px;
+      }
+      .terminal-body::-webkit-scrollbar-thumb {
+        background: rgba(71, 85, 105, 0.72);
+        border-radius: 999px;
+      }
+      .hide-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .mini-tab {
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+        color: #cbd5e1;
+      }
+      .mini-tab.active {
+        background: rgba(34, 211, 238, 0.14);
+        border-color: rgba(34, 211, 238, 0.25);
+        color: #ecfeff;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen bg-slate-950 text-slate-100">
+    <div
+      class="fixed inset-0 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.14),_transparent_32%),linear-gradient(180deg,_#020617_0%,_#020617_48%,_#08111f_100%)]"
+    ></div>
+
+    <div
+      id="admin-auth-overlay"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/88 backdrop-blur-xl"
+    >
+      <div
+        class="w-full max-w-md glass border border-white/10 rounded-[2rem] p-6 sm:p-8 shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
+      >
+        <div class="flex items-center gap-3">
+          <img src="/favicon.png" alt="ML Community" class="h-12 w-12 rounded-2xl border border-white/10 bg-white/5 p-2" />
+          <div>
+            <p
+              class="text-[11px] uppercase tracking-[0.32em] text-cyan-400 font-bold"
+            >
+              ML Community
+            </p>
+            <h2 class="text-3xl font-bold mt-1">Admin Sign In</h2>
+          </div>
+        </div>
+        <p class="text-slate-400 mt-3 text-sm">Secure dashboard access.</p>
+        <label class="block mt-6">
+          <span
+            class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold"
+            >Email</span
+          >
+          <input
+            id="admin-email"
+            type="email"
+            class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-cyan-400"
+            placeholder="dev@gmail.com"
+          />
+        </label>
+        <label class="block mt-6">
+          <span
+            class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold"
+            >Password</span
+          >
+          <input
+            id="admin-password"
+            type="password"
+            class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-cyan-400"
+            placeholder="Enter admin password"
+          />
+        </label>
+        <div class="flex gap-3 mt-6">
+          <button
+            onclick="unlockAdmin()"
+            class="flex-1 rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-bold text-slate-950 hover:bg-cyan-300 transition-all"
+          >
+            Unlock
+          </button>
+          <a
+            href="/index.html"
+            class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-slate-200 hover:bg-white/10 transition-all"
+            >Back</a
+          >
+        </div>
+        <p id="admin-auth-error" class="mt-4 text-sm text-rose-300 hidden">
+          Wrong password. Try again.
+        </p>
+      </div>
+    </div>
+
+    <div
+      id="clear-logs-modal"
+      class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-slate-950/82 backdrop-blur-xl"
+    >
+      <div
+        onclick="event.stopPropagation()"
+        class="w-full max-w-md glass border border-white/10 rounded-[2rem] p-6 sm:p-7 shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
+      >
+        <div
+          class="text-[11px] uppercase tracking-[0.28em] text-rose-300 font-bold"
+        >
+          Clear Logs
+        </div>
+        <h3 class="text-2xl font-bold mt-3">Delete all usage logs?</h3>
+        <p class="text-slate-400 mt-3 text-sm">
+          This clears the live terminal history from the database. This action
+          cannot be undone.
+        </p>
+        <div class="flex gap-3 mt-6">
+          <button
+            onclick="closeClearLogsModal()"
+            class="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-slate-200"
+          >
+            Cancel
+          </button>
+          <button
+            id="clear-logs-confirm-btn"
+            onclick="clearUsageLogs()"
+            class="flex-1 rounded-2xl bg-rose-500 px-4 py-3 text-sm font-bold text-white"
+          >
+            Clear Logs
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="withdrawal-failure-modal"
+      class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-slate-950/82 backdrop-blur-xl"
+      onclick="if (event.target === this) closeWithdrawalFailurePrompt();"
+    >
+      <div
+        onclick="event.stopPropagation()"
+        class="w-full max-w-lg glass border border-white/10 rounded-[2rem] p-6 sm:p-7 shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
+      >
+        <div
+          class="text-[11px] uppercase tracking-[0.28em] text-rose-300 font-bold"
+        >
+          Deny Withdrawal
+        </div>
+        <h3 class="text-2xl font-bold mt-3">Add a reason for this decision</h3>
+        <p class="text-slate-400 mt-3 text-sm">
+          This note will appear in the user's withdrawal status so the outcome
+          stays clear and professional.
+        </p>
+        <label class="block mt-5">
+          <span
+            class="text-[11px] uppercase tracking-[0.22em] text-slate-500 font-bold"
+            >Reason</span
+          >
+          <textarea
+            id="withdrawal-failure-reason"
+            rows="4"
+            class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none resize-none focus:border-rose-400"
+            placeholder="Explain why this withdrawal was denied..."
+          ></textarea>
+        </label>
+        <p
+          id="withdrawal-failure-error"
+          class="mt-3 hidden rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100"
+        ></p>
+        <div class="flex gap-3 mt-6">
+          <button
+            onclick="closeWithdrawalFailurePrompt()"
+            class="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-slate-200"
+          >
+            Cancel
+          </button>
+          <button
+            id="withdrawal-failure-submit-btn"
+            onclick="submitWithdrawalFailure()"
+            class="flex-1 rounded-2xl bg-rose-500 px-4 py-3 text-sm font-bold text-white"
+          >
+            Deny Request
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <main class="relative z-10 w-full px-2 py-3 sm:px-3 sm:py-4">
+      <header
+        class="glass border border-white/10 rounded-[1.4rem] sm:rounded-[1.8rem] p-3 sm:p-5 shadow-[0_30px_80px_rgba(0,0,0,0.45)]"
+      >
+        <div class="flex flex-col gap-5">
+          <div
+            class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
+          >
+            <div>
+              <div class="flex items-center gap-3">
+                <img src="/favicon.png" alt="ML Community" class="h-11 w-11 rounded-2xl border border-white/10 bg-white/5 p-2" />
+                <div>
+                  <p
+                    class="text-[11px] uppercase tracking-[0.32em] text-cyan-400 font-bold"
+                  >
+                    ML Community
+                  </p>
+                  <h1 class="text-2xl sm:text-4xl font-bold mt-2 tracking-tight">
+                    Studio monitor
+                  </h1>
+                </div>
+              </div>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-3">
+              <div
+                class="flex items-center gap-3 rounded-2xl border border-emerald-500/15 bg-emerald-500/10 px-4 py-3"
+              >
+                <span id="live-update-dot" class="live-dot"></span>
+                <div>
+                  <div
+                    class="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-300"
+                  >
+                    Live Updates
+                  </div>
+                  <div id="live-update-label" class="text-xs text-slate-200">
+                    Connected
+                  </div>
+                </div>
+              </div>
+              <button
+                onclick="loadAdminData()"
+                class="px-4 py-3 rounded-2xl bg-cyan-400 text-slate-950 hover:bg-cyan-300 transition-all text-sm font-bold"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto hide-scrollbar">
+            <div class="flex min-w-max gap-2">
+              <button
+                data-tab="analytics"
+                class="top-tab active px-4 py-3 rounded-2xl text-sm font-bold transition-all"
+                onclick="showAdminTab('analytics', this)"
+              >
+                Analysis
+              </button>
+              <button
+                data-tab="feedbacks"
+                class="top-tab px-4 py-3 rounded-2xl text-sm font-bold transition-all"
+                onclick="showAdminTab('feedbacks', this)"
+              >
+                Feedbacks
+                <span id="badge-feedbacks" class="hidden ml-2 rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-black text-rose-200"></span>
+              </button>
+              <button
+                data-tab="logs"
+                class="top-tab px-4 py-3 rounded-2xl text-sm font-bold transition-all"
+                onclick="showAdminTab('logs', this)"
+              >
+                Live Logs
+                <span id="badge-logs" class="hidden ml-2 rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-black text-rose-200"></span>
+              </button>
+              <button
+                data-tab="users"
+                class="top-tab px-4 py-3 rounded-2xl text-sm font-bold transition-all"
+                onclick="showAdminTab('users', this)"
+              >
+                Audience
+                <span id="badge-users" class="hidden ml-2 rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-black text-rose-200"></span>
+              </button>
+              <button
+                data-tab="premium"
+                class="top-tab px-4 py-3 rounded-2xl text-sm font-bold transition-all"
+                onclick="showAdminTab('premium', this)"
+              >
+                Premium Requests
+                <span id="badge-premium" class="hidden ml-2 rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-black text-rose-200"></span>
+              </button>
+              <button
+                data-tab="downloads"
+                class="top-tab px-4 py-3 rounded-2xl text-sm font-bold transition-all"
+                onclick="showAdminTab('downloads', this)"
+              >
+                Downloads
+                <span id="badge-downloads" class="hidden ml-2 rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-black text-rose-200"></span>
+              </button>
+              <button
+                data-tab="withdrawals"
+                class="top-tab px-4 py-3 rounded-2xl text-sm font-bold transition-all"
+                onclick="showAdminTab('withdrawals', this)"
+              >
+                Withdrawals
+                <span id="badge-withdrawals" class="hidden ml-2 rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-black text-rose-200"></span>
+              </button>
+              <button
+                data-tab="payouts"
+                class="top-tab px-4 py-3 rounded-2xl text-sm font-bold transition-all"
+                onclick="showAdminTab('payouts', this)"
+              >
+                Payouts
+                <span id="badge-payouts" class="hidden ml-2 rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-black text-rose-200"></span>
+              </button>
+              <button
+                data-tab="notify"
+                class="top-tab px-4 py-3 rounded-2xl text-sm font-bold transition-all"
+                onclick="showAdminTab('notify', this)"
+              >
+                Notify
+              </button>
+              <button
+                data-tab="marketplace"
+                class="top-tab px-4 py-3 rounded-2xl text-sm font-bold transition-all"
+                onclick="showAdminTab('marketplace', this)"
+              >
+                Marketplace Desk
+                <span id="badge-marketplace" class="hidden ml-2 rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-black text-rose-200"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section id="tab-analytics" class="mt-6 space-y-4"></section>
+      <section id="tab-feedbacks" class="mt-6 space-y-3 hidden"></section>
+      <section id="tab-logs" class="mt-6 space-y-4 hidden"></section>
+      <section id="tab-users" class="mt-6 space-y-4 hidden"></section>
+      <section id="tab-premium" class="mt-6 space-y-4 hidden"></section>
+      <section id="tab-downloads" class="mt-6 space-y-4 hidden"></section>
+      <section id="tab-withdrawals" class="mt-6 space-y-4 hidden"></section>
+      <section id="tab-payouts" class="mt-6 space-y-4 hidden"></section>
+      <section id="tab-notify" class="mt-6 space-y-4 hidden"></section>
+      <section id="tab-marketplace" class="mt-6 space-y-4 hidden"></section>
+    </main>
+
+    <div
+      id="admin-marketplace-modal"
+      class="hidden fixed inset-0 z-[5001] items-center justify-center bg-slate-950/84 p-4 backdrop-blur-xl"
+      onclick="if (event.target === this) closeAdminMarketplaceModal();"
+    >
+      <div class="w-full max-w-5xl rounded-[2rem] border border-white/10 bg-slate-950/95 p-6 shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <div class="text-[11px] font-black uppercase tracking-[0.28em] text-cyan-400">Marketplace Review</div>
+            <h3 id="admin-marketplace-modal-title" class="mt-3 text-3xl font-bold text-white">Loading listing...</h3>
+            <p id="admin-marketplace-modal-subtitle" class="mt-2 text-sm text-slate-400">Preparing project dashboard.</p>
+          </div>
+          <button onclick="closeAdminMarketplaceModal()" class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div id="admin-marketplace-modal-body" class="mt-6"></div>
+      </div>
+    </div>
+
+    <script>
+      let adminFeedbacks = [];
+      let adminAnalytics = null;
+      let adminUsageLogs = [];
+      let adminPremiumRequests = [];
+      let adminDownloads = [];
+      let adminWithdrawals = [];
+      let adminPayoutUsers = [];
+      let adminNotifications = [];
+      let adminMarketplace = { pendingListings: [], approvedListings: [], pendingPurchases: [], completedPurchases: [] };
+      let adminMarketplaceTab = "pending";
+      let currentAdminMarketplaceItem = null;
+      let adminSocket = null;
+      let adminCounterValues = {};
+      let activeAdminTab = "analytics";
+      let hasLoadedAdminData = false;
+      let adminUnreadCounts = {
+        feedbacks: 0,
+        logs: 0,
+        users: 0,
+        premium: 0,
+        downloads: 0,
+        withdrawals: 0,
+        payouts: 0,
+        marketplace: 0,
+      };
+      let feedbackView = "all";
+      let audienceQuery = "";
+      let payoutAmounts = {};
+      let adminNotifyMode = "all";
+      let adminNotifyEmail = "";
+      let adminNotifyMessage = "";
+      let withdrawalFilterTab = "pending";
+      let pendingWithdrawalFailureId = "";
+      let feedbackFilters = {
+        name: "",
+        email: "",
+        location: "",
+        time: "",
+      };
+      let logFilters = {
+        query: "",
+      };
+      const ADMIN_EMAIL = "dev@gmail.com";
+      const ADMIN_PASSWORD = "spiderman";
+      const ADMIN_ACCESS_KEY = "medialab_admin_access";
+      const ADMIN_EMAIL_KEY = "medialab_admin_email";
+      const ADMIN_PASSWORD_KEY = "medialab_admin_password";
+      const ADMIN_UNREAD_STORAGE_KEY = "medialab_admin_unread_counts";
+      function showAdminToast(message, tone = "info") {
+        const colors =
+          tone === "error"
+            ? "bg-rose-500/90 text-white"
+            : tone === "success"
+              ? "bg-emerald-500/90 text-slate-950"
+              : "bg-cyan-500/90 text-slate-950";
+        let node = document.getElementById("admin-toast");
+        if (!node) {
+          node = document.createElement("div");
+          node.id = "admin-toast";
+          node.className =
+            "fixed right-4 top-4 z-[5000] rounded-2xl px-4 py-3 text-sm font-bold shadow-[0_24px_60px_rgba(2,6,23,0.45)]";
+          document.body.appendChild(node);
+        }
+        node.className = `fixed right-4 top-4 z-[5000] rounded-2xl px-4 py-3 text-sm font-bold shadow-[0_24px_60px_rgba(2,6,23,0.45)] ${colors}`;
+        node.textContent = message;
+        node.classList.remove("hidden");
+        clearTimeout(node._timer);
+        node._timer = setTimeout(() => node.classList.add("hidden"), 2600);
+      }
+      function loadAdminUnreadCounts() {
+        try {
+          const parsed = JSON.parse(
+            localStorage.getItem(ADMIN_UNREAD_STORAGE_KEY) || "{}",
+          );
+          if (!parsed || typeof parsed !== "object") return;
+          Object.keys(adminUnreadCounts).forEach((key) => {
+            adminUnreadCounts[key] = Number(parsed[key] || 0);
+          });
+        } catch {}
+      }
+      function persistAdminUnreadCounts() {
+        try {
+          localStorage.setItem(
+            ADMIN_UNREAD_STORAGE_KEY,
+            JSON.stringify(adminUnreadCounts),
+          );
+        } catch {}
+      }
+      function renderAdminTabBadges() {
+        Object.entries(adminUnreadCounts).forEach(([tab, count]) => {
+          const badge = document.getElementById(`badge-${tab}`);
+          if (!badge) return;
+          if (count > 0) {
+            badge.textContent = count > 99 ? "99+" : String(count);
+            badge.classList.remove("hidden");
+          } else {
+            badge.classList.add("hidden");
+            badge.textContent = "";
+          }
+        });
+        persistAdminUnreadCounts();
+      }
+      function markAdminTabRead(name) {
+        if (name in adminUnreadCounts) {
+          adminUnreadCounts[name] = 0;
+          renderAdminTabBadges();
+        }
+      }
+      function bumpAdminUnread(name) {
+        if (!(name in adminUnreadCounts) || activeAdminTab === name) return;
+        adminUnreadCounts[name] += 1;
+        renderAdminTabBadges();
+      }
+
+      function getAdminHeaders() {
+        const unlocked = localStorage.getItem(ADMIN_ACCESS_KEY) === "granted";
+        const email = unlocked ? String(localStorage.getItem(ADMIN_EMAIL_KEY) || "").trim().toLowerCase() : "";
+        const password = unlocked ? String(localStorage.getItem(ADMIN_PASSWORD_KEY) || "").trim() : "";
+        return email && password
+          ? { "x-admin-email": email, "x-admin-password": password }
+          : {};
+      }
+
+      function showAdminTab(name, button) {
+        activeAdminTab = name;
+        markAdminTabRead(name);
+        document
+          .querySelectorAll(".top-tab")
+          .forEach((tab) => tab.classList.remove("active"));
+        document
+          .querySelectorAll(`.top-tab[data-tab="${name}"]`)
+          .forEach((tab) => tab.classList.add("active"));
+        ["analytics", "feedbacks", "logs", "users", "premium", "downloads", "withdrawals", "payouts", "notify", "marketplace"].forEach((tabName) => {
+          document
+            .getElementById(`tab-${tabName}`)
+            ?.classList.toggle("hidden", tabName !== name);
+        });
+        if (name === "logs") {
+          requestAnimationFrame(() => {
+            document
+              .querySelectorAll("#tab-logs .terminal-body")
+              .forEach((node) => {
+                node.scrollTop = node.scrollHeight;
+              });
+          });
+        }
+      }
+
+      function formatDate(value) {
+        return value ? new Date(value).toLocaleString() : "Unknown";
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function formatLogIdentity(item) {
+        if (item.isAnonymous) return "anonymous";
+        const email = (item.email || "unknown").trim();
+        const name = (item.name || "unknown").trim();
+        return `${name}#${email}`;
+      }
+
+      function formatLogSummary(item) {
+        const base = item.summary || item.action || "activity";
+        const device = String(item?.metadata?.device || "").trim();
+        return device ? `${base} (${device})` : base;
+      }
+
+      function updateLogFilter(value) {
+        logFilters.query = String(value || "");
+        renderLogs();
+      }
+
+      function captureLogFilterFocus() {
+        const active = document.activeElement;
+        if (!active || active.tagName !== "INPUT") return null;
+        const key = active.getAttribute("data-log-filter");
+        if (!key) return null;
+        return {
+          key,
+          start: active.selectionStart ?? String(active.value || "").length,
+          end: active.selectionEnd ?? String(active.value || "").length,
+        };
+      }
+
+      function restoreLogFilterFocus(state) {
+        if (!state) return;
+        requestAnimationFrame(() => {
+          const input = document.querySelector(
+            `[data-log-filter="${state.key}"]`,
+          );
+          if (!input) return;
+          input.focus({ preventScroll: true });
+          if (typeof input.setSelectionRange === "function") {
+            input.setSelectionRange(state.start, state.end);
+          }
+        });
+      }
+
+      function getLogSearchFields(item) {
+        const action = String(item.action || "").toLowerCase();
+        const summary = String(item.summary || "").toLowerCase();
+        const source = String(
+          item.source || item.metadata?.toolType || item.metadata?.toolId || "",
+        ).toLowerCase();
+        const metadataText = JSON.stringify(item.metadata || {}).toLowerCase();
+        const created = formatDate(item.createdAt).toLowerCase();
+        const name = String(item.name || "").toLowerCase();
+        const email = String(item.email || "").toLowerCase();
+        const location = String(item.location || item.metadata?.location || "").toLowerCase();
+        const ip = String(item.ip || item.metadata?.ip || "").toLowerCase();
+        const device = String(item.metadata?.device || "").toLowerCase();
+        const activity = [action, summary, source, metadataText].filter(Boolean).join(" ");
+        const full = [
+          name,
+          email,
+          source,
+          action,
+          summary,
+          created,
+          location,
+          ip,
+          device,
+          metadataText,
+        ]
+          .filter(Boolean)
+          .join(" ");
+        return {
+          username: name,
+          name,
+          user: name,
+          email,
+          activity,
+          action,
+          summary,
+          tool: source,
+          source,
+          date: created,
+          time: created,
+          location,
+          ip,
+          device,
+          text: full,
+          any: full,
+          full,
+        };
+      }
+
+      function splitSmartQuery(query, operator) {
+        return String(query || "")
+          .split(new RegExp(`\\s+${operator}\\s+`, "i"))
+          .map((part) => part.trim())
+          .filter(Boolean);
+      }
+
+      function wrapAdminQueryKeywords(query = "", fields = []) {
+        const escaped = escapeHtml(String(query || ""));
+        if (!escaped.trim()) {
+          return `<span class="text-slate-500">Smart query preview will appear here.</span>`;
+        }
+        let html = escaped;
+        const operators = ["and", "or", "not"];
+        operators.forEach((keyword) => {
+          const regex = new RegExp(`(^|\\s)(${keyword})(?=\\s|$)`, "gi");
+          html = html.replace(
+            regex,
+            (_match, prefix, word) =>
+              `${prefix}<span class="font-black text-cyan-300">${word}</span>`,
+          );
+        });
+        fields.forEach((field) => {
+          const regex = new RegExp(`\\b(${field})\\s*(=|:|~)`, "gi");
+          html = html.replace(
+            regex,
+            '<span class="font-black text-sky-300">$1</span><span class="font-black text-cyan-300">$2</span>',
+          );
+        });
+        return html;
+      }
+
+      const SMART_LOG_FIELDS = [
+        "username",
+        "name",
+        "user",
+        "email",
+        "activity",
+        "action",
+        "summary",
+        "tool",
+        "source",
+        "date",
+        "time",
+        "location",
+        "ip",
+        "device",
+        "text",
+        "any",
+      ];
+
+      function normalizeLogDateToken(value = "") {
+        const raw = String(value || "").trim();
+        if (!raw) return "";
+        const now = new Date();
+        const lower = raw.toLowerCase();
+        if (lower.startsWith("today")) {
+          return `${now.toLocaleDateString()} ${raw.slice(5).trim()}`.trim();
+        }
+        if (lower.startsWith("yesterday")) {
+          const yesterday = new Date(now);
+          yesterday.setDate(now.getDate() - 1);
+          return `${yesterday.toLocaleDateString()} ${raw.slice(9).trim()}`.trim();
+        }
+        return raw;
+      }
+
+      function parseLogDateValue(value = "") {
+        const normalized = normalizeLogDateToken(value);
+        if (!normalized) return null;
+        const parsed = new Date(normalized);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+      }
+
+      function parseLogDateRange(raw = "") {
+        const value = String(raw || "").trim();
+        if (!value) return null;
+        const parts = value.split(/\s+to\s+/i).map((part) => part.trim()).filter(Boolean);
+        if (parts.length === 2) {
+          const from = parseLogDateValue(parts[0]);
+          const to = parseLogDateValue(parts[1]);
+          if (!from || !to) return "__invalid_date__";
+          return { from, to };
+        }
+        const point = parseLogDateValue(value);
+        if (!point) return "__invalid_date__";
+        return { from: point, to: point };
+      }
+
+      function parseSmartLogClause(clause) {
+        const normalized = String(clause || "").trim();
+        if (!normalized) return null;
+        const isNegated = /^not\s+/i.test(normalized);
+        const baseClause = normalized.replace(/^not\s+/i, "").trim();
+        const match = baseClause.match(
+          /^(username|name|user|email|activity|action|summary|tool|source|date|time|location|ip|device|text|any)\s*(=|:|~)\s*(.+)$/i,
+        );
+        if (match) {
+          const field = match[1].toLowerCase();
+          const rawValue = match[3].trim().replace(/^["']|["']$/g, "");
+          return {
+            field,
+            isNegated,
+            value: field === "date" || field === "time" ? rawValue : rawValue.toLowerCase(),
+          };
+        }
+        return {
+          field: "full",
+          isNegated,
+          value: baseClause.replace(/^["']|["']$/g, "").toLowerCase(),
+        };
+      }
+      function analyzeSmartLogClause(clause) {
+        const normalized = String(clause || "").trim();
+        if (!normalized) {
+          return { status: "empty", message: "Type a query to filter logs." };
+        }
+        if (/^not\s*$/i.test(normalized)) {
+          return { status: "invalid", message: 'Finish the "not" clause with a field or value.' };
+        }
+        const parsed = parseSmartLogClause(normalized);
+        if (parsed?.field !== "full") {
+          if (
+            (parsed.field === "date" || parsed.field === "time") &&
+            parseLogDateRange(parsed.value) === "__invalid_date__"
+          ) {
+            return {
+              status: "partial",
+              message:
+                "Use a date like 4/4/2026, 5:24:20 PM or a range like Today 5:24:20 PM TO 4/4/2026, 5:25:20 PM.",
+            };
+          }
+          return parsed.value
+            ? { status: "valid", message: `${parsed.isNegated ? "Excluding" : "Filtering by"} ${parsed.field}.` }
+            : {
+                status: "partial",
+                message: `Add a value after ${parsed.field}= to finish this filter.`,
+              };
+        }
+        if (/[=:~]/.test(normalized)) {
+          return {
+            status: "invalid",
+            message: "Unknown log field. Try username=, email=, activity=, tool=, device=, or date=.",
+          };
+        }
+        const partialFieldMatch = normalized.match(/^([a-z]+)\s*(=|:|~)?\s*$/i);
+        if (partialFieldMatch) {
+          const fragment = partialFieldMatch[1].toLowerCase();
+          const suggestions = SMART_LOG_FIELDS.filter((field) =>
+            field.startsWith(fragment),
+          ).slice(0, 3);
+          if (suggestions.length) {
+            return {
+              status: "partial",
+              message: `Smart query ready. Try ${suggestions
+                .map((field) => `${field}=...`)
+                .join(", ")}.`,
+            };
+          }
+        }
+        return {
+          status: "valid",
+          message: "Searching logs with flexible text matching.",
+        };
+      }
+      function analyzeSmartLogQuery(query) {
+        const trimmedQuery = String(query || "").trim();
+        if (!trimmedQuery) {
+          return { status: "empty", message: "Use smart filters or plain text search." };
+        }
+        const orGroups = splitSmartQuery(trimmedQuery, "or");
+        const clauseStatuses = orGroups.flatMap((group) =>
+          splitSmartQuery(group, "and").map((clause) => analyzeSmartLogClause(clause)),
+        );
+        if (clauseStatuses.some((item) => item.status === "invalid")) {
+          return clauseStatuses.find((item) => item.status === "invalid");
+        }
+        if (clauseStatuses.some((item) => item.status === "partial")) {
+          return clauseStatuses.find((item) => item.status === "partial");
+        }
+        return clauseStatuses.find((item) => item.status === "valid") || {
+          status: "valid",
+          message: "Searching logs.",
+        };
+      }
+
+      function matchesSmartLogClause(item, clause) {
+        const parsed = parseSmartLogClause(clause);
+        if (!parsed || !parsed.value) return true;
+        if (parsed.field === "date" || parsed.field === "time") {
+          const range = parseLogDateRange(parsed.value);
+          if (range === "__invalid_date__") return false;
+          const createdAt = new Date(item.createdAt || 0);
+          if (Number.isNaN(createdAt.getTime())) return false;
+          const result =
+            range.from.toDateString() === range.to.toDateString() && !/\bto\b/i.test(String(parsed.value || ""))
+              ? createdAt.toLocaleDateString() === range.from.toLocaleDateString()
+              : createdAt >= range.from && createdAt <= range.to;
+          return parsed.isNegated ? !result : result;
+        }
+        const fields = getLogSearchFields(item);
+        const haystack = String(fields[parsed.field] || fields.full || "").toLowerCase();
+        const result = haystack.includes(parsed.value);
+        return parsed.isNegated ? !result : result;
+      }
+
+      function matchesSmartLogQuery(item, query) {
+        const trimmedQuery = String(query || "").trim();
+        if (!trimmedQuery) return true;
+        const orGroups = splitSmartQuery(trimmedQuery, "or");
+        return orGroups.some((group) => {
+          const andClauses = splitSmartQuery(group, "and");
+          return andClauses.every((clause) => matchesSmartLogClause(item, clause));
+        });
+      }
+
+      function getFilteredLogs() {
+        return adminUsageLogs.filter((item) =>
+          matchesSmartLogQuery(item, logFilters.query),
+        );
+      }
+
+      function animateCountValue(target, nextValue) {
+        const finalValue = Number(nextValue || 0);
+        const startValue = Number(target.dataset.currentValue || 0);
+        if (startValue === finalValue) {
+          target.textContent = finalValue.toLocaleString();
+          target.dataset.currentValue = String(finalValue);
+          return;
+        }
+        const duration = 900;
+        const startTime = performance.now();
+        function step(now) {
+          const progress = Math.min((now - startTime) / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          const current = Math.round(
+            startValue + (finalValue - startValue) * eased,
+          );
+          target.textContent = current.toLocaleString();
+          if (progress < 1) {
+            requestAnimationFrame(step);
+          } else {
+            target.dataset.currentValue = String(finalValue);
+          }
+        }
+        requestAnimationFrame(step);
+      }
+
+      function animateAnalyticsCounts() {
+        document.querySelectorAll("[data-count-value]").forEach((node) => {
+          const key = node.dataset.countKey || "";
+          const nextValue = Number(node.dataset.countValue || 0);
+          const previousValue = Number(node.dataset.currentValue || nextValue);
+          if (previousValue === nextValue) {
+            node.textContent = nextValue.toLocaleString();
+            node.dataset.currentValue = String(nextValue);
+          } else {
+            animateCountValue(node, nextValue);
+          }
+          if (key) adminCounterValues[key] = nextValue;
+        });
+      }
+
+      function setLiveStatus(connected) {
+        const dot = document.getElementById("live-update-dot");
+        const label = document.getElementById("live-update-label");
+        dot?.classList.toggle("offline", !connected);
+        if (label) {
+          label.textContent = connected ? "Connected" : "Reconnecting";
+        }
+      }
+
+      function unlockAdmin() {
+        const emailField = document.getElementById("admin-email");
+        const field = document.getElementById("admin-password");
+        const error = document.getElementById("admin-auth-error");
+        const email = emailField?.value?.trim().toLowerCase() || "";
+        const password = field?.value?.trim() || "";
+        if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
+          error?.classList.remove("hidden");
+          if (emailField) {
+            emailField.value = "";
+          }
+          if (field) {
+            field.value = "";
+          }
+          emailField?.focus();
+          return;
+        }
+        localStorage.setItem(ADMIN_ACCESS_KEY, "granted");
+        localStorage.setItem(ADMIN_EMAIL_KEY, email);
+        localStorage.setItem(ADMIN_PASSWORD_KEY, password);
+        document.getElementById("admin-auth-overlay")?.classList.add("hidden");
+        error?.classList.add("hidden");
+        loadAdminData();
+      }
+
+      function ensureAdminAccess() {
+        const unlocked =
+          localStorage.getItem(ADMIN_ACCESS_KEY) === "granted" &&
+          String(localStorage.getItem(ADMIN_EMAIL_KEY) || "").trim().toLowerCase() === ADMIN_EMAIL &&
+          String(localStorage.getItem(ADMIN_PASSWORD_KEY) || "").trim() === ADMIN_PASSWORD;
+        if (!unlocked) {
+          localStorage.removeItem(ADMIN_ACCESS_KEY);
+          localStorage.removeItem(ADMIN_EMAIL_KEY);
+          localStorage.removeItem(ADMIN_PASSWORD_KEY);
+        }
+        document
+          .getElementById("admin-auth-overlay")
+          ?.classList.toggle("hidden", unlocked);
+        renderAdminTabBadges();
+        if (unlocked) loadAdminData();
+      }
+
+      function toggleFeedbackRow(id) {
+        document.getElementById(`feedback-row-${id}`)?.classList.toggle("open");
+      }
+
+      function togglePremiumRow(id) {
+        document.getElementById(`premium-row-${id}`)?.classList.toggle("open");
+      }
+
+      function setFeedbackView(view) {
+        feedbackView = view;
+        renderFeedbacks();
+      }
+
+      function updateFeedbackFilter(key, value) {
+        const activeInput = document.activeElement;
+        const selectionStart =
+          activeInput && typeof activeInput.selectionStart === "number"
+            ? activeInput.selectionStart
+            : null;
+        const selectionEnd =
+          activeInput && typeof activeInput.selectionEnd === "number"
+            ? activeInput.selectionEnd
+            : null;
+        const activeKey = activeInput?.dataset?.feedbackFilter || "";
+        feedbackFilters[key] = String(value || "")
+          .trim()
+          .toLowerCase();
+        renderFeedbacks();
+        requestAnimationFrame(() => {
+          const nextInput = document.querySelector(
+            `[data-feedback-filter="${activeKey || key}"]`,
+          );
+          if (nextInput) {
+            nextInput.focus();
+            if (
+              typeof selectionStart === "number" &&
+              typeof selectionEnd === "number"
+            ) {
+              nextInput.setSelectionRange(selectionStart, selectionEnd);
+            }
+          }
+        });
+      }
+
+      function openClearLogsModal() {
+        document.getElementById("clear-logs-modal")?.classList.remove("hidden");
+        document.getElementById("clear-logs-modal")?.classList.add("flex");
+      }
+
+      function closeClearLogsModal() {
+        document.getElementById("clear-logs-modal")?.classList.add("hidden");
+        document.getElementById("clear-logs-modal")?.classList.remove("flex");
+      }
+
+      async function clearUsageLogs() {
+        const btn = document.getElementById("clear-logs-confirm-btn");
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Clearing...";
+        }
+        try {
+          const res = await fetch("/api/admin/usage-logs", {
+            method: "DELETE",
+            headers: getAdminHeaders(),
+          });
+          const data = await res.json();
+          if (!data.success)
+            throw new Error(data.message || "Could not clear logs.");
+          adminUsageLogs = [];
+          if (adminAnalytics) {
+            adminAnalytics.totalUsageLogs = 0;
+            adminAnalytics.recentErrors = 0;
+            if (adminAnalytics.last30Days) {
+              adminAnalytics.last30Days.usageLogs = 0;
+              adminAnalytics.last30Days.errors = 0;
+            }
+          }
+          renderAnalyticsDetails();
+          renderLogs();
+          closeClearLogsModal();
+        } catch (error) {
+          showAdminToast(error.message || "Could not clear logs.", "error");
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = "Clear Logs";
+          }
+        }
+      }
+
+      function getFilteredFeedbacks() {
+        return adminFeedbacks.filter((item) => {
+          if (feedbackView === "flagged" && !item.hidden) return false;
+          const nameText = String(
+            item.username || item.name || "anonymous",
+          ).toLowerCase();
+          const emailText = String(item.email || "").toLowerCase();
+          const locationText = String(
+            item.location || item.country || item.region || "",
+          ).toLowerCase();
+          const timeText = formatDate(item.createdAt).toLowerCase();
+          if (feedbackFilters.name && !nameText.includes(feedbackFilters.name))
+            return false;
+          if (
+            feedbackFilters.email &&
+            !emailText.includes(feedbackFilters.email)
+          )
+            return false;
+          if (
+            feedbackFilters.location &&
+            !locationText.includes(feedbackFilters.location)
+          )
+            return false;
+          if (feedbackFilters.time && !timeText.includes(feedbackFilters.time))
+            return false;
+          return true;
+        });
+      }
+
+      function toggleAudienceRow(id) {
+        document.getElementById(`audience-row-${id}`)?.classList.toggle("open");
+      }
+
+      function toggleTerminalPane(id) {
+        document.getElementById(id)?.classList.toggle("collapsed");
+      }
+
+      function renderAnalyticsDetails() {
+        const el = document.getElementById("tab-analytics");
+        if (!el || !adminAnalytics) return;
+        const cards = [
+          ["users", "Users", adminAnalytics.totalUsers || 0],
+          ["proUsers", "Pro Users", adminAnalytics.proUsers || 0],
+          ["feedbacks", "Feedbacks", adminAnalytics.totalFeedbacks || 0],
+          ["premiumRequests", "Premium Requests", adminAnalytics.totalUpgradeRequests || 0],
+          ["downloads", "Downloads", adminAnalytics.totalDownloads || 0],
+          ["withdrawals", "Withdrawals", adminAnalytics.totalWithdrawals || 0],
+          ["usageLogs", "Usage Logs", adminAnalytics.totalUsageLogs || 0],
+        ];
+        el.innerHTML = `
+          <div class="grid grid-cols-2 xl:grid-cols-7 gap-3 sm:gap-4">
+            ${cards
+              .map(
+                ([key, label, value]) => `
+              <div class="glass border border-white/10 rounded-[1.3rem] sm:rounded-[1.5rem] p-4 sm:p-5">
+                <div class="text-[11px] uppercase tracking-[0.22em] text-slate-400 font-bold">${label}</div>
+                <div data-count-key="${key}" data-count-value="${value}" data-current-value="${adminCounterValues[key] ?? value}" class="text-2xl sm:text-3xl font-bold mt-3">${Number(adminCounterValues[key] ?? value).toLocaleString()}</div>
+              </div>
+            `,
+              )
+              .join("")}
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="glass border border-white/10 rounded-[1.5rem] p-5">
+              <div class="text-[11px] uppercase tracking-[0.22em] text-slate-400 font-bold">Feedback Summary</div>
+              <div class="space-y-3 mt-4 text-sm">
+                <div class="flex items-center justify-between"><span class="text-slate-300">Open</span><strong>${adminAnalytics.openFeedbacks || 0}</strong></div>
+                <div class="flex items-center justify-between"><span class="text-slate-300">Completed</span><strong>${adminAnalytics.completedFeedbacks || 0}</strong></div>
+                <div class="flex items-center justify-between"><span class="text-slate-300">Flagged</span><strong>${adminAnalytics.hiddenFeedbacks || 0}</strong></div>
+              </div>
+            </div>
+            <div class="glass border border-white/10 rounded-[1.5rem] p-5">
+              <div class="text-[11px] uppercase tracking-[0.22em] text-slate-400 font-bold">Premium Summary</div>
+              <div class="space-y-3 mt-4 text-sm">
+                <div class="flex items-center justify-between"><span class="text-slate-300">Total users</span><strong>${adminAnalytics.totalUsers || 0}</strong></div>
+                <div class="flex items-center justify-between"><span class="text-slate-300">Pro users</span><strong>${adminAnalytics.proUsers || 0}</strong></div>
+                <div class="flex items-center justify-between"><span class="text-slate-300">Premium requests</span><strong>${adminAnalytics.totalUpgradeRequests || 0}</strong></div>
+                <div class="flex items-center justify-between"><span class="text-slate-300">Pending review</span><strong>${adminAnalytics.pendingUpgradeRequests || 0}</strong></div>
+              </div>
+            </div>
+            <div class="glass border border-white/10 rounded-[1.5rem] p-5">
+              <div class="text-[11px] uppercase tracking-[0.22em] text-slate-400 font-bold">Payout Summary</div>
+              <div class="space-y-3 mt-4 text-sm">
+                <div class="flex items-center justify-between"><span class="text-slate-300">All requests</span><strong>${adminAnalytics.totalWithdrawals || 0}</strong></div>
+                <div class="flex items-center justify-between"><span class="text-slate-300">Pending</span><strong>${adminAnalytics.pendingWithdrawals || 0}</strong></div>
+                <div class="flex items-center justify-between"><span class="text-slate-300">Paid</span><strong>${adminAnalytics.paidWithdrawals || 0}</strong></div>
+              </div>
+            </div>
+          </div>
+          <div class="glass border border-white/10 rounded-[1.5rem] p-5">
+            <div class="flex items-center justify-between gap-3">
+              <div class="text-[11px] uppercase tracking-[0.22em] text-slate-400 font-bold">Last 30 Days</div>
+              <div class="text-xs text-slate-500">Rolling summary</div>
+            </div>
+            <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 mt-4">
+              <div class="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4">
+                <div class="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-bold">New Signups</div>
+                <div class="text-xl font-bold mt-2">${adminAnalytics.last30Days?.newUsers || 0}</div>
+              </div>
+              <div class="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4">
+                <div class="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-bold">New Pro</div>
+                <div class="text-xl font-bold mt-2">${adminAnalytics.last30Days?.newProUsers || 0}</div>
+              </div>
+              <div class="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4">
+                <div class="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-bold">Feedbacks</div>
+                <div class="text-xl font-bold mt-2">${adminAnalytics.last30Days?.feedbacks || 0}</div>
+              </div>
+              <div class="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4">
+                <div class="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-bold">Logs</div>
+                <div class="text-xl font-bold mt-2">${adminAnalytics.last30Days?.usageLogs || 0}</div>
+              </div>
+              <div class="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4">
+                <div class="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-bold">Downloads</div>
+                <div class="text-xl font-bold mt-2">${adminAnalytics.last30Days?.downloads || 0}</div>
+              </div>
+              <div class="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4">
+                <div class="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-bold">Errors</div>
+                <div class="text-xl font-bold mt-2">${adminAnalytics.last30Days?.errors || 0}</div>
+              </div>
+              <div class="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4">
+                <div class="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-bold">Withdrawals</div>
+                <div class="text-xl font-bold mt-2">${adminAnalytics.last30Days?.withdrawals || 0}</div>
+              </div>
+              <div class="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4">
+                <div class="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-bold">Upgrade Requests</div>
+                <div class="text-xl font-bold mt-2">${adminAnalytics.last30Days?.upgradeRequests || 0}</div>
+              </div>
+            </div>
+          </div>
+        `;
+        requestAnimationFrame(() => animateAnalyticsCounts());
+      }
+
+      function renderPremiumRequests() {
+        const el = document.getElementById("tab-premium");
+        if (!el) return;
+        if (!adminPremiumRequests.length) {
+          el.innerHTML = `<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No premium requests yet.</div>`;
+          return;
+        }
+        el.innerHTML = adminPremiumRequests
+          .map((item) => {
+            const statusTone =
+              item.status === "granted"
+                ? "bg-emerald-500/15 text-emerald-300"
+                : item.status === "denied"
+                  ? "bg-rose-500/15 text-rose-300"
+                  : "bg-amber-500/15 text-amber-300";
+            return `
+          <article id="premium-row-${item._id}" class="premium-row glass border border-white/10 rounded-[1.35rem] overflow-hidden">
+            <button onclick="togglePremiumRow('${item._id}')" class="w-full text-left px-4 py-4 sm:px-5 hover:bg-white/[0.03] transition-all">
+              <div class="flex items-start gap-3">
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="text-base sm:text-lg font-bold text-white">${escapeHtml(item.name || "Unknown User")}</h3>
+                    <span class="px-2.5 py-1 rounded-full ${statusTone} text-[10px] font-bold uppercase tracking-[0.16em]">${escapeHtml(item.status || "pending")}</span>
+                  </div>
+                  <div class="mt-2 text-sm text-slate-400 break-all">${escapeHtml(item.email || "No email")}</div>
+                  <div class="mt-2 text-xs text-slate-500">Requested ${escapeHtml(formatDate(item.createdAt))}</div>
+                </div>
+                <svg class="premium-chevron mt-1.5 h-4 w-4 text-slate-500 transition-transform" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 011.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"></path></svg>
+              </div>
+            </button>
+            <div class="premium-detail border-t border-white/6 px-4 py-4 sm:px-5 sm:py-5 bg-slate-950/35">
+              <div class="mt-0 space-y-1 text-sm text-slate-300">
+                  <div><span class="text-slate-500">Feature:</span> ${escapeHtml(item.requestedFeature || "MediaLab Pro")}</div>
+                  <div><span class="text-slate-500">Source:</span> ${escapeHtml(item.source || "studio")}</div>
+                  <div><span class="text-slate-500">Requested:</span> ${escapeHtml(formatDate(item.createdAt))}</div>
+                  <div><span class="text-slate-500">Message:</span> ${escapeHtml(item.message || "Request premium join.")}</div>
+                </div>
+              <div class="flex flex-wrap gap-2 mt-4">
+                <button onclick="updatePremiumRequest('${item._id}', 'granted')" class="px-3.5 py-2 rounded-xl bg-emerald-400 text-slate-950 text-xs sm:text-sm font-bold hover:bg-emerald-300 transition-all">Grant</button>
+                <button onclick="updatePremiumRequest('${item._id}', 'denied')" class="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-xs sm:text-sm font-bold hover:bg-white/10 transition-all">Request Denied</button>
+              </div>
+            </div> 
+          </article>
+        `;
+          })
+          .join("");
+      }
+
+      function renderDownloads() {
+        const el = document.getElementById("tab-downloads");
+        if (!el) return;
+        if (!adminDownloads.length) {
+          el.innerHTML = `<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No downloads recorded yet.</div>`;
+          return;
+        }
+        el.innerHTML = adminDownloads
+          .map(
+            (item) => `
+          <article class="rounded-[1.35rem] border border-white/10 bg-white/[0.03] overflow-hidden">
+            <div class="px-4 py-4 sm:px-5 sm:py-5">
+              <div class="flex items-center gap-4">
+                <div class="w-11 h-11 rounded-full border border-cyan-400/25 bg-cyan-500/10 text-cyan-300 flex items-center justify-center shrink-0">
+                  <i class="fas fa-download text-sm"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="text-sm sm:text-base font-bold text-white">${escapeHtml(item.name || "Anonymous")}</h3>
+                    <span class="px-2.5 py-1 rounded-full ${item.isAnonymous ? "bg-white/5 text-slate-300" : "bg-emerald-500/15 text-emerald-300"} text-[10px] font-bold uppercase tracking-[0.16em]">${item.isAnonymous ? "Guest" : "User"}</span>
+                    <span class="px-2.5 py-1 rounded-full bg-cyan-500/15 text-cyan-300 text-[10px] font-bold uppercase tracking-[0.16em]">${escapeHtml(item.type || "pwa")}</span>
+                  </div>
+                  <div class="mt-2 text-xs sm:text-sm text-slate-400 break-all">${escapeHtml(item.email || "No email")}</div>
+                </div>
+              </div>
+              <div class="mt-4 space-y-2 text-sm sm:text-[15px]">
+                <div class="text-slate-300"><span class="text-slate-500">Platform:</span> ${escapeHtml(item.platform || "Unknown")}</div>
+                <div class="text-slate-300"><span class="text-slate-500">Source:</span> ${escapeHtml(item.source || "web")}</div>
+                <div class="text-slate-300"><span class="text-slate-500">Downloaded:</span> ${formatDate(item.createdAt)}</div>
+              </div>
+            </div>
+          </article>
+        `,
+          )
+          .join("");
+      }
+
+      function renderWithdrawals() {
+        const el = document.getElementById("tab-withdrawals");
+        if (!el) return;
+        if (!adminWithdrawals.length) {
+          el.innerHTML = `<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No withdrawal requests yet.</div>`;
+          return;
+        }
+        const pendingCount = adminWithdrawals.filter((item) =>
+          ["pending", "processing"].includes(String(item.status || "").toLowerCase()),
+        ).length;
+        const paidCount = adminWithdrawals.filter(
+          (item) => String(item.status || "").toLowerCase() === "paid",
+        ).length;
+        const failedCount = adminWithdrawals.filter(
+          (item) => String(item.status || "").toLowerCase() === "failed",
+        ).length;
+        const filtered = adminWithdrawals.filter((item) =>
+          withdrawalFilterTab === "pending"
+            ? ["pending", "processing"].includes(String(item.status || "").toLowerCase())
+            : String(item.status || "").toLowerCase() === withdrawalFilterTab,
+        );
+        el.innerHTML = `
+          <div class="flex gap-2 overflow-x-auto hide-scrollbar mb-4">
+            <button onclick="setWithdrawalFilterTab('pending')" class="mini-tab ${withdrawalFilterTab === "pending" ? "active" : ""} px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-[0.16em]">Pending (${pendingCount})</button>
+            <button onclick="setWithdrawalFilterTab('paid')" class="mini-tab ${withdrawalFilterTab === "paid" ? "active" : ""} px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-[0.16em]">Paid (${paidCount})</button>
+            <button onclick="setWithdrawalFilterTab('failed')" class="mini-tab ${withdrawalFilterTab === "failed" ? "active" : ""} px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-[0.16em]">Failed (${failedCount})</button>
+          </div>
+          ${
+            filtered.length
+              ? filtered
+                  .map(
+                    (item) => {
+                      const tone =
+                        item.status === "paid"
+                          ? "bg-emerald-500/15 text-emerald-300"
+                          : item.status === "failed"
+                            ? "bg-rose-500/15 text-rose-300"
+                            : item.status === "processing"
+                              ? "bg-amber-500/15 text-amber-300"
+                              : "bg-cyan-500/15 text-cyan-300";
+                      return `
+          <article class="rounded-[1.35rem] border border-white/10 bg-white/[0.03] overflow-hidden">
+            <div class="px-4 py-4 sm:px-5 sm:py-5">
+              <div class="flex items-start gap-4">
+                <div class="w-11 h-11 rounded-full border border-emerald-400/25 bg-emerald-500/10 text-emerald-300 flex items-center justify-center shrink-0">
+                  <i class="fas fa-money-bill-wave text-sm"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="text-sm sm:text-base font-bold text-white">${escapeHtml(item.name || "Unknown User")}</h3>
+                    <span class="px-2.5 py-1 rounded-full ${tone} text-[10px] font-bold uppercase tracking-[0.16em]">${escapeHtml(item.status || "pending")}</span>
+                  </div>
+                  <div class="mt-2 text-xs sm:text-sm text-slate-400 break-all">${escapeHtml(item.email || "No email")}</div>
+                  <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-slate-300">
+                    <div><span class="text-slate-500">Amount:</span> $${Number(item.amount || 0).toFixed(2)}</div>
+                    <div><span class="text-slate-500">Method:</span> ${escapeHtml(item.method || "Unknown")}</div>
+                    <div><span class="text-slate-500">Destination:</span> ${escapeHtml(item.destination || "Not set")}</div>
+                    <div><span class="text-slate-500">Requested:</span> ${formatDate(item.createdAt)}</div>
+                    ${item.deniedReason ? `<div class="sm:col-span-2 text-rose-300"><span class="text-rose-200/70">Reason:</span> ${escapeHtml(item.deniedReason)}</div>` : ""}
+                  </div>
+                  ${
+                    withdrawalFilterTab === "pending"
+                      ? `<div class="mt-4 flex flex-wrap gap-2">
+                          <button onclick="updateWithdrawalStatus('${item._id}', 'processing')" class="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-xs sm:text-sm font-bold hover:bg-white/10 transition-all">Processing</button>
+                          <button onclick="updateWithdrawalStatus('${item._id}', 'paid')" class="px-3.5 py-2 rounded-xl bg-emerald-400 text-slate-950 text-xs sm:text-sm font-bold hover:bg-emerald-300 transition-all">Paid</button>
+                          <button onclick="openWithdrawalFailurePrompt('${item._id}')" class="px-3.5 py-2 rounded-xl bg-rose-500/90 text-white text-xs sm:text-sm font-bold hover:bg-rose-400 transition-all">Failed / Refund</button>
+                        </div>`
+                      : ""
+                  }
+                </div>
+              </div>
+            </div>
+          </article>`;
+                    },
+                  )
+                  .join("")
+              : `<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No ${withdrawalFilterTab} withdrawals right now.</div>`
+          }
+        `;
+      }
+
+      function setWithdrawalFilterTab(tab) {
+        withdrawalFilterTab = tab;
+        renderWithdrawals();
+      }
+
+      function renderFeedbacks() {
+        const el = document.getElementById("tab-feedbacks");
+        if (!el) return;
+        if (!adminFeedbacks.length) {
+          el.innerHTML = `<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No feedback saved yet.</div>`;
+          return;
+        }
+        const filteredFeedbacks = getFilteredFeedbacks();
+        el.innerHTML = `
+          <div class="glass border border-white/10 rounded-[1.4rem] p-4 sm:p-5 space-y-4">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div class="flex gap-2 overflow-x-auto hide-scrollbar">
+                <button onclick="setFeedbackView('all')" class="mini-tab ${feedbackView === "all" ? "active" : ""} px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-[0.16em]">All Feedbacks</button>
+                <button onclick="setFeedbackView('flagged')" class="mini-tab ${feedbackView === "flagged" ? "active" : ""} px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-[0.16em]">Flagged</button>
+                <button onclick="setFeedbackView('filter')" class="mini-tab ${feedbackView === "filter" ? "active" : ""} px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-[0.16em]">Filter</button>
+              </div>
+              <div class="text-xs text-slate-400">${filteredFeedbacks.length} result${filteredFeedbacks.length === 1 ? "" : "s"}</div>
+            </div>
+            <div class="${feedbackView === "filter" ? "grid" : "hidden"} grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+              <input data-feedback-filter="name" value="${escapeHtml(feedbackFilters.name)}" oninput="updateFeedbackFilter('name', this.value)" placeholder="Filter by name" class="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400" />
+              <input data-feedback-filter="email" value="${escapeHtml(feedbackFilters.email)}" oninput="updateFeedbackFilter('email', this.value)" placeholder="Filter by email" class="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400" />
+              <input data-feedback-filter="location" value="${escapeHtml(feedbackFilters.location)}" oninput="updateFeedbackFilter('location', this.value)" placeholder="Filter by location" class="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400" />
+              <input data-feedback-filter="time" value="${escapeHtml(feedbackFilters.time)}" oninput="updateFeedbackFilter('time', this.value)" placeholder="Filter by time" class="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:border-cyan-400" />
+            </div>
+          </div>
+          ${
+            filteredFeedbacks.length
+              ? filteredFeedbacks
+                  .map(
+                    (item) => `
+          <article id="feedback-row-${item._id}" class="feedback-row rounded-[1.35rem] border border-white/10 bg-white/[0.03] overflow-hidden">
+            <button onclick="toggleFeedbackRow('${item._id}')" class="w-full text-left px-4 py-4 sm:px-5 hover:bg-white/[0.03] transition-all">
+              <div class="flex items-start gap-3">
+                <div class="mt-1 w-2.5 h-2.5 rounded-full ${item.status === "completed" ? "bg-emerald-400" : "bg-cyan-400"} shrink-0"></div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="text-sm sm:text-base font-bold text-white">${item.username || "Anonymous"}</h3>
+                    <span class="px-2.5 py-1 rounded-full bg-white/5 text-slate-300 text-[10px] font-bold uppercase tracking-[0.16em]">${item.rating}/5</span>
+                    <span class="px-2.5 py-1 rounded-full ${item.status === "completed" ? "bg-emerald-500/15 text-emerald-300" : "bg-cyan-500/15 text-cyan-300"} text-[10px] font-bold uppercase tracking-[0.16em]">${item.status || "open"}</span>
+                    <span class="px-2.5 py-1 rounded-full ${item.hidden ? "bg-amber-500/15 text-amber-300" : "bg-white/5 text-slate-400"} text-[10px] font-bold uppercase tracking-[0.16em]">${item.hidden ? "flagged" : "visible"}</span>
+                  </div>
+                  <p class="text-xs sm:text-sm text-slate-400 mt-1">${item.email || "Anonymous"} | ${formatDate(item.createdAt)}</p>
+                </div>
+                <svg class="feedback-chevron mt-1.5 h-4 w-4 text-slate-500 transition-transform" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 011.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"></path></svg>
+              </div>
+            </button>
+            <div class="feedback-detail border-t border-white/6 px-4 py-4 sm:px-5 sm:py-5 bg-slate-950/35">
+              <p class="text-sm sm:text-base text-slate-200 leading-relaxed">${item.feedback}</p>
+              <div class="mt-3 space-y-1 text-xs sm:text-sm text-slate-400">
+                <div>Name: ${item.username || "Anonymous"}</div>
+                <div>Email: ${item.email || "Anonymous"}</div>
+                <div>Location: ${item.location || item.country || item.region || "Not available"}</div>
+                <div>Time: ${formatDate(item.createdAt)}</div>
+              </div>
+              <div class="flex flex-wrap gap-2 mt-4">
+                <button onclick="updateFeedback('${item._id}', { status: '${item.status === "completed" ? "open" : "completed"}' })" class="px-3.5 py-2 rounded-xl bg-cyan-400 text-slate-950 text-xs sm:text-sm font-bold hover:bg-cyan-300 transition-all">${item.status === "completed" ? "Reopen" : "Complete"}</button>
+                <button onclick="updateFeedback('${item._id}', { hidden: ${item.hidden ? "false" : "true"} })" class="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-xs sm:text-sm font-bold hover:bg-white/10 transition-all">${item.hidden ? "Unflag" : "Flag"}</button>
+              </div>
+            </div>
+          </article>
+        `,
+                  )
+                  .join("")
+              : `<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No feedback matches this view.</div>`
+          }
+        `;
+      }
+
+      function renderUsers() {
+        const el = document.getElementById("tab-users");
+        if (!el || !adminAnalytics) return;
+        const users = getFilteredAudienceUsers();
+        const queryStatus = getAudienceQueryStatus();
+        const queryTone = !queryStatus.valid
+          ? "text-rose-200 border-rose-400/20 bg-rose-500/10"
+          : queryStatus.status === "empty"
+            ? "text-amber-200 border-amber-400/20 bg-amber-500/10"
+            : "text-emerald-200 border-emerald-400/20 bg-emerald-500/10";
+        const inputTone = !queryStatus.valid
+          ? "border-rose-400/35 bg-rose-500/10 text-rose-100 focus:border-rose-400"
+          : "border-cyan-500/20 bg-white/5 text-white focus:border-cyan-400";
+        const queryPreview = wrapAdminQueryKeywords(
+          audienceQuery,
+          ["username", "name", "email", "location", "provider", "plan", "any"],
+        );
+        if (!users.length) {
+          el.innerHTML = `
+            <div class="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 mb-4 space-y-2">
+              <input value="${escapeHtml(audienceQuery)}" oninput="updateAudienceQuery(this.value)" placeholder="Try username=amani, not email=gmail.com, or provider=/google/i" class="w-full rounded-xl border px-3 py-2.5 text-xs outline-none ${inputTone}" />
+              <div class="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-2 text-[11px] leading-relaxed">${queryPreview}</div>
+              <div class="rounded-xl border px-3 py-2 text-[11px] ${queryTone}">${escapeHtml(queryStatus.message)}</div>
+            </div>
+            <div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No users found yet.</div>`;
+          return;
+        }
+        el.innerHTML = `
+          <div class="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 mb-4 space-y-2">
+            <input value="${escapeHtml(audienceQuery)}" oninput="updateAudienceQuery(this.value)" placeholder="Try username=amani, not email=gmail.com, or provider=/google/i" class="w-full rounded-xl border px-3 py-2.5 text-xs outline-none ${inputTone}" />
+            <div class="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-2 text-[11px] leading-relaxed">${queryPreview}</div>
+            <div class="rounded-xl border px-3 py-2 text-[11px] ${queryTone}">${escapeHtml(queryStatus.message)}</div>
+          </div>
+        ` + users
+          .map(
+            (user) => `
+          <article id="audience-row-${user._id}" class="audience-row rounded-[1.35rem] border border-white/10 bg-white/[0.03] overflow-hidden">
+            <button onclick="toggleAudienceRow('${user._id}')" class="w-full px-4 py-4 sm:px-5 text-left hover:bg-white/[0.03] transition-all">
+              <div class="flex items-center gap-4">
+                <img src="${user.profilePicture || "https://via.placeholder.com/40/0f172a/e2e8f0?text=U"}" alt="${escapeHtml(user.name || "User")}" class="w-11 h-11 rounded-full object-cover border border-white/10 bg-slate-900 shrink-0" />
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="text-sm sm:text-base font-bold text-white">${user.name || "Unknown User"}</h3>
+                    <span class="px-2.5 py-1 rounded-full ${user.isPro ? "bg-emerald-500/15 text-emerald-300" : "bg-white/5 text-slate-300"} text-[10px] font-bold uppercase tracking-[0.16em]">${user.isPro ? "Pro" : "Free"}</span>
+                  </div>
+                  <p class="text-xs sm:text-sm text-slate-400 mt-1 break-all">${user.email || "No email"}</p>
+                </div>
+                <svg class="audience-chevron h-4 w-4 text-slate-500 transition-transform" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 011.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"></path></svg>
+              </div>
+            </button>
+            <div class="audience-detail border-t border-white/6 px-4 py-4 sm:px-5 sm:py-5 bg-slate-950/35">
+              <div class="space-y-2 text-sm sm:text-[15px]">
+                <div class="text-slate-300"><span class="text-slate-500">Location:</span> ${escapeHtml(user.location || "Not available")}</div>
+                <div class="text-slate-300"><span class="text-slate-500">Provider:</span> ${escapeHtml(user.provider || "Unknown")}</div>
+                <div class="text-slate-300"><span class="text-slate-500">Requested / Joined:</span> ${formatDate(user.createdAt)}</div>
+                <div class="text-slate-300"><span class="text-slate-500">Last Logged In:</span> ${formatDate(user.lastLogin)}</div>
+              </div>
+            </div>
+          </article>
+        `,
+          )
+          .join("");
+      }
+
+      function buildAudienceSearchFields(user = {}) {
+        return {
+          username: String(user.name || "").toLowerCase(),
+          name: String(user.name || "").toLowerCase(),
+          email: String(user.email || "").toLowerCase(),
+          location: String(user.location || "").toLowerCase(),
+          provider: String(user.provider || "").toLowerCase(),
+          plan: user.isPro ? "pro" : "free",
+          any: [
+            user.name,
+            user.email,
+            user.location,
+            user.provider,
+            user.isPro ? "pro" : "free",
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase(),
+        };
+      }
+
+      function parseAudienceMatcher(value = "") {
+        const raw = String(value || "").trim();
+        if (!raw) return null;
+        if (raw.startsWith("/") && raw.lastIndexOf("/") > 0) {
+          const lastSlash = raw.lastIndexOf("/");
+          const pattern = raw.slice(1, lastSlash);
+          const flags = raw.slice(lastSlash + 1) || "i";
+          try {
+            return new RegExp(pattern, flags);
+          } catch {
+            return "__invalid_regex__";
+          }
+        }
+        return raw.toLowerCase();
+      }
+
+      function matchesAudienceClause(user, clause = "") {
+        const trimmed = String(clause || "").trim();
+        if (!trimmed) return true;
+        const isNegated = /^not\s+/i.test(trimmed);
+        const baseClause = trimmed.replace(/^not\s+/i, "").trim();
+        const fields = buildAudienceSearchFields(user);
+        const match = baseClause.match(/^(username|name|email|location|provider|plan|any)\s*(=|:|~)\s*(.+)$/i);
+        if (!match) {
+          const result = fields.any.includes(baseClause.toLowerCase());
+          return isNegated ? !result : result;
+        }
+        const field = match[1].toLowerCase();
+        const matcher = parseAudienceMatcher(match[3]);
+        if (matcher === "__invalid_regex__") return false;
+        const target = String(fields[field] || "");
+        const result = matcher instanceof RegExp ? matcher.test(target) : target.includes(matcher);
+        return isNegated ? !result : result;
+      }
+
+      function getFilteredAudienceUsers() {
+        const users = Array.isArray(adminAnalytics?.recentUsers) ? adminAnalytics.recentUsers : [];
+        const raw = String(audienceQuery || "").trim();
+        if (!raw) return users;
+        const orGroups = raw
+          .split(/\s+\bor\b\s+/i)
+          .map((group) => group.split(/\s+\band\b\s+/i).map((item) => item.trim()).filter(Boolean))
+          .filter((group) => group.length);
+        return users.filter((user) =>
+          orGroups.some((group) => group.every((clause) => matchesAudienceClause(user, clause))),
+        );
+      }
+
+      function getAudienceQueryStatus() {
+        const raw = String(audienceQuery || "").trim();
+        if (!raw) {
+          return {
+            valid: true,
+            status: "empty",
+            message:
+              "Use username=, email=, location=, provider=, plan=, plus and/or/not. Regex works too, for example provider=/google/i.",
+          };
+        }
+        if (
+          raw
+            .split(/\s+\bor\b\s+|\s+\band\b\s+/i)
+            .map((item) => item.trim())
+            .filter(Boolean)
+            .some((clause) => /^not\s*$/i.test(clause))
+        ) {
+          return {
+            valid: false,
+            status: "invalid",
+            message: 'Finish the "not" clause with a field or value.',
+          };
+        }
+        const invalidRegex = raw
+          .split(/\s+\bor\b\s+|\s+\band\b\s+/i)
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .find((clause) => {
+            const baseClause = String(clause || "").replace(/^not\s+/i, "").trim();
+            const match = baseClause.match(/^(username|name|email|location|provider|plan|any)\s*(=|:|~)\s*(.+)$/i);
+            return match && parseAudienceMatcher(match[3]) === "__invalid_regex__";
+          });
+        if (invalidRegex) {
+          return {
+            valid: false,
+            status: "invalid",
+            message: `Regex looks incomplete in "${invalidRegex}". Close the pattern like /google/i.`,
+          };
+        }
+        const invalidField = raw
+          .split(/\s+\bor\b\s+|\s+\band\b\s+/i)
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .find((clause) => {
+            const baseClause = String(clause || "").replace(/^not\s+/i, "").trim();
+            return /[=:~]/.test(baseClause) && !/^(username|name|email|location|provider|plan|any)\s*(=|:|~)\s*(.+)$/i.test(baseClause);
+          });
+        if (invalidField) {
+          return {
+            valid: false,
+            status: "invalid",
+            message: `Unknown audience field in "${invalidField}". Try username=, email=, location=, provider=, or plan=.`,
+          };
+        }
+        const users = getFilteredAudienceUsers();
+        return {
+          valid: true,
+          status: "valid",
+          message: users.length
+            ? `${users.length} audience match${users.length === 1 ? "" : "es"} found.`
+            : "Query syntax looks good, but no audience matches were found yet.",
+        };
+      }
+
+      function updateAudienceQuery(value) {
+        audienceQuery = String(value || "");
+        renderUsers();
+      }
+
+      function updateRewardAmount(userId, value) {
+        payoutAmounts[userId] = String(value || "");
+        renderPayouts();
+      }
+
+      async function rewardUser(userId) {
+        const amount = Number(payoutAmounts[userId] || 0);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          showAdminToast("Enter a valid reward amount.", "error");
+          return;
+        }
+        const res = await fetch(`/api/admin/users/${userId}/reward`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getAdminHeaders() },
+          body: JSON.stringify({ amount }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+          showAdminToast(data.message || "Could not reward this user.", "error");
+          return;
+        }
+        payoutAmounts[userId] = "";
+        await loadAdminData();
+        showAdminToast("User rewarded successfully.", "success");
+      }
+
+      function renderPayouts() {
+        const el = document.getElementById("tab-payouts");
+        if (!el) return;
+        if (!adminPayoutUsers.length) {
+          el.innerHTML = `<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No payout candidates yet.</div>`;
+          return;
+        }
+        el.innerHTML = adminPayoutUsers
+          .map((user, index) => {
+            const rewardValue = payoutAmounts[user._id] || "";
+            return `
+              <article class="rounded-[1.35rem] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+                <div class="flex items-start gap-4">
+                  <img src="${user.profilePicture || "https://via.placeholder.com/40/0f172a/e2e8f0?text=U"}" alt="${escapeHtml(user.name || "User")}" class="w-11 h-11 rounded-full object-cover border border-white/10 bg-slate-900 shrink-0" />
+                  <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="px-2.5 py-1 rounded-full bg-violet-500/15 text-violet-200 text-[10px] font-bold uppercase tracking-[0.16em]">Rank ${index + 1}</span>
+                      <h3 class="text-sm sm:text-base font-bold text-white">${escapeHtml(user.name || "Unknown User")}</h3>
+                      <span class="px-2.5 py-1 rounded-full bg-cyan-500/15 text-cyan-300 text-[10px] font-bold uppercase tracking-[0.16em]">Weight ${Number(user.activityWeight || 0).toFixed(0)}</span>
+                      <span class="px-2.5 py-1 rounded-full bg-white/5 text-slate-300 text-[10px] font-bold uppercase tracking-[0.16em]">Current Balance $${Number(user.accountBalance || 0).toFixed(2)}</span>
+                    </div>
+                    <div class="mt-2 text-xs sm:text-sm text-slate-400 break-all">${escapeHtml(user.email || "")}</div>
+                    <div class="mt-3 text-xs text-slate-400">
+                      Logins ${Number(user.activityStats?.logins || 0)} · Tool opens ${Number(user.activityStats?.toolOpens || 0)} · Projects ${Number(user.activityStats?.projects || 0)} · Publishes ${Number(user.activityStats?.publishes || 0)}
+                    </div>
+                    <div class="mt-2 text-[11px] text-slate-500">
+                      Last weighted ${user.lastActivityWeightCalculatedAt ? escapeHtml(formatDate(user.lastActivityWeightCalculatedAt)) : "Not calculated yet"}
+                    </div>
+                    <div class="mt-4 flex flex-col sm:flex-row gap-3">
+                      <input value="${escapeHtml(rewardValue)}" oninput="updateRewardAmount('${user._id}', this.value)" type="number" min="0.01" step="0.01" placeholder="Reward amount" class="w-full sm:max-w-[180px] rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-400" />
+                      ${rewardValue && Number(rewardValue) > 0 ? `<button onclick="rewardUser('${user._id}')" class="rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-black text-slate-950 hover:bg-emerald-300 transition-all">Reward</button>` : ""}
+                    </div>
+                  </div>
+                </div>
+              </article>`;
+          })
+          .join("");
+      }
+
+      function updateAdminNotifyMode(value = "all") {
+        adminNotifyMode = String(value || "all");
+        renderNotifyTab();
+      }
+
+      function renderNotifyTab() {
+        const el = document.getElementById("tab-notify");
+        if (!el) return;
+        el.innerHTML = `
+          <div class="rounded-[1.8rem] border border-white/10 bg-white/[0.03] p-5">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div class="text-[11px] font-black uppercase tracking-[0.22em] text-cyan-400">Notify Users</div>
+                <h3 class="mt-2 text-2xl font-semibold text-white">Send a notification</h3>
+                <p class="mt-2 text-sm text-slate-400">Choose a single user or broadcast to everyone.</p>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="updateAdminNotifyMode('individual')" class="mini-tab ${adminNotifyMode === "individual" ? "active" : ""} px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-[0.16em]">Individual</button>
+                <button onclick="updateAdminNotifyMode('all')" class="mini-tab ${adminNotifyMode === "all" ? "active" : ""} px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-[0.16em]">All</button>
+              </div>
+            </div>
+            <div class="mt-5 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+              <div class="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
+                ${adminNotifyMode === "individual" ? `<label class="block">
+                  <span class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">User Email</span>
+                  <input value="${escapeHtml(adminNotifyEmail)}" oninput="adminNotifyEmail=this.value" class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-cyan-400" placeholder="user@example.com" />
+                </label>` : `<div class="rounded-2xl border border-emerald-400/15 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-100">This message will be delivered to every MediaLab user.</div>`}
+                <label class="block mt-4">
+                  <span class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Message</span>
+                  <textarea rows="6" oninput="adminNotifyMessage=this.value" class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none resize-none focus:border-cyan-400" placeholder="Write a clear update for users...">${escapeHtml(adminNotifyMessage)}</textarea>
+                </label>
+                <div class="mt-4 flex gap-3">
+                  <button onclick="sendAdminNotification()" class="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-cyan-300 transition-all">Send</button>
+                  <button onclick="clearAdminNotificationForm()" class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-slate-200 hover:bg-white/10 transition-all">Clear</button>
+                </div>
+              </div>
+              <div class="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
+                <div class="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-400">Recent Notifications</div>
+                <div class="mt-4 space-y-3 max-h-[28rem] overflow-y-auto pr-1">
+                  ${(adminNotifications.length ? adminNotifications : []).map((item) => `
+                    <div class="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                      <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-semibold text-white">${escapeHtml(item.title || "Notification")}</p>
+                        <span class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">${escapeHtml(formatDate(item.createdAt))}</span>
+                      </div>
+                      <p class="mt-2 text-sm leading-6 text-slate-300">${escapeHtml(item.message || "")}</p>
+                    </div>`).join("") || `<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No notifications sent yet.</div>`}
+                </div>
+              </div>
+            </div>
+          </div>`;
+      }
+
+      async function sendAdminNotification() {
+        const message = String(adminNotifyMessage || "").trim();
+        const email = String(adminNotifyEmail || "").trim();
+        if (!message) {
+          showAdminToast("Enter a notification message first.", "error");
+          return;
+        }
+        if (adminNotifyMode === "individual" && !email) {
+          showAdminToast("Enter the target user email first.", "error");
+          return;
+        }
+        const res = await fetch("/api/admin/notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getAdminHeaders() },
+          body: JSON.stringify({ mode: adminNotifyMode, email, message }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          showAdminToast(data.message || "Could not send this notification.", "error");
+          return;
+        }
+        adminNotifyMessage = "";
+        if (adminNotifyMode === "individual") adminNotifyEmail = "";
+        await loadAdminData();
+        showAdminToast(data.message || "Notification sent.", "success");
+      }
+
+      function clearAdminNotificationForm() {
+        adminNotifyEmail = "";
+        adminNotifyMessage = "";
+        renderNotifyTab();
+      }
+
+      function setAdminMarketplaceTab(tab = "pending") {
+        adminMarketplaceTab = tab;
+        renderAdminMarketplace();
+      }
+
+      function renderAdminMarketplace() {
+        const el = document.getElementById("tab-marketplace");
+        if (!el) return;
+        const pendingListings = adminMarketplace.pendingListings || [];
+        const approvedListings = adminMarketplace.approvedListings || [];
+        const pendingPurchases = adminMarketplace.pendingPurchases || [];
+        const completedPurchases = adminMarketplace.completedPurchases || [];
+        el.innerHTML = `
+          <div class="rounded-[1.8rem] border border-white/10 bg-white/[0.03] p-5">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div class="text-[11px] font-black uppercase tracking-[0.22em] text-cyan-400">Marketplace Review</div>
+                <h3 class="mt-2 text-2xl font-semibold text-white">Pending and approved listings</h3>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="setAdminMarketplaceTab('pending')" class="mini-tab ${adminMarketplaceTab === "pending" ? "active" : ""} px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-[0.16em]">Pending (${pendingListings.length})</button>
+                <button onclick="setAdminMarketplaceTab('approved')" class="mini-tab ${adminMarketplaceTab === "approved" ? "active" : ""} px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-[0.16em]">Approved (${approvedListings.length})</button>
+                <button onclick="setAdminMarketplaceTab('purchases')" class="mini-tab ${adminMarketplaceTab === "purchases" ? "active" : ""} px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-[0.16em]">Purchase Requests (${pendingPurchases.length})</button>
+                <button onclick="setAdminMarketplaceTab('purchased')" class="mini-tab ${adminMarketplaceTab === "purchased" ? "active" : ""} px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-[0.16em]">Purchased (${completedPurchases.length})</button>
+              </div>
+            </div>
+            <div class="mt-5 space-y-4">
+              ${adminMarketplaceTab === "purchases"
+                ? pendingPurchases.length
+                  ? pendingPurchases.map((item) => `
+                    <article class="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
+                      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0">
+                          <h4 class="text-lg font-semibold text-white">${escapeHtml(item.title || "Untitled Purchase")}</h4>
+                          <p class="mt-2 text-sm text-slate-400">${escapeHtml(item.buyerName || "Unknown Buyer")} · ${escapeHtml(item.buyerEmail || "")}</p>
+                          <p class="mt-2 text-[11px] font-semibold text-slate-500">${item.price > 0 ? `$${Number(item.price).toFixed(2)}` : "Free"} · ${escapeHtml(formatDate(item.createdAt))}</p>
+                        </div>
+                        <div class="flex gap-2">
+                          <button onclick="updateMarketplacePurchase('${item.itemId}', '${item.purchaseId}', 'approved')" class="rounded-2xl bg-emerald-400 px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-slate-950 hover:bg-emerald-300">Approve</button>
+                          <button onclick="updateMarketplacePurchase('${item.itemId}', '${item.purchaseId}', 'failed')" class="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-rose-100 hover:bg-rose-500/20">Disapprove</button>
+                        </div>
+                      </div>
+                    </article>`).join("")
+                  : `<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No pending purchase requests right now.</div>`
+                : adminMarketplaceTab === "purchased"
+                  ? completedPurchases.length
+                    ? completedPurchases.map((item) => `
+                      <article class="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
+                        <div class="flex flex-col gap-3">
+                          <div class="flex flex-wrap items-center gap-3">
+                            <h4 class="text-lg font-semibold text-white">${escapeHtml(item.title || "Purchased Project")}</h4>
+                            <span class="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${String(item.status || "").toLowerCase() === "approved" ? "text-emerald-300" : "text-rose-300"}">${escapeHtml(item.status || "")}</span>
+                          </div>
+                          <p class="text-sm text-slate-400">${escapeHtml(item.buyerName || "Unknown Buyer")} · ${escapeHtml(item.buyerEmail || "")}</p>
+                          <p class="text-sm ${String(item.status || "").toLowerCase() === "approved" ? "text-emerald-200" : "text-rose-200"}">${escapeHtml(item.message || "")}</p>
+                        </div>
+                      </article>`).join("")
+                    : `<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No completed purchases yet.</div>`
+                  : (adminMarketplaceTab === "approved" ? approvedListings : pendingListings).length
+                ? (adminMarketplaceTab === "approved" ? approvedListings : pendingListings)
+                    .map(
+                      (item) => `
+                  <article class="rounded-[1.5rem] border border-white/10 bg-slate-950/70 p-4">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-3">
+                          <h4 class="text-lg font-semibold text-white">${escapeHtml(item.title || "Untitled Listing")}</h4>
+                          <span class="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">${escapeHtml(item.status || "pending")}</span>
+                          <span class="rounded-full border ${String(item.listingKind || "sale").toLowerCase() === "template" ? "border-fuchsia-400/20 bg-fuchsia-500/10 text-fuchsia-200" : "border-cyan-400/20 bg-cyan-500/10 text-cyan-200"} px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em]">${String(item.listingKind || "sale").toLowerCase() === "template" ? "template" : "sale"}</span>
+                        </div>
+                        <p class="mt-2 text-sm leading-6 text-slate-400">${escapeHtml(item.description || item.purpose || "")}</p>
+                        <div class="mt-3 flex flex-wrap gap-4 text-[11px] font-semibold text-slate-500">
+                          <span>${escapeHtml(item.authorName || "Unknown Creator")}</span>
+                          <span>${escapeHtml(item.category || "General")}</span>
+                          <span>${item.price > 0 ? `$${Number(item.price).toFixed(2)}` : "Free"}</span>
+                        </div>
+                      </div>
+                      <button onclick="openAdminMarketplaceDetail('${item._id}')" class="rounded-2xl bg-cyan-400 px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-slate-950 hover:bg-cyan-300">Review</button>
+                    </div>
+                  </article>`,
+                    )
+                    .join("")
+                : `<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No ${adminMarketplaceTab} marketplace listings right now.</div>`}
+            </div>
+          </div>`;
+      }
+
+      function closeAdminMarketplaceModal() {
+        currentAdminMarketplaceItem = null;
+        document.getElementById("admin-marketplace-modal")?.classList.add("hidden");
+        document.getElementById("admin-marketplace-modal")?.classList.remove("flex");
+      }
+
+      async function openAdminMarketplaceDetail(id) {
+        const modal = document.getElementById("admin-marketplace-modal");
+        const body = document.getElementById("admin-marketplace-modal-body");
+        document.getElementById("admin-marketplace-modal-title").textContent = "Loading listing...";
+        document.getElementById("admin-marketplace-modal-subtitle").textContent = "Preparing preview and review controls.";
+        if (body) body.innerHTML = `<div class="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-6 text-slate-300">Loading...</div>`;
+        modal?.classList.remove("hidden");
+        modal?.classList.add("flex");
+        try {
+          const res = await fetch(`/api/admin/marketplace/${id}`, { headers: getAdminHeaders() });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.message || "Could not load this listing.");
+          currentAdminMarketplaceItem = data.item;
+          document.getElementById("admin-marketplace-modal-title").textContent = data.item.title || "Marketplace Listing";
+          document.getElementById("admin-marketplace-modal-subtitle").textContent = `${data.item.authorName || "Unknown Creator"} · ${data.item.price > 0 ? `$${Number(data.item.price).toFixed(2)}` : "Free"}`;
+          if (body) {
+            body.innerHTML = `
+              <div class="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
+                <div class="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="text-[11px] font-black uppercase tracking-[0.22em] text-cyan-400">Project Preview</div>
+                    <button onclick="window.open('/admin/marketplace', '_blank')" class="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-200">Open Desk</button>
+                  </div>
+                  <div class="mt-4 overflow-hidden rounded-[1.25rem] border border-white/10 bg-white">
+                    <iframe srcdoc="${escapeHtml(data.item.sourceHtml || "<!DOCTYPE html><html><body><p>No preview available.</p></body></html>")}" class="block h-[420px] w-full bg-white"></iframe>
+                  </div>
+                </div>
+                <div class="space-y-4">
+                  <div class="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4">
+                    <div class="text-[11px] font-black uppercase tracking-[0.22em] text-cyan-400">Listing Details</div>
+                    <p class="mt-3 text-sm leading-6 text-slate-300">${escapeHtml(data.item.description || data.item.purpose || "")}</p>
+                    ${data.item.disapprovalReason ? `<p class="mt-3 text-sm text-rose-300"><span class="font-bold uppercase tracking-[0.12em]">Reason:</span> ${escapeHtml(data.item.disapprovalReason)}</p>` : ""}
+                    <div class="mt-4 flex flex-wrap gap-3 text-[11px] font-semibold text-slate-400">
+                      <span>Category: ${escapeHtml(data.item.category || "General")}</span>
+                      <span>Rating: ${Number(data.item.ratingPercent || 0).toFixed(0)}%</span>
+                      <span>Status: ${escapeHtml(data.item.status || "pending")}</span>
+                      <span>Type: ${escapeHtml(String(data.item.listingKind || "sale").toLowerCase() === "template" ? "Template" : "Sale")}</span>
+                    </div>
+                  </div>
+                  <div class="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4">
+                    <label class="block text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">${String(data.item.status || "").toLowerCase() === "approved" ? "Suspension reason" : "Disapproval message"}</label>
+                    <textarea id="admin-marketplace-disapproval" rows="4" class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none resize-none focus:border-rose-400" placeholder="${String(data.item.status || "").toLowerCase() === "approved" ? "Explain why this approved sale is being suspended..." : "Explain what should be fixed before approval..."}">${escapeHtml(data.item.disapprovalReason || "")}</textarea>
+                    <div class="mt-4 flex flex-wrap gap-3">
+                      ${String(data.item.status || "").toLowerCase() === "approved"
+                        ? `<button onclick="updateAdminMarketplaceListing('${data.item._id}', 'disapproved')" class="rounded-2xl bg-rose-500 px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-white hover:bg-rose-400">Suspend</button>`
+                        : `<button onclick="updateAdminMarketplaceListing('${data.item._id}', 'approved')" class="rounded-2xl bg-emerald-400 px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-slate-950 hover:bg-emerald-300">Approve</button>
+                      <button onclick="updateAdminMarketplaceListing('${data.item._id}', 'disapproved')" class="rounded-2xl bg-rose-500 px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-white hover:bg-rose-400">Disapprove</button>`}
+                    </div>
+                  </div>
+                </div>
+              </div>`;
+          }
+        } catch (error) {
+          if (body) {
+            body.innerHTML = `<div class="rounded-[1.5rem] border border-rose-400/20 bg-rose-500/10 p-6 text-rose-100">${escapeHtml(error.message || "Could not load this listing.")}</div>`;
+          }
+        }
+      }
+
+      async function updateAdminMarketplaceListing(id, status) {
+        const disapprovalReason = String(
+          document.getElementById("admin-marketplace-disapproval")?.value || "",
+        ).trim();
+        try {
+          const res = await fetch(`/api/admin/marketplace/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", ...getAdminHeaders() },
+            body: JSON.stringify({ status, disapprovalReason }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || "Could not update this listing.");
+          }
+          showAdminToast(data.message || "Marketplace listing updated.", "success");
+          closeAdminMarketplaceModal();
+          await loadAdminData();
+        } catch (error) {
+          showAdminToast(error.message || "Could not update this listing.", "error");
+        }
+      }
+
+      function renderLogs() {
+        const el = document.getElementById("tab-logs");
+        if (!el) return;
+        const focusState = captureLogFilterFocus();
+        if (!adminUsageLogs.length) {
+          el.innerHTML = `<div class="rounded-[1.5rem] border border-dashed border-white/10 p-8 text-center text-slate-400">No usage logs saved yet.</div>`;
+          return;
+        }
+        const activities = [...getFilteredLogs()].reverse().slice(-140);
+        const queryStatus = analyzeSmartLogQuery(logFilters.query);
+        const queryTone =
+          queryStatus.status === "invalid"
+            ? "border-rose-400/20 bg-rose-500/10 text-rose-200"
+            : queryStatus.status === "partial" || queryStatus.status === "empty"
+              ? "border-amber-400/20 bg-amber-500/10 text-amber-200"
+              : "border-emerald-400/20 bg-emerald-500/10 text-emerald-200";
+        const inputTone =
+          queryStatus.status === "invalid"
+            ? "border-rose-400/35 bg-rose-500/10 text-rose-100 focus:border-rose-400"
+            : "border-cyan-500/20 bg-white/5 text-white focus:border-cyan-400";
+        const queryPreview = wrapAdminQueryKeywords(logFilters.query, SMART_LOG_FIELDS);
+        el.innerHTML = `
+          <div id="activity-terminal" class="terminal-shell terminal-shell-window rounded-[1.6rem] border border-cyan-500/12 shadow-[0_25px_80px_rgba(2,6,23,0.35)] overflow-hidden">
+            <button onclick="toggleTerminalPane('activity-terminal')" class="w-full flex items-center justify-between gap-3 px-5 py-4 border-b border-white/8">
+              <div>
+                <div class="text-[11px] uppercase tracking-[0.22em] text-cyan-300 font-bold">Live Logs</div>
+                <div class="text-sm text-slate-400 mt-2">Unified terminal stream</div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="px-3 py-1 rounded-full bg-cyan-500/15 text-cyan-300 text-[10px] font-bold uppercase tracking-[0.18em]">${activities.length} lines</span>
+                <button onclick="event.stopPropagation(); openClearLogsModal()" class="rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-rose-200 hover:bg-rose-500/15 transition-all">Clear Log</button>
+                <svg class="terminal-chevron h-4 w-4 text-slate-500 transition-transform" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 011.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"></path></svg>
+              </div>
+            </button>
+            <div class="border-b border-white/8 px-4 py-3">
+              <div class="space-y-2">
+                <input data-log-filter="query" value="${escapeHtml(logFilters.query)}" oninput="updateLogFilter(this.value)" placeholder="Try: username=charles and not activity=login or email=gmail.com and tool=builder" class="w-full rounded-xl border px-3 py-2.5 text-xs outline-none ${inputTone}" />
+                <div class="rounded-xl border border-white/10 bg-slate-950/45 px-3 py-2 text-[11px] leading-relaxed">${queryPreview}</div>
+                <div class="text-[11px] text-slate-400 leading-relaxed">
+                  Smart query:
+                  <span class="text-slate-300">username=</span>,
+                  <span class="text-slate-300">email=</span>,
+                  <span class="text-slate-300">activity=</span>,
+                  <span class="text-slate-300">tool=</span>,
+                  <span class="text-slate-300">device=</span>,
+                  <span class="text-slate-300">date=</span>
+                  with
+                  <span class="text-cyan-300 font-semibold">and</span>
+                  /
+                  <span class="text-cyan-300 font-semibold">or</span>
+                  /
+                  <span class="text-cyan-300 font-semibold">not</span>.
+                  Try:
+                  <span class="text-cyan-300 font-semibold">Today 5:24:20 PM TO 4/4/2026, 5:25:20 PM</span>
+                </div>
+                <div class="rounded-xl border px-3 py-2 text-[11px] leading-relaxed ${queryTone}">
+                  ${escapeHtml(queryStatus.message)}
+                </div>
+              </div>
+            </div>
+            <div class="terminal-body overflow-y-auto px-4 py-4" style="max-height:min(62vh, calc(100vh - 320px));">
+              ${activities
+                .map((item, index) => {
+                  const actionText = String(item.action || "").toLowerCase();
+                  const summaryText = String(item.summary || "").toLowerCase();
+                  const isErrorLog = item.kind === "error";
+                  const isExitLog =
+                    actionText.includes("exit") || summaryText.includes("exit");
+                  const isLoginLog =
+                    actionText.includes("login") ||
+                    summaryText.includes("login");
+                  const isProLog =
+                    actionText.includes("upgrade") ||
+                    actionText.includes("pro") ||
+                    summaryText.includes("upgrade") ||
+                    summaryText.includes("pro");
+                  const lineTone = isErrorLog || isExitLog
+                    ? "text-rose-300"
+                    : isProLog
+                      ? "text-amber-300"
+                      : isLoginLog
+                        ? "text-emerald-300"
+                        : !item.isAnonymous
+                          ? "text-emerald-200"
+                          : "text-slate-200";
+                  const identityTone = isErrorLog || isExitLog
+                    ? "text-rose-400/90"
+                    : isProLog
+                      ? "text-amber-300/90"
+                      : isLoginLog
+                        ? "text-emerald-400/90"
+                        : "text-cyan-200/85";
+                  return `
+                <div class="terminal-line px-1 py-1.5">
+                  <div class="text-right text-[11px] font-black text-slate-600 pt-0.5">${String(index + 1).padStart(4, "0")}</div>
+                  <div class="text-sm leading-6 break-words ${lineTone}">
+                    <span class="${identityTone}">[${escapeHtml(formatLogIdentity(item))}]</span>
+                    <span class="${lineTone}">${escapeHtml(formatLogSummary(item))}</span>
+                    <span class="text-slate-500">| ${escapeHtml(item.source || "web")}</span>
+                    <span class="text-slate-600">-- ${escapeHtml(formatDate(item.createdAt))}</span>
+                  </div>
+                </div>
+              `;
+                })
+                .join("")}
+            </div>
+          </div>
+        `;
+        requestAnimationFrame(() => {
+          document.querySelectorAll(".terminal-body").forEach((node) => {
+            node.scrollTop = node.scrollHeight;
+          });
+        });
+        restoreLogFilterFocus(focusState);
+      }
+
+      function upsertLiveLog(log) {
+        adminUsageLogs = [
+          log,
+          ...adminUsageLogs.filter((item) => item._id !== log._id),
+        ].slice(0, 1000);
+        bumpAdminUnread("logs");
+        if (adminAnalytics) {
+          adminAnalytics.totalUsageLogs = Math.max(
+            adminAnalytics.totalUsageLogs || 0,
+            adminUsageLogs.length,
+          );
+          if (log.kind === "error") {
+            adminAnalytics.recentErrors =
+              (adminAnalytics.recentErrors || 0) + 1;
+          }
+        }
+        renderAnalyticsDetails();
+        renderLogs();
+      }
+
+      function upsertDownload(download) {
+        adminDownloads = [
+          download,
+          ...adminDownloads.filter((item) => item._id !== download._id),
+        ].slice(0, 300);
+        bumpAdminUnread("downloads");
+        if (adminAnalytics) {
+          adminAnalytics.totalDownloads = Math.max(
+            adminAnalytics.totalDownloads || 0,
+            adminDownloads.length,
+          );
+          if (adminAnalytics.last30Days) {
+            adminAnalytics.last30Days.downloads =
+              (adminAnalytics.last30Days.downloads || 0) + 1;
+          }
+        }
+        renderAnalyticsDetails();
+        renderDownloads();
+      }
+
+      function upsertWithdrawal(request) {
+        adminWithdrawals = [
+          request,
+          ...adminWithdrawals.filter((item) => item._id !== request._id),
+        ].slice(0, 300);
+        bumpAdminUnread("withdrawals");
+        renderWithdrawals();
+      }
+
+      function upsertPremiumRequest(request) {
+        adminPremiumRequests = [
+          request,
+          ...adminPremiumRequests.filter((item) => item._id !== request._id),
+        ].slice(0, 300);
+        bumpAdminUnread("premium");
+        loadAdminData();
+      }
+
+      function connectAdminLiveFeed() {
+        if (adminSocket || localStorage.getItem(ADMIN_ACCESS_KEY) !== "granted")
+          return;
+        adminSocket = io();
+        adminSocket.on("connect", () => setLiveStatus(true));
+        adminSocket.on("disconnect", () => setLiveStatus(false));
+        adminSocket.on("admin:usage-log", (payload) => {
+          upsertLiveLog(payload);
+        });
+        adminSocket.on("admin:server-error", (payload) => {
+          upsertLiveLog({ ...payload, kind: "error" });
+        });
+        adminSocket.on("admin:usage-log-cleared", () => {
+          adminUsageLogs = [];
+          renderLogs();
+        });
+        adminSocket.on("admin:premium-request-updated", (payload) => {
+          upsertPremiumRequest(payload);
+        });
+        adminSocket.on("admin:download", (payload) => {
+          upsertDownload(payload);
+        });
+        adminSocket.on("admin:withdrawal-updated", (payload) => {
+          upsertWithdrawal(payload);
+        });
+      }
+
+      async function updateFeedback(id, payload) {
+        const res = await fetch(`/api/admin/feedbacks/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", ...getAdminHeaders() },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!data.success) {
+          showAdminToast(data.message || "Could not update feedback.", "error");
+          return;
+        }
+        await loadAdminData();
+      }
+
+      async function updatePremiumRequest(id, status) {
+        const res = await fetch(`/api/admin/upgrade-requests/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", ...getAdminHeaders() },
+          body: JSON.stringify({ status }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+          showAdminToast(data.message || "Could not update premium request.", "error");
+          return;
+        }
+        await loadAdminData();
+      }
+
+      async function updateWithdrawalStatus(id, status) {
+        const res = await fetch(`/api/admin/withdrawals/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", ...getAdminHeaders() },
+          body: JSON.stringify({ status }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+          showAdminToast(data.message || "Could not update withdrawal.", "error");
+          return;
+        }
+        await loadAdminData();
+      }
+
+      function openWithdrawalFailurePrompt(id) {
+        pendingWithdrawalFailureId = String(id || "");
+        document.getElementById("withdrawal-failure-reason").value = "";
+        document.getElementById("withdrawal-failure-error")?.classList.add("hidden");
+        document.getElementById("withdrawal-failure-modal")?.classList.remove("hidden");
+        document.getElementById("withdrawal-failure-modal")?.classList.add("flex");
+      }
+
+      function closeWithdrawalFailurePrompt() {
+        pendingWithdrawalFailureId = "";
+        document.getElementById("withdrawal-failure-modal")?.classList.add("hidden");
+        document.getElementById("withdrawal-failure-modal")?.classList.remove("flex");
+      }
+
+      async function submitWithdrawalFailure() {
+        const id = String(pendingWithdrawalFailureId || "").trim();
+        const reason = String(
+          document.getElementById("withdrawal-failure-reason")?.value || "",
+        ).trim();
+        const errorNode = document.getElementById("withdrawal-failure-error");
+        const submitBtn = document.getElementById("withdrawal-failure-submit-btn");
+        if (!id) {
+          showAdminToast("No withdrawal request is selected.", "error");
+          return;
+        }
+        if (!reason) {
+          if (errorNode) {
+            errorNode.textContent = "Add a short reason so the user understands the denial.";
+            errorNode.classList.remove("hidden");
+          }
+          return;
+        }
+        if (errorNode) errorNode.classList.add("hidden");
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Saving...";
+        }
+        try {
+          const res = await fetch(`/api/admin/withdrawals/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", ...getAdminHeaders() },
+            body: JSON.stringify({ status: "failed", deniedReason: reason }),
+          });
+          const data = await res.json();
+          if (!data.success) {
+            throw new Error(data.message || "Could not deny this withdrawal.");
+          }
+          closeWithdrawalFailurePrompt();
+          await loadAdminData();
+          showAdminToast("Withdrawal marked as failed with a saved reason.", "success");
+        } catch (error) {
+          if (errorNode) {
+            errorNode.textContent = error.message || "Could not deny this withdrawal.";
+            errorNode.classList.remove("hidden");
+          }
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Deny Request";
+          }
+        }
+      }
+
+      async function loadAdminData() {
+        if (localStorage.getItem(ADMIN_ACCESS_KEY) !== "granted") return;
+        try {
+          const previousFeedbackIds = new Set(adminFeedbacks.map((item) => item._id));
+          const previousUserIds = new Set(
+            (adminAnalytics?.recentUsers || []).map((item) => item._id),
+          );
+          const previousPayoutIds = new Set(adminPayoutUsers.map((item) => item._id));
+          const headers = getAdminHeaders();
+          const previousMarketplacePendingIds = new Set(
+            (adminMarketplace?.pendingListings || []).map((item) => item._id),
+          );
+          const previousMarketplacePurchaseIds = new Set(
+            (adminMarketplace?.pendingPurchases || []).map((item) => item.purchaseId),
+          );
+          const [feedbackRes, analyticsRes, usageLogRes, premiumRes, downloadsRes, withdrawalsRes, payoutUsersRes, marketplaceRes, notificationsRes] = await Promise.all([
+            fetch("/api/admin/feedbacks", { headers }),
+            fetch("/api/admin/analytics", { headers }),
+            fetch("/api/admin/usage-logs", { headers }),
+            fetch("/api/admin/upgrade-requests", { headers }),
+            fetch("/api/admin/downloads", { headers }),
+            fetch("/api/admin/withdrawals", { headers }),
+            fetch("/api/admin/payout-users", { headers }),
+            fetch("/api/admin/marketplace", { headers }),
+            fetch("/api/admin/notifications", { headers }),
+          ]);
+          const feedbackData = await feedbackRes.json();
+          const analyticsData = await analyticsRes.json();
+          const usageLogData = await usageLogRes.json();
+          const premiumData = await premiumRes.json();
+          const downloadsData = await downloadsRes.json();
+          const withdrawalsData = await withdrawalsRes.json();
+          const payoutUsersData = await payoutUsersRes.json();
+          const marketplaceData = await marketplaceRes.json();
+          const notificationsData = await notificationsRes.json();
+          adminFeedbacks = feedbackData.feedbacks || [];
+          adminAnalytics = analyticsData.analytics || {};
+          adminUsageLogs = usageLogData.logs || [];
+          adminPremiumRequests = premiumData.requests || [];
+          adminDownloads = downloadsData.downloads || [];
+          adminWithdrawals = withdrawalsData.withdrawals || [];
+          adminPayoutUsers = payoutUsersData.users || [];
+          adminNotifications = notificationsData.notifications || [];
+          adminMarketplace = marketplaceData.success
+            ? {
+                pendingListings: marketplaceData.pendingListings || [],
+                approvedListings: marketplaceData.approvedListings || [],
+                pendingPurchases: marketplaceData.pendingPurchases || [],
+                completedPurchases: marketplaceData.completedPurchases || [],
+              }
+            : { pendingListings: [], approvedListings: [], pendingPurchases: [], completedPurchases: [] };
+          const nextFeedbacks = adminFeedbacks.filter((item) => !previousFeedbackIds.has(item._id));
+          const nextUsers = (adminAnalytics?.recentUsers || []).filter(
+            (item) => !previousUserIds.has(item._id),
+          );
+          const nextPayoutUsers = adminPayoutUsers.filter(
+            (item) => !previousPayoutIds.has(item._id),
+          );
+          const nextMarketplacePending = (adminMarketplace.pendingListings || []).filter(
+            (item) => !previousMarketplacePendingIds.has(item._id),
+          );
+          const nextMarketplacePurchases = (adminMarketplace.pendingPurchases || []).filter(
+            (item) => !previousMarketplacePurchaseIds.has(item.purchaseId),
+          );
+          if (hasLoadedAdminData && nextFeedbacks.length && activeAdminTab !== "feedbacks") {
+            adminUnreadCounts.feedbacks += nextFeedbacks.length;
+          }
+          if (hasLoadedAdminData && nextUsers.length && activeAdminTab !== "users") {
+            adminUnreadCounts.users += nextUsers.length;
+          }
+          if (hasLoadedAdminData && nextPayoutUsers.length && activeAdminTab !== "payouts") {
+            adminUnreadCounts.payouts += nextPayoutUsers.length;
+          }
+          if (
+            hasLoadedAdminData &&
+            activeAdminTab !== "marketplace"
+          ) {
+            adminUnreadCounts.marketplace +=
+              nextMarketplacePending.length +
+              nextMarketplacePurchases.length;
+          }
+          hasLoadedAdminData = true;
+          renderAdminTabBadges();
+          renderAnalyticsDetails();
+          renderFeedbacks();
+          renderLogs();
+          renderUsers();
+          renderPremiumRequests();
+          renderDownloads();
+          renderWithdrawals();
+          renderPayouts();
+          renderNotifyTab();
+          renderAdminMarketplace();
+          connectAdminLiveFeed();
+          setLiveStatus(Boolean(adminSocket?.connected));
+        } catch (error) {
+          console.error(error);
+          setLiveStatus(false);
+          showAdminToast("Admin data could not be loaded.", "error");
+        }
+      }
+
+      document
+        .getElementById("admin-email")
+        ?.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") unlockAdmin();
+        });
+
+      document
+        .getElementById("admin-password")
+        ?.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") unlockAdmin();
+        });
+
+      loadAdminUnreadCounts();
+      ensureAdminAccess();
+      setLiveStatus(localStorage.getItem(ADMIN_ACCESS_KEY) === "granted");
+    </script>
+  </body>
+</html>
