@@ -269,7 +269,20 @@ async function createBulkNotifications(userIds = [], payload = {}) {
     return notifications;
   } catch (error) {
     console.error("Bulk notification create failed:", error);
-    return [];
+    const fallbackNotifications = await Promise.all(
+      uniqueIds.map((userId) =>
+        createUserNotification({
+          userId,
+          type: payload.type || "general",
+          title: payload.title || "",
+          message: payload.message || "",
+          targetType: payload.targetType || "",
+          targetId: payload.targetId || "",
+          metadata: payload.metadata && typeof payload.metadata === "object" ? payload.metadata : {},
+        }),
+      ),
+    );
+    return fallbackNotifications.filter(Boolean);
   }
 }
 
@@ -2500,7 +2513,7 @@ app.post("/api/admin/notifications", adminRateLimit, requireAdminApi, express.js
       if (!user) {
         return res.status(404).json({ success: false, message: "User not found for that email." });
       }
-      await createUserNotification({
+      const notification = await createUserNotification({
         userId: user._id,
         type: "admin",
         title: "New admin message",
@@ -2508,10 +2521,13 @@ app.post("/api/admin/notifications", adminRateLimit, requireAdminApi, express.js
         targetType: "console",
         metadata: { scope: "individual", email },
       });
+      if (!notification) {
+        return res.status(500).json({ success: false, message: "Could not send this notification right now." });
+      }
       return res.json({ success: true, message: "Notification sent to the selected user." });
     }
     const users = await User.find({}).select("_id").lean();
-    await createBulkNotifications(
+    const notifications = await createBulkNotifications(
       users.map((user) => user._id),
       {
         type: "admin",
@@ -2521,6 +2537,9 @@ app.post("/api/admin/notifications", adminRateLimit, requireAdminApi, express.js
         metadata: { scope: "all" },
       },
     );
+    if (!notifications.length) {
+      return res.status(500).json({ success: false, message: "Could not send notifications right now." });
+    }
     return res.json({ success: true, message: "Notification sent to all users." });
   } catch (error) {
     console.error("Admin notification send failed:", error);
