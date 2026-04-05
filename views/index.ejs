@@ -3665,6 +3665,149 @@
                 </div>
               </div>
             </div>
+            <div class="mt-6 flex items-center justify-between gap-3 border-t border-white/5 pt-4">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-[0.18em] text-rose-300/70">
+                  Need A Break?
+                </p>
+                <p class="mt-1 text-[11px] text-slate-500">
+                  You can suspend your account permanently.
+                </p>
+              </div>
+              <button
+                onclick="openAccountSuspendModal()"
+                class="inline-flex items-center gap-2 rounded-2xl border border-rose-400/15 bg-rose-500/5 px-3 py-2 text-[11px] font-bold text-rose-300/80 transition-all hover:border-rose-400/30 hover:bg-rose-500/10 hover:text-rose-200"
+              >
+                <i class="fas fa-trash text-[10px]"></i>
+                Suspend my account
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div
+      id="account-suspend-modal"
+      class="hidden builder-modal-backdrop"
+      onclick="if (event.target === this) closeAccountSuspendModal();"
+    >
+      <div
+        class="builder-modal-card w-full max-w-2xl p-5 sm:p-7"
+        onclick="event.stopPropagation()"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-[0.22em] text-rose-300">
+              Suspend Account
+            </p>
+            <h3 class="mt-2 text-2xl font-black text-white">
+              Permanently remove your MediaLab account
+            </h3>
+            <p class="mt-2 text-sm text-slate-400">
+              This action is irreversible and will delete your projects, files, storage links, and account records.
+            </p>
+          </div>
+          <button
+            onclick="closeAccountSuspendModal()"
+            class="w-10 h-10 rounded-2xl border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+          >
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="mt-5 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em]">
+          <div id="suspend-step-chip-verify" class="rounded-full border border-rose-400/30 bg-rose-500/10 px-3 py-1.5 text-rose-200">1. Verify</div>
+          <div class="h-px flex-1 bg-white/10"></div>
+          <div id="suspend-step-chip-reason" class="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-slate-400">2. Reason</div>
+          <div class="h-px flex-1 bg-white/10"></div>
+          <div id="suspend-step-chip-confirm" class="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-slate-400">3. Confirm</div>
+        </div>
+        <div class="mt-6">
+          <div id="suspend-step-verify" class="space-y-4">
+            <div class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+              <p class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Owner Verification</p>
+              <p class="mt-2 text-sm text-slate-300">
+                Enter your user code from the end of your referral link, then solve the short security code.
+              </p>
+              <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                <label class="block">
+                  <span class="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">User Code</span>
+                  <input
+                    id="suspend-account-referral-input"
+                    type="text"
+                    autocomplete="off"
+                    class="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition-all focus:border-rose-400/50"
+                    placeholder="Enter your referral code"
+                  />
+                </label>
+                <div>
+                  <span class="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Security Code</span>
+                  <div id="suspend-account-captcha-display" class="mt-2 flex min-h-[52px] items-center justify-center rounded-2xl border border-dashed border-rose-400/30 bg-rose-500/8 px-4 text-lg font-black tracking-[0.38em] text-rose-100 italic" style="font-family: 'Courier New', monospace;">
+                    MLABX
+                  </div>
+                </div>
+              </div>
+              <label class="mt-4 block">
+                <span class="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Type Security Code</span>
+                <input
+                  id="suspend-account-captcha-input"
+                  type="text"
+                  autocomplete="off"
+                  class="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition-all focus:border-rose-400/50"
+                  placeholder="Enter the 5-character code"
+                />
+              </label>
+            </div>
+          </div>
+          <div id="suspend-step-reason" class="hidden space-y-4">
+            <div class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+              <p class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Reason</p>
+              <p class="mt-2 text-sm text-slate-300">
+                Please tell us why you are suspending your account.
+              </p>
+              <textarea
+                id="suspend-account-reason-input"
+                rows="5"
+                class="mt-4 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition-all focus:border-rose-400/50"
+                placeholder="Write your reason here..."
+              ></textarea>
+            </div>
+          </div>
+          <div id="suspend-step-confirm" class="hidden space-y-4">
+            <div class="rounded-3xl border border-rose-400/15 bg-rose-500/6 p-4">
+              <p class="text-[11px] font-black uppercase tracking-[0.18em] text-rose-300">Final Confirmation</p>
+              <p class="mt-3 text-sm leading-7 text-slate-200">
+                MediaLab will suspend your account, delete your projects, remove your GitHub repositories, clear ImageKit assets, and wipe account traces tied to
+                <span id="suspend-account-email-preview" class="font-bold text-white break-all">your email</span>.
+              </p>
+              <p class="mt-3 text-sm font-semibold text-rose-200">
+                This process is irreversible.
+              </p>
+            </div>
+          </div>
+          <p id="suspend-account-error" class="mt-4 hidden rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"></p>
+        </div>
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <button
+            id="suspend-account-back-btn"
+            onclick="goBackAccountSuspendStep()"
+            class="hidden rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black uppercase tracking-[0.16em] text-slate-100 hover:bg-white/10 transition-all"
+          >
+            Back
+          </button>
+          <div class="ml-auto flex flex-wrap gap-3">
+            <button
+              onclick="closeAccountSuspendModal()"
+              class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black uppercase tracking-[0.16em] text-slate-200 hover:bg-white/10 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              id="suspend-account-next-btn"
+              onclick="advanceAccountSuspendStep()"
+              class="rounded-2xl bg-rose-500 px-5 py-3 text-xs font-black uppercase tracking-[0.16em] text-white hover:bg-rose-400 transition-all"
+            >
+              Next
+            </button>
           </div>
         </div>
       </div>
@@ -4011,6 +4154,10 @@
       let currentWithdrawalRequests = [];
       let expandedWithdrawalRequestId = "";
       let currentReferralStatus = null;
+      let accountSuspendStep = "verify";
+      let accountSuspendCaptcha = "";
+      let accountSuspendInFlight = false;
+      let guestLoginReminderTimer = null;
       let githubStorageAutoCreating = false;
       let marketplaceItems = [];
       let marketplaceMySales = [];
@@ -4886,6 +5033,9 @@
         return marketplacePurchasedItems;
       }
       async function refreshMarketplaceData() {
+        if (!loggedIn || !currentUser) {
+          throw new Error("Please login to access Marketplace.");
+        }
         await Promise.all([
           fetchMarketplaceDiscovery(),
           fetchMarketplaceMySales().catch((error) => {
@@ -8309,6 +8459,7 @@
         document.getElementById("landing")?.classList.remove("hidden");
         authSessionFailureCount = 0;
         lastSuccessfulAuthAt = 0;
+        startGuestLoginReminderLoop();
       }
       function markAuthHealthy() {
         lastSuccessfulAuthAt = Date.now();
@@ -8565,6 +8716,7 @@
         const premiumPlanLabel = document.getElementById("premium-plan-label");
         const premiumPlanIcon = document.getElementById("premium-plan-icon");
         if (!loggedIn || !currentUser) {
+          startGuestLoginReminderLoop();
           userSection?.classList.add("hidden");
           startBtn?.classList.remove("hidden");
           notificationsList = [];
@@ -8576,6 +8728,7 @@
           closeRenderHostingOnboarding();
           return;
         }
+        stopGuestLoginReminderLoop();
         if (currentUser?._id) {
           socket.emit("register-user", currentUser._id);
         }
@@ -9238,6 +9391,213 @@
           updateWithdrawalStatusSummary();
         });
         fetchReferralStatus();
+      }
+      function generateAccountSuspendCaptcha() {
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        accountSuspendCaptcha = Array.from({ length: 5 }, () =>
+          chars.charAt(Math.floor(Math.random() * chars.length)),
+        ).join("");
+        const display = document.getElementById("suspend-account-captcha-display");
+        if (display) {
+          display.textContent = accountSuspendCaptcha;
+          display.style.transform = `rotate(${Math.random() > 0.5 ? "-" : ""}${6 + Math.floor(Math.random() * 5)}deg)`;
+        }
+      }
+      function setAccountSuspendError(message = "") {
+        const node = document.getElementById("suspend-account-error");
+        if (!node) return;
+        const text = String(message || "").trim();
+        node.textContent = text;
+        node.classList.toggle("hidden", !text);
+      }
+      function renderAccountSuspendStep() {
+        const step = String(accountSuspendStep || "verify");
+        const isVerify = step === "verify";
+        const isReason = step === "reason";
+        const isConfirm = step === "confirm";
+        document.getElementById("suspend-step-verify")?.classList.toggle("hidden", !isVerify);
+        document.getElementById("suspend-step-reason")?.classList.toggle("hidden", !isReason);
+        document.getElementById("suspend-step-confirm")?.classList.toggle("hidden", !isConfirm);
+        document.getElementById("suspend-account-back-btn")?.classList.toggle("hidden", isVerify);
+        const nextBtn = document.getElementById("suspend-account-next-btn");
+        if (nextBtn) {
+          nextBtn.textContent = isConfirm ? "Suspend Account" : "Next";
+          nextBtn.disabled = accountSuspendInFlight;
+          nextBtn.classList.toggle("opacity-60", accountSuspendInFlight);
+          nextBtn.classList.toggle("cursor-not-allowed", accountSuspendInFlight);
+        }
+        const chips = {
+          verify: document.getElementById("suspend-step-chip-verify"),
+          reason: document.getElementById("suspend-step-chip-reason"),
+          confirm: document.getElementById("suspend-step-chip-confirm"),
+        };
+        [chips.verify, chips.reason, chips.confirm].forEach((chip) => {
+          chip?.classList.remove("border-rose-400/30", "bg-rose-500/10", "text-rose-200");
+          chip?.classList.add("border-white/10", "bg-white/5", "text-slate-400");
+        });
+        chips.verify?.classList.add("border-rose-400/30", "bg-rose-500/10", "text-rose-200");
+        chips.verify?.classList.remove("border-white/10", "bg-white/5", "text-slate-400");
+        if (isReason || isConfirm) {
+          chips.reason?.classList.add("border-rose-400/30", "bg-rose-500/10", "text-rose-200");
+          chips.reason?.classList.remove("border-white/10", "bg-white/5", "text-slate-400");
+        }
+        if (isConfirm) {
+          chips.confirm?.classList.add("border-rose-400/30", "bg-rose-500/10", "text-rose-200");
+          chips.confirm?.classList.remove("border-white/10", "bg-white/5", "text-slate-400");
+        }
+      }
+      function resetAccountSuspendFlow() {
+        accountSuspendStep = "verify";
+        accountSuspendInFlight = false;
+        document.getElementById("suspend-account-referral-input").value = "";
+        document.getElementById("suspend-account-captcha-input").value = "";
+        document.getElementById("suspend-account-reason-input").value = "";
+        document.getElementById("suspend-account-email-preview").textContent =
+          currentUser?.email || "your email";
+        setAccountSuspendError("");
+        generateAccountSuspendCaptcha();
+        renderAccountSuspendStep();
+      }
+      function openAccountSuspendModal() {
+        if (!loggedIn || !currentUser) {
+          showLogin();
+          return;
+        }
+        resetAccountSuspendFlow();
+        document.getElementById("account-suspend-modal")?.classList.remove("hidden");
+        document.getElementById("account-suspend-modal")?.classList.add("flex");
+      }
+      function closeAccountSuspendModal() {
+        if (accountSuspendInFlight) return;
+        document.getElementById("account-suspend-modal")?.classList.add("hidden");
+        document.getElementById("account-suspend-modal")?.classList.remove("flex");
+      }
+      function goBackAccountSuspendStep() {
+        if (accountSuspendInFlight) return;
+        if (accountSuspendStep === "reason") {
+          accountSuspendStep = "verify";
+        } else if (accountSuspendStep === "confirm") {
+          accountSuspendStep = "reason";
+        }
+        setAccountSuspendError("");
+        renderAccountSuspendStep();
+      }
+      async function advanceAccountSuspendStep() {
+        if (accountSuspendInFlight) return;
+        const referralInput = String(
+          document.getElementById("suspend-account-referral-input")?.value || "",
+        ).trim();
+        const expectedReferralCode = String(
+          currentReferralStatus?.referralCode || currentUser?.referralCode || "",
+        ).trim();
+        const captchaInput = String(
+          document.getElementById("suspend-account-captcha-input")?.value || "",
+        )
+          .trim()
+          .toUpperCase();
+        const reason = String(
+          document.getElementById("suspend-account-reason-input")?.value || "",
+        ).trim();
+        if (accountSuspendStep === "verify") {
+          if (!referralInput || referralInput !== expectedReferralCode) {
+            setAccountSuspendError("Enter the referral code linked to your account.");
+            return;
+          }
+          if (!captchaInput || captchaInput !== accountSuspendCaptcha) {
+            setAccountSuspendError("The security code does not match. Please try again.");
+            generateAccountSuspendCaptcha();
+            document.getElementById("suspend-account-captcha-input").value = "";
+            return;
+          }
+          setAccountSuspendError("");
+          accountSuspendStep = "reason";
+          renderAccountSuspendStep();
+          return;
+        }
+        if (accountSuspendStep === "reason") {
+          if (reason.length < 6) {
+            setAccountSuspendError("Please enter a short reason before continuing.");
+            return;
+          }
+          setAccountSuspendError("");
+          accountSuspendStep = "confirm";
+          renderAccountSuspendStep();
+          return;
+        }
+        const confirmed = await openAppDialog({
+          chip: "Final Warning",
+          title: "Suspend your account permanently?",
+          message:
+            "Are you sure you want to suspend your account? This process is irreversible and will remove your MediaLab data completely.",
+          tone: "error",
+          confirmLabel: "Yes, Suspend",
+          cancelLabel: "Keep Account",
+          destructive: true,
+        });
+        if (!confirmed) return;
+        accountSuspendInFlight = true;
+        renderAccountSuspendStep();
+        closeAccountSuspendModal();
+        closeAccountModal();
+        beginUniversalProgress("Suspending your account...", 8, 86);
+        const progressStages = [
+          [18, "Deleting your projects..."],
+          [36, "Removing your GitHub repository..."],
+          [58, "Deleting your cloud images..."],
+          [78, "Wiping account records from MediaLab..."],
+        ];
+        let stageIndex = 0;
+        const stageTimer = setInterval(() => {
+          const stage = progressStages[stageIndex++];
+          if (!stage) {
+            clearInterval(stageTimer);
+            return;
+          }
+          updateUniversalProgress(stage[0], stage[1]);
+        }, 900);
+        try {
+          const res = await fetch("/api/account/suspend", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              referralCode: referralInput,
+              reason,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          clearInterval(stageTimer);
+          if (res.status === 401) {
+            failUniversalProgress("Account suspension could not continue.");
+            await handleAuthSessionFailure(data.message || "Your session ended. Please sign in again.");
+            accountSuspendInFlight = false;
+            resetAccountSuspendFlow();
+            return;
+          }
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || "Could not suspend this account right now.");
+          }
+          completeUniversalProgress("Account suspended successfully.");
+          clearClientAuthState();
+          await openAppDialog({
+            chip: "Account Suspended",
+            title: "Your account has been removed",
+            message:
+              "MediaLab completed the suspension process and removed the account data tied to this profile.",
+            tone: "success",
+            confirmLabel: "OK",
+            cancelLabel: "Close",
+          });
+          window.location.href = "/";
+        } catch (error) {
+          clearInterval(stageTimer);
+          failUniversalProgress("Account suspension failed.");
+          accountSuspendInFlight = false;
+          document.getElementById("account-suspend-modal")?.classList.remove("hidden");
+          document.getElementById("account-suspend-modal")?.classList.add("flex");
+          renderAccountSuspendStep();
+          setAccountSuspendError(error.message || "Could not suspend this account right now.");
+        }
       }
       async function openAdsenseWithdrawalCenter() {
         try {
@@ -10066,6 +10426,26 @@
       function hideLogin() {
         document.getElementById("login-modal").classList.add("hidden");
       }
+      function stopGuestLoginReminderLoop() {
+        if (guestLoginReminderTimer) {
+          clearInterval(guestLoginReminderTimer);
+          guestLoginReminderTimer = null;
+        }
+      }
+      function startGuestLoginReminderLoop() {
+        stopGuestLoginReminderLoop();
+        if (loggedIn || currentUser) return;
+        guestLoginReminderTimer = setInterval(() => {
+          if (loggedIn || currentUser) {
+            stopGuestLoginReminderLoop();
+            return;
+          }
+          const modal = document.getElementById("login-modal");
+          if (modal?.classList.contains("hidden")) {
+            showLogin();
+          }
+        }, 30000);
+      }
       function googleLogin() {
         logUsageActivity("google-login-start", "started Google login", "auth");
         window.location.href = "/api/auth/google";
@@ -10256,9 +10636,11 @@
             setTimeout(() => maybePromptRenderHostingOnboarding(), 600);
           } else {
             currentPremiumRequest = null;
+            updateUserProfileUi();
           }
         } catch (e) {
           console.error("Auth check failed:", e);
+          updateUserProfileUi();
         }
         scheduleFeedbackPrompt();
       }
@@ -11486,6 +11868,17 @@
             </div>`;
         }
         else if (id === "marketplace") {
+          if (!loggedIn || !currentUser) {
+            stopMarketplacePreviewRotation();
+            html = `<div class="animate-fadeIn rounded-[2rem] border border-rose-500/20 bg-rose-500/10 p-8 text-center">
+              <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-[1.4rem] border border-rose-400/20 bg-white/5 text-rose-200">
+                <i class="fas fa-lock text-xl"></i>
+              </div>
+              <h3 class="mt-5 text-2xl font-semibold text-white">Marketplace isn't currently available</h3>
+              <p class="mt-3 text-sm leading-6 text-rose-100">Please login to access.</p>
+              <button onclick="showLogin()" class="mt-5 inline-flex items-center gap-2 rounded-2xl bg-white text-slate-950 px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em]">Login Required</button>
+            </div>`;
+          } else {
           try {
             await refreshMarketplaceData();
             if (switchToken !== studioToolSwitchToken || currentStudioToolId !== id) return;
@@ -11501,6 +11894,7 @@
               <p class="mt-3 text-sm leading-6 text-slate-300">${escapeHtmlText(error.message || "Could not load marketplace projects right now.")}</p>
               <button onclick="switchTool('marketplace')" class="mt-5 inline-flex items-center gap-2 rounded-2xl bg-white text-slate-950 px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em]">Retry</button>
             </div>`;
+          }
           }
         }
         // =============================================================
@@ -13299,6 +13693,16 @@
       window.onload = async () => {
         renderCards();
         storePendingReferralFromUrl();
+        await logUsageActivityOnce(
+          "site-open",
+          "site-open",
+          "opened MediaLab website",
+          "navigation",
+          {
+            page: window.location.pathname || "/",
+          },
+          60000,
+        );
         await checkAuth();
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get("loggedIn") === "true") {

@@ -1284,6 +1284,81 @@ async function cleanupMarketplaceTemplateArtifacts(item = null) {
   await BuilderTemplate.deleteMany({ sourceMarketplaceItemId: item._id });
 }
 
+async function deleteGithubRepoIfExists(octokit, owner, repo) {
+  const normalizedOwner = String(owner || "").trim();
+  const normalizedRepo = String(repo || "").trim();
+  if (!octokit || !normalizedOwner || !normalizedRepo) return false;
+  try {
+    await octokit.rest.repos.delete({
+      owner: normalizedOwner,
+      repo: normalizedRepo,
+    });
+    return true;
+  } catch (error) {
+    const status = error?.status || error?.response?.status;
+    if (status === 404) return false;
+    throw error;
+  }
+}
+
+async function cleanupStandaloneBuilderTemplatesForUser(userId) {
+  const templates = await BuilderTemplate.find({
+    authorId: userId,
+    $or: [
+      { sourceMarketplaceItemId: null },
+      { sourceMarketplaceItemId: { $exists: false } },
+    ],
+  })
+    .select("_id htmlFileId")
+    .lean();
+  for (const template of templates) {
+    const htmlFileId = String(template?.htmlFileId || "").trim();
+    if (!htmlFileId) continue;
+    try {
+      await deleteImageKitFileById(htmlFileId);
+    } catch (error) {
+      const status = error?.status || error?.response?.status;
+      if (status !== 404) {
+        console.warn("Standalone template cleanup skipped:", error.message);
+      }
+    }
+  }
+  if (templates.length) {
+    await BuilderTemplate.deleteMany({
+      _id: { $in: templates.map((template) => template._id) },
+    });
+  }
+}
+
+async function removeUserParticipationFromMarketplace(userId) {
+  const items = await MarketplaceItem.find({
+    $or: [
+      { "comments.userId": userId },
+      { "comments.replies.userId": userId },
+      { "ratings.userId": userId },
+      { "purchases.buyerId": userId },
+    ],
+  });
+  for (const item of items) {
+    item.comments = (Array.isArray(item.comments) ? item.comments : [])
+      .filter((comment) => String(comment?.userId || "") !== String(userId))
+      .map((comment) => ({
+        ...(typeof comment?.toObject === "function" ? comment.toObject() : comment),
+        replies: (Array.isArray(comment?.replies) ? comment.replies : []).filter(
+          (reply) => String(reply?.userId || "") !== String(userId),
+        ),
+      }));
+    item.ratings = (Array.isArray(item.ratings) ? item.ratings : []).filter(
+      (rating) => String(rating?.userId || "") !== String(userId),
+    );
+    item.purchases = (Array.isArray(item.purchases) ? item.purchases : []).filter(
+      (purchase) => String(purchase?.buyerId || "") !== String(userId),
+    );
+    item.updatedAt = new Date();
+    await item.save();
+  }
+}
+
 function buildMarketplacePublicItem(item = {}, viewerId = "") {
   const comments = Array.isArray(item.comments) ? item.comments : [];
   const purchases = Array.isArray(item.purchases) ? item.purchases : [];
@@ -6502,6 +6577,131 @@ app.get("/api/account/withdrawals", async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Could not load withdrawal history right now.",
+    });
+  }
+});
+
+app.post("/api/account/suspend", accountRateLimit, express.json(), async (req, res) => {
+  if (!req.isAuthenticated() || !req.user?._id) {
+    return res.status(401).json({ success: false, message: "Login required." });
+  }
+  try {
+    const user = await User.findById(req.user._id).select("+githubToken");
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    const referralCode = String(req.body?.referralCode || "").trim();
+    const reason = String(req.body?.reason || "").trim();
+    if (!referralCode || referralCode !== String(user.referralCode || "").trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Owner verification failed. Enter the referral code tied to your account.",
+      });
+    }
+    if (reason.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Please tell us why you are suspending your account.",
+      });
+    }
+
+    const userId = user._id;
+    const userEmail = String(user.email || "").trim().toLowerCase();
+    const marketplaceItems = await MarketplaceItem.find({ authorId: userId }).lean();
+    const marketplaceItemIds = marketplaceItems.map((item) => item._id);
+
+    for (const item of marketplaceItems) {
+      await cleanupMarketplaceStorageArtifacts(item);
+    }
+    await cleanupStandaloneBuilderTemplatesForUser(userId);
+    await MarketplaceItem.deleteMany({ authorId: userId });
+    await removeUserParticipationFromMarketplace(userId);
+    await BuilderTemplate.deleteMany({ authorId: userId });
+
+    await Notification.deleteMany({
+      $or: [
+        { userId },
+        { targetId: { $in: marketplaceItemIds.map((id) => String(id)) } },
+      ],
+    });
+    await WithdrawalRequest.deleteMany({
+      $or: [{ userId }, { email: userEmail }],
+    });
+    await Download.deleteMany({
+      $or: [{ userId }, { email: userEmail }],
+    });
+    await UsageLog.deleteMany({
+      $or: [{ userId }, { email: userEmail }],
+    });
+    await Feedback.deleteMany({
+      $or: [{ userId }, { email: userEmail }],
+    });
+    await UpgradeRequest.deleteMany({
+      $or: [{ userId }, { email: userEmail }],
+    });
+
+    await User.updateMany(
+      {},
+      {
+        $pull: {
+          sellerRatings: { userId },
+          referralRewards: { referredUserId: userId },
+        },
+      },
+    );
+
+    if (user.githubUsername && user.githubToken) {
+      try {
+        const octokit = buildGithubClient(user);
+        const reposToDelete = [
+          getUserGithubRepoName(user),
+          "marketplace",
+        ].filter(Boolean);
+        for (const repoName of [...new Set(reposToDelete)]) {
+          try {
+            await deleteGithubRepoIfExists(octokit, user.githubUsername, repoName);
+          } catch (repoError) {
+            console.warn(`GitHub repo cleanup skipped for ${repoName}:`, repoError.message);
+          }
+        }
+      } catch (githubError) {
+        console.warn("GitHub account cleanup skipped:", githubError.message);
+      }
+    }
+
+    await User.deleteOne({ _id: userId });
+
+    const finish = () =>
+      res.json({
+        success: true,
+        message: "Your MediaLab account has been suspended and removed.",
+      });
+
+    req.logout((logoutError) => {
+      if (logoutError) {
+        console.error("Account suspension logout failed:", logoutError);
+        return finish();
+      }
+      if (req.session) {
+        delete req.session.githubOAuthState;
+        delete req.session.githubOAuthUserId;
+        delete req.session.googleAuthMode;
+        return req.session.destroy(() => {
+          res.clearCookie("medialab.sid");
+          res.clearCookie("connect.sid");
+          finish();
+        });
+      }
+      res.clearCookie("medialab.sid");
+      res.clearCookie("connect.sid");
+      return finish();
+    });
+  } catch (error) {
+    console.error("Account suspension failed:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Could not suspend this account right now.",
     });
   }
 });
