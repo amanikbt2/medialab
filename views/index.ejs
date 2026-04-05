@@ -5170,6 +5170,7 @@
         const title = String(marketplaceDraftListing.title || "").trim();
         const category = String(marketplaceDraftListing.category || "").trim();
         const purpose = String(marketplaceDraftListing.purpose || "").trim();
+        const effectivePurpose = purpose || description.slice(0, 180);
         const description = String(marketplaceDraftListing.description || "").trim();
         const screenshots = Array.isArray(marketplaceDraftListing.screenshots)
           ? marketplaceDraftListing.screenshots.filter(Boolean)
@@ -5195,7 +5196,7 @@
         if (!category) {
           issues.push("Enter a project category.");
         }
-        if (purpose.length < 5) {
+        if (effectivePurpose.length < 5) {
           issues.push("Purpose is too short.");
         }
         if (description.length < 8) {
@@ -5228,6 +5229,7 @@
         const title = String(marketplaceDraftListing.title || "").trim();
         const category = String(marketplaceDraftListing.category || "").trim();
         const purpose = String(marketplaceDraftListing.purpose || "").trim();
+        const effectivePurpose = purpose || description.slice(0, 180);
         const description = String(marketplaceDraftListing.description || "").trim();
         const screenshots = Array.isArray(marketplaceDraftListing.screenshots)
           ? marketplaceDraftListing.screenshots.filter(Boolean)
@@ -5251,7 +5253,7 @@
           const issues = [];
           if (title.length < 3) issues.push("Enter a marketplace title with at least 3 characters.");
           if (!category) issues.push("Enter a project category.");
-          if (purpose.length < 5) issues.push("Purpose is too short.");
+          if (effectivePurpose.length < 5) issues.push("Purpose is too short.");
           if (description.length < 8) issues.push("Professional description is too short.");
           if (Number(marketplaceDraftListing.price) < 0 || Number.isNaN(Number(marketplaceDraftListing.price))) {
             issues.push("Price must be 0 or more.");
@@ -5938,10 +5940,17 @@
         }
       }
       function updateMarketplaceDraftField(field, value) {
+        const nextValue = field === "price" ? Number(value || 0) : String(value || "");
         marketplaceDraftListing = {
           ...marketplaceDraftListing,
-          [field]: field === "price" ? Number(value || 0) : String(value || ""),
+          [field]: nextValue,
         };
+        if (field === "description") {
+          const currentPurpose = String(marketplaceDraftListing.purpose || "").trim();
+          if (!currentPurpose) {
+            marketplaceDraftListing.purpose = String(nextValue || "").trim().slice(0, 180);
+          }
+        }
       }
       async function toggleMarketplaceTemplateMode(enabled = false) {
         if (enabled) {
@@ -6447,6 +6456,14 @@
         if (!loggedIn) {
           showLogin();
           return;
+        }
+        const currentPurpose = String(marketplaceDraftListing.purpose || "").trim();
+        const currentDescription = String(marketplaceDraftListing.description || "").trim();
+        if (!currentPurpose && currentDescription) {
+          marketplaceDraftListing = {
+            ...marketplaceDraftListing,
+            purpose: currentDescription.slice(0, 180),
+          };
         }
         if (String(marketplaceDraftListing.sourceType || "").trim() === "draft") {
           const selectedDraft = getMarketplaceDraftProjects().find(
