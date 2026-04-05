@@ -388,9 +388,23 @@ export const toSafeUser = (user) => {
 };
 
 export const generateReferralCode = (user = {}) => {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const bytes = crypto.randomBytes(8);
   return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+};
+
+export const ensureUserReferralCode = async (user) => {
+  if (!user) return user;
+  if (String(user.referralCode || "").trim()) return user;
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    const candidate = generateReferralCode(user);
+    const existing = await User.findOne({ referralCode: candidate }).select("_id").lean();
+    if (existing) continue;
+    user.referralCode = candidate;
+    await user.save();
+    return user;
+  }
+  throw new Error("Could not allocate a referral code right now.");
 };
 
 const extractClientIp = (req) => {
@@ -553,6 +567,8 @@ passport.use(
           await user.save();
         }
 
+        await ensureUserReferralCode(user);
+
         return done(null, user);
       } catch (err) {
         return done(err, null);
@@ -637,6 +653,8 @@ router.post("/dev-login", express.json(), async (req, res) => {
     user.profilePicture = "/favicon.png";
     await user.save();
   }
+
+  await ensureUserReferralCode(user);
 
   await updateUserLocationOnLogin(req, user);
 
@@ -847,11 +865,12 @@ router.post("/github/initialize-storage", express.json(), async (req, res) => {
 });
 
 // Get Current User (The "Me" Route)
-router.get("/me", (req, res) => {
+router.get("/me", async (req, res) => {
   // Add Cache-Control to prevent old session data being cached by browser
   res.setHeader("Cache-Control", "no-store");
 
   if (req.isAuthenticated() && req.user) {
+    await ensureUserReferralCode(req.user);
     res.json({ success: true, user: toSafeUser(req.user) });
   } else {
     res.json({ success: false, message: "Not authenticated" });

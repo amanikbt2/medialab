@@ -1750,7 +1750,7 @@
             </button>
             <div
               id="notification-dropdown"
-              class="hidden fixed inset-y-0 right-0 z-[120] w-full max-w-[24rem] border-l border-white/10 bg-slate-950 p-5 shadow-[-20px_0_60px_rgba(2,6,23,0.5)]"
+              class="hidden fixed inset-y-0 right-0 z-[5005] w-full max-w-[24rem] border-l border-white/10 bg-slate-950 p-5 shadow-[-20px_0_60px_rgba(2,6,23,0.5)]"
             >
               <div class="flex items-center justify-between gap-3">
                 <div>
@@ -9330,6 +9330,9 @@
         const accountEmail = document.getElementById("account-email");
         const accountPlan = document.getElementById("account-plan");
         const accountLastLogin = document.getElementById("account-last-login");
+        const accountGithubStatus = document.getElementById("account-github-status");
+        const accountGithubConnectBtn = document.getElementById("account-github-connect-btn");
+        const accountGithubDisconnectBtn = document.getElementById("account-github-disconnect-btn");
         if (balanceValue) balanceValue.textContent = formatCurrency(balance);
         if (balanceNote) {
           balanceNote.textContent = canWithdraw
@@ -9371,9 +9374,25 @@
             ? new Date(currentUser.lastLogin).toLocaleString()
             : "Unknown";
         }
+        const githubConnected = Boolean(currentUser?.githubUsername);
+        const githubRepoActive = Boolean(currentUser?.githubRepoCreated);
+        if (accountGithubStatus) {
+          accountGithubStatus.textContent = !githubConnected
+            ? "Not connected"
+            : githubRepoActive
+              ? `Connected • Cloud Storage Online (${getGithubRepoLabel()})`
+              : "Connected • Auto creating repo";
+        }
+        if (accountGithubConnectBtn) {
+          accountGithubConnectBtn.classList.toggle("hidden", githubConnected);
+        }
+        if (accountGithubDisconnectBtn) {
+          accountGithubDisconnectBtn.classList.toggle("hidden", !githubConnected);
+        }
         const availableBalance = document.getElementById("withdraw-available-balance");
         if (availableBalance) availableBalance.textContent = formatCurrency(balance);
         updateWithdrawalStatusSummary();
+        updateReferralUi();
       }
       function openAccountModal() {
         if (!loggedIn || !currentUser) {
@@ -10605,8 +10624,12 @@
           console.warn("Referral claim skipped:", error.message);
         }
       }
-      async function checkAuth() {
+      async function checkAuth(options = {}) {
+        const showProgress = Boolean(options?.showProgress);
         try {
+          if (showProgress) {
+            beginUniversalProgress("Logging you in...", 14, 76);
+          }
           const res = await fetch("/api/auth/me", { credentials: "include" });
           const data = await res.json();
           if (data.success && data.user) {
@@ -10632,15 +10655,34 @@
               "restored logged-in session",
               "auth",
             );
+            if (showProgress) {
+              completeUniversalProgress("Logged in successfully.");
+            }
             goToStudio();
             setTimeout(() => maybePromptRenderHostingOnboarding(), 600);
           } else {
             currentPremiumRequest = null;
             updateUserProfileUi();
+            if (showProgress) {
+              setUniversalProgress({
+                visible: false,
+                message: "Ready",
+                percent: 0,
+                tone: "cyan",
+              });
+            }
           }
         } catch (e) {
           console.error("Auth check failed:", e);
           updateUserProfileUi();
+          if (showProgress) {
+            setUniversalProgress({
+              visible: false,
+              message: "Ready",
+              percent: 0,
+              tone: "cyan",
+            });
+          }
         }
         scheduleFeedbackPrompt();
       }
@@ -13703,15 +13745,15 @@
           },
           60000,
         );
-        await checkAuth();
+        await checkAuth({ showProgress: true });
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get("loggedIn") === "true") {
-          await checkAuth();
+          await checkAuth({ showProgress: true });
           window.history.replaceState({}, document.title, "/");
         }
         const githubState = urlParams.get("github");
         if (githubState) {
-          await checkAuth();
+          await checkAuth({ showProgress: true });
           if (githubState === "connected") {
             alert(
               "GitHub connected. Initialize Cloud Storage in the sidebar to activate the medialab repository and GitHub Pages.",
@@ -13729,7 +13771,7 @@
         }
         const adsenseState = urlParams.get("adsense");
         if (adsenseState) {
-          await checkAuth();
+          await checkAuth({ showProgress: true });
           if (adsenseState === "connected") {
             showStudioStatusSnackbar(
               "Google AdSense access connected. You can continue linking your site now.",
