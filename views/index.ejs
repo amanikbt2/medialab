@@ -5260,10 +5260,10 @@
         }
         if (Number(step) === 2) {
           const issues = [];
-          if (title.length < 3) issues.push("Enter a marketplace title with at least 3 characters.");
+          if (title.length < 2) issues.push("Enter a marketplace title.");
           if (!category) issues.push("Enter a project category.");
-          if (effectivePurpose.length < 5) issues.push("Purpose is too short.");
-          if (description.length < 8) issues.push("Professional description is too short.");
+          if (!effectivePurpose) issues.push("Add a short purpose.");
+          if (description.length < 3) issues.push("Add a short professional description.");
           if (Number(marketplaceDraftListing.price) < 0 || Number.isNaN(Number(marketplaceDraftListing.price))) {
             issues.push("Price must be 0 or more.");
           }
@@ -6004,7 +6004,7 @@
       function handleMarketplaceLiveInput(event, field) {
         updateMarketplaceDraftField(field, event?.target?.value ?? "");
         if (currentStudioToolId === "marketplace" && marketplaceActiveTab === "create") {
-          mountMarketplaceTool();
+          syncMarketplaceCreateActions();
         }
       }
       function handleMarketplaceSearchInput(event) {
