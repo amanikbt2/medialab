@@ -5745,14 +5745,14 @@
                   <p class="mt-1">Screenshots: ${(marketplaceDraftListing.screenshots || []).length}/4</p>
                 </div>
                 <label class="flex items-start gap-3 rounded-[1.6rem] border border-emerald-400/15 bg-emerald-500/[0.06] p-4">
-                  <input type="checkbox" ${marketplaceDraftListing.allowTest ? "checked" : ""} onchange="toggleMarketplaceAllowTest(this.checked)" class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-emerald-400 accent-emerald-400" />
+                  <input type="checkbox" ${marketplaceDraftListing.allowTest ? "checked" : ""} onchange="toggleMarketplaceAllowTest(this.checked, this)" class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-emerald-400 accent-emerald-400" />
                   <span class="min-w-0">
                     <span class="block text-[11px] font-black uppercase tracking-[0.18em] text-emerald-200">Allow Test</span>
                     <span class="mt-2 block text-sm leading-6 text-slate-300">Let people run this sale project for 30 seconds from its marketplace dashboard before they decide.</span>
                   </span>
                 </label>
                 <label class="flex items-start gap-3 rounded-[1.6rem] border border-fuchsia-400/15 bg-fuchsia-500/[0.06] p-4">
-                  <input type="checkbox" ${marketplaceDraftListing.listingKind === "template" ? "checked" : ""} onchange="toggleMarketplaceTemplateMode(this.checked)" class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-fuchsia-400 accent-fuchsia-400" />
+                  <input type="checkbox" ${marketplaceDraftListing.listingKind === "template" ? "checked" : ""} onchange="toggleMarketplaceTemplateMode(this.checked, this)" class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-fuchsia-400 accent-fuchsia-400" />
                   <span class="min-w-0">
                     <span class="block text-[11px] font-black uppercase tracking-[0.18em] text-fuchsia-200">Sell as template</span>
                     <span class="mt-2 block text-sm leading-6 text-slate-300">Submit this project for official MediaLab template review instead of public marketplace sale.</span>
@@ -5967,7 +5967,7 @@
           }
         }
       }
-      async function toggleMarketplaceTemplateMode(enabled = false) {
+      async function toggleMarketplaceTemplateMode(enabled = false, input = null) {
         if (enabled) {
           const confirmed = await openAppDialog({
             chip: "Official Template Review",
@@ -5982,23 +5982,26 @@
             ...marketplaceDraftListing,
             listingKind: confirmed ? "template" : "sale",
           };
+          if (input) input.checked = confirmed;
         } else {
           marketplaceDraftListing = {
             ...marketplaceDraftListing,
             listingKind: "sale",
           };
+          if (input) input.checked = false;
         }
         if (currentStudioToolId === "marketplace" && marketplaceActiveTab === "create") {
-          mountMarketplaceTool();
+          syncMarketplaceCreateActions();
         }
       }
-      function toggleMarketplaceAllowTest(enabled = false) {
+      function toggleMarketplaceAllowTest(enabled = false, input = null) {
         marketplaceDraftListing = {
           ...marketplaceDraftListing,
           allowTest: Boolean(enabled),
         };
+        if (input) input.checked = Boolean(enabled);
         if (currentStudioToolId === "marketplace" && marketplaceActiveTab === "create") {
-          mountMarketplaceTool();
+          syncMarketplaceCreateActions();
         }
       }
       function handleMarketplaceLiveInput(event, field) {
