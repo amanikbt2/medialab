@@ -4212,6 +4212,7 @@
       let studioToolSwitchToken = 0;
       let notificationsList = [];
       let unreadNotificationCount = 0;
+      let notificationsLoading = false;
       let notificationDropdownTimer = null;
       let builderCommunityTemplates = [];
       function createEmptyMarketplaceDraftListing() {
@@ -8570,6 +8571,17 @@
           list.innerHTML = `<div class="rounded-[1.3rem] border border-dashed border-white/10 p-5 text-center text-sm text-slate-400">Sign in to view your notifications.</div>`;
           return;
         }
+        if (notificationsLoading) {
+          list.innerHTML = `
+            <div class="rounded-[1.3rem] border border-white/10 bg-white/[0.02] px-5 py-7 text-center">
+              <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-cyan-200">
+                <i class="fas fa-spinner animate-spin text-xl"></i>
+              </div>
+              <p class="mt-4 text-sm font-semibold text-white">Loading notifications</p>
+              <p class="mt-1 text-xs text-slate-400">Please wait a moment.</p>
+            </div>`;
+          return;
+        }
         if (!notificationsList.length) {
           list.innerHTML = `
             <div class="rounded-[1.3rem] border border-dashed border-white/10 bg-white/[0.02] px-5 py-7 text-center">
@@ -8595,13 +8607,29 @@
             </button>`)
           .join("");
       }
+      function normalizeNotificationItem(item = {}) {
+        return {
+          _id: String(item?._id || ""),
+          userId: String(item?.userId || ""),
+          type: String(item?.type || "general"),
+          title: String(item?.title || "").trim(),
+          message: String(item?.message || "").trim(),
+          targetType: String(item?.targetType || "").trim(),
+          targetId: String(item?.targetId || "").trim(),
+          metadata:
+            item?.metadata && typeof item.metadata === "object" ? item.metadata : {},
+          isRead: Boolean(item?.isRead),
+          createdAt: item?.createdAt || item?.date || new Date().toISOString(),
+          readAt: item?.readAt || null,
+        };
+      }
       function upsertNotificationFromSocket(payload = {}) {
         if (!payload?._id) return;
         const existingIndex = notificationsList.findIndex(
           (item) => String(item?._id || "") === String(payload._id || ""),
         );
         const nextItem = {
-          ...payload,
+          ...normalizeNotificationItem(payload),
           isRead: false,
         };
         if (existingIndex >= 0) {
@@ -8619,6 +8647,8 @@
           return [];
         }
         try {
+          notificationsLoading = true;
+          renderNotificationsUi();
           const res = await fetch("/api/notifications", { credentials: "include" });
           const data = await res.json();
           if (res.status === 401) {
@@ -8629,7 +8659,9 @@
             throw new Error(data.message || "Could not load notifications.");
           }
           markSessionHealthy();
-          notificationsList = Array.isArray(data.notifications) ? data.notifications.slice(0, 10) : [];
+          notificationsList = Array.isArray(data.notifications)
+            ? data.notifications.map((item) => normalizeNotificationItem(item)).slice(0, 10)
+            : [];
           unreadNotificationCount = Number(
             data.unreadCount ?? notificationsList.filter((item) => !item.isRead).length,
           );
@@ -8637,7 +8669,11 @@
           return notificationsList;
         } catch (error) {
           console.warn("Notification fetch skipped:", error.message);
+          renderNotificationsUi();
           return notificationsList;
+        } finally {
+          notificationsLoading = false;
+          renderNotificationsUi();
         }
       }
       async function markAllNotificationsRead(options = {}) {
@@ -8677,6 +8713,7 @@
         const dropdown = document.getElementById("notification-dropdown");
         if (!dropdown) return;
         dropdown.classList.add("hidden");
+        dropdown.style.display = "none";
       }
       async function toggleNotifications(event) {
         event?.stopPropagation();
@@ -8684,6 +8721,7 @@
         if (!dropdown) return;
         const shouldOpen = dropdown.classList.contains("hidden");
         dropdown.classList.toggle("hidden", !shouldOpen);
+        dropdown.style.display = shouldOpen ? "flex" : "none";
         if (shouldOpen) {
           queueNotificationAutoHide();
           await fetchNotifications();
