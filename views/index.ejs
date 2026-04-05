@@ -1097,6 +1097,13 @@
         justify-content: center;
         padding: 16px;
       }
+      #app-dialog-modal {
+        z-index: 2000005 !important;
+      }
+      #app-dialog-modal .builder-modal-card {
+        position: relative;
+        z-index: 2000006 !important;
+      }
       .builder-modal-card {
         width: min(100%, 460px);
         max-height: min(88vh, 760px);
@@ -6786,6 +6793,16 @@
                   ${getMarketplaceStatusBadge(item.status)}
                 </div>
                 <div class="mt-4 flex items-center gap-2 text-sm">${renderMarketplaceRating(item.averageRating || 0)}<span class="ml-2 text-slate-400">${Number(item.ratingPercent || 0).toFixed(0)}% rating from ${item.ratingCount || 0} users</span></div>
+                <div class="mt-4 grid grid-cols-2 gap-3">
+                  <div class="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                    <p class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Total Purchases</p>
+                    <p class="mt-2 text-lg font-semibold text-white">${Number(item.purchaseCount || 0)}</p>
+                  </div>
+                  <div class="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                    <p class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Pending Approval</p>
+                    <p class="mt-2 text-lg font-semibold text-amber-300">${Number(item.pendingPurchases || 0)}</p>
+                  </div>
+                </div>
                 ${!access.approved ? `<div class="mt-4 rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">This project is still pending approval. Rating and purchase unlock after approval.</div>` : access.isOwner ? `<div class="mt-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">You are the owner of this project, so rating and purchase are disabled.</div>` : ``}
                 <button onclick="rateMarketplaceItem('${item._id}')" class="mt-4 inline-flex items-center gap-2 rounded-2xl border ${!access.canRate ? "border-white/10 bg-white/[0.04] text-slate-500 cursor-not-allowed" : item.viewerHasRated ? "border-amber-400/30 bg-amber-500/10 text-amber-300" : "border-white/10 bg-white/5 text-slate-200"} px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em]">
                   <i class="fas fa-star"></i>
@@ -7075,6 +7092,26 @@
           const data = await res.json();
           if (!res.ok || !data.success) {
             throw new Error(data.message || "Could not submit this purchase.");
+          }
+          const nextItem = data?.item || null;
+          if (nextItem && nextItem._id) {
+            if (currentMarketplaceItem && String(currentMarketplaceItem._id || "") === String(nextItem._id || "")) {
+              currentMarketplaceItem = nextItem;
+              renderMarketplaceDetail(currentMarketplaceItem);
+            }
+            marketplaceItems = (Array.isArray(marketplaceItems) ? marketplaceItems : []).map((item) =>
+              String(item?._id || "") === String(nextItem._id || "") ? nextItem : item,
+            );
+            marketplaceMySales = (Array.isArray(marketplaceMySales) ? marketplaceMySales : []).map((item) =>
+              String(item?._id || "") === String(nextItem._id || "") ? nextItem : item,
+            );
+            marketplacePurchasedItems = (Array.isArray(marketplacePurchasedItems) ? marketplacePurchasedItems : []).some(
+              (item) => String(item?._id || "") === String(nextItem._id || ""),
+            )
+              ? marketplacePurchasedItems.map((item) =>
+                  String(item?._id || "") === String(nextItem._id || "") ? nextItem : item,
+                )
+              : [nextItem, ...(Array.isArray(marketplacePurchasedItems) ? marketplacePurchasedItems : [])];
           }
           completeUniversalProgress("Purchase request sent.");
           await refreshMarketplaceData();
