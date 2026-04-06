@@ -21,13 +21,13 @@
       "purpose": "any"
     },
     {
-      "src": "/mediafiles/icon.png",
+      "src": "/mediafiles/favicon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/mediafiles/icon.png",
+      "src": "/mediafiles/favicon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

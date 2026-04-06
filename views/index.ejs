@@ -11,6 +11,8 @@
     />
     <link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
     <link rel="icon" href="/favicon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/mediafiles/favicon.png" />
+    <meta name="theme-color" content="#06b6d4" />
     <script
       async
       src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8914021980453978"
@@ -4480,7 +4482,7 @@
           ? `<div class="feature-gate-status feature-gate-status--pending">Pending. Your premium request is being processed. You'll get feedback within 48 hours.</div>`
           : "";
         const deniedMessage = hasDeniedPremiumRequest()
-          ? `<div class="feature-gate-status">${escapeHtml(getPremiumDeniedMessage())}</div>`
+          ? `<div class="feature-gate-status">${escapeHtmlText(getPremiumDeniedMessage())}</div>`
           : "";
         const actionButton = hasPendingPremiumRequest()
           ? ""
