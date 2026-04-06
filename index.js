@@ -4887,9 +4887,7 @@ app.post("/api/marketplace/:id/purchase", publishRateLimit, express.json(), asyn
     };
     item.purchases.push(purchase);
     item.updatedAt = new Date();
-    if (!shouldKeepMarketplaceListingAvailable(item)) {
-      item.status = "sold";
-    }
+    item.status = "approved";
 
     let transfer = null;
     let responseMessage = "Your purchase will be processed within 24 hours.";
@@ -4904,11 +4902,7 @@ app.post("/api/marketplace/:id/purchase", publishRateLimit, express.json(), asyn
       targetPurchase.approvedUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       targetPurchase.message = "Purchase approved. You now own the project.";
       transfer = await transferMarketplaceProjectToBuyer(item, buyer);
-      if (!shouldKeepMarketplaceListingAvailable(item)) {
-        item.status = "sold";
-      } else {
-        item.status = "approved";
-      }
+      item.status = "approved";
       responseMessage = "Purchase approved. You now own the project.";
     }
 
@@ -5237,11 +5231,7 @@ app.patch(
         purchase.declineReason = "";
         purchase.approvedUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
         transfer = await transferMarketplaceProjectToBuyer(item, buyer);
-        if (!shouldKeepMarketplaceListingAvailable(item)) {
-          item.status = "sold";
-        } else {
-          item.status = "approved";
-        }
+        item.status = "approved";
         await createUserNotification({
           userId: buyer._id,
           type: "marketplace-purchase-approved",
