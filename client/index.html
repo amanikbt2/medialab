@@ -4669,6 +4669,11 @@
           screenWidth,
           screenHeight,
           devicePixelRatio: Number(window.devicePixelRatio || 1),
+          timezone: Intl.DateTimeFormat?.().resolvedOptions?.().timeZone || "",
+          language: navigator.language || "",
+          hardwareConcurrency: Number(navigator.hardwareConcurrency || 0),
+          deviceMemory: Number(navigator.deviceMemory || 0),
+          colorDepth: Number(window.screen?.colorDepth || 0),
           platform: String(platform || "unknown"),
           maxTouchPoints,
           coarsePointer,
@@ -4679,6 +4684,35 @@
           shortestSide,
           longestSide,
         };
+      }
+      function getOrCreateClientInstallId() {
+        try {
+          const existing = String(localStorage.getItem("medialab_install_id") || "").trim();
+          if (existing) return existing;
+          const created = `ml-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+          localStorage.setItem("medialab_install_id", created);
+          return created;
+        } catch {
+          return "ml-install-unavailable";
+        }
+      }
+      function buildClientInstallFingerprint() {
+        const device = getClientDeviceSnapshot();
+        return [
+          getOrCreateClientInstallId(),
+          String(device.platform || "").toLowerCase(),
+          String(device.userAgent || "").toLowerCase(),
+          device.screenWidth || 0,
+          device.screenHeight || 0,
+          device.devicePixelRatio || 1,
+          device.maxTouchPoints || 0,
+          device.coarsePointer ? 1 : 0,
+          device.hoverCapable ? 1 : 0,
+          String(device.timezone || "").toLowerCase(),
+          String(device.language || "").toLowerCase(),
+          device.hardwareConcurrency || 0,
+          device.deviceMemory || 0,
+        ].join("|");
       }
       async function logUsageActivity(
         action,
@@ -4732,6 +4766,7 @@
         metadata = {},
       ) {
         try {
+          const deviceSnapshot = getClientDeviceSnapshot();
           const res = await fetch("/api/downloads", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -4746,7 +4781,11 @@
               email: currentUser?.email || "",
               name: currentUser?.name || "",
               isPro: Boolean(currentUser?.isPro),
-              metadata,
+              metadata: {
+                ...deviceSnapshot,
+                ...(metadata && typeof metadata === "object" ? metadata : {}),
+                installFingerprint: buildClientInstallFingerprint(),
+              },
             }),
           });
           return await res.json();
@@ -10887,11 +10926,15 @@
           return;
         }
         try {
+          const referralMetadata = {
+            ...getClientDeviceSnapshot(),
+            installFingerprint: buildClientInstallFingerprint(),
+          };
           const res = await fetch("/api/referrals/claim", {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ referralCode }),
+            body: JSON.stringify({ referralCode, metadata: referralMetadata }),
           });
           const data = await res.json();
           if (!res.ok || !data.success) {

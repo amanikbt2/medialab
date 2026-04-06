@@ -4,6 +4,7 @@ import { Server } from "socket.io";
 import cors from "cors";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { fileURLToPath } from "url";
 import session from "express-session";
 import MongoStore from "connect-mongo";
@@ -33,6 +34,7 @@ import WithdrawalRequest from "./models/WithdrawalRequest.js";
 import MarketplaceItem from "./models/MarketplaceItem.js";
 import BuilderTemplate from "./models/BuilderTemplate.js";
 import Notification from "./models/Notification.js";
+import ReferralLedger from "./models/ReferralLedger.js";
 import {
   createRenderBlueprintInstance,
   extractRenderDeploySuccessPayload,
@@ -2136,6 +2138,104 @@ function enrichUsageMetadata(rawMetadata = {}, userAgent = "", req = null) {
   return metadata;
 }
 
+function hashReferralSignal(value = "") {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "";
+  return crypto.createHash("sha256").update(normalized).digest("hex");
+}
+
+function buildReferralFingerprintSeed(metadata = {}, userAgent = "") {
+  const explicitFingerprint = String(
+    metadata?.installFingerprint || metadata?.clientFingerprint || "",
+  ).trim();
+  if (explicitFingerprint) return explicitFingerprint;
+  return [
+    String(metadata?.platform || "").trim().toLowerCase(),
+    String(metadata?.browser || "").trim().toLowerCase(),
+    String(metadata?.device || metadata?.clientDeviceClass || "").trim().toLowerCase(),
+    String(metadata?.screenWidth || metadata?.viewportWidth || "").trim(),
+    String(metadata?.screenHeight || metadata?.viewportHeight || "").trim(),
+    String(metadata?.devicePixelRatio || "").trim(),
+    String(metadata?.maxTouchPoints || "").trim(),
+    metadata?.coarsePointer ? "1" : "0",
+    metadata?.hoverCapable ? "1" : "0",
+    metadata?.mobileHint ? "1" : "0",
+    String(metadata?.timezone || "").trim().toLowerCase(),
+    String(metadata?.language || "").trim().toLowerCase(),
+    String(metadata?.hardwareConcurrency || "").trim(),
+    String(metadata?.deviceMemory || "").trim(),
+    String(userAgent || "").trim().toLowerCase(),
+  ]
+    .filter(Boolean)
+    .join("|");
+}
+
+function extractReferralSignals(rawMetadata = {}, userAgent = "", req = null) {
+  const metadata = enrichUsageMetadata(rawMetadata, userAgent, req);
+  const fingerprintSeed = buildReferralFingerprintSeed(metadata, metadata.userAgent || userAgent);
+  return {
+    metadata,
+    fingerprintHash: hashReferralSignal(fingerprintSeed),
+    ipHash: hashReferralSignal(extractClientIp(req)),
+  };
+}
+
+async function findReferralLedgerForFingerprint(fingerprintHash = "") {
+  const normalizedHash = String(fingerprintHash || "").trim();
+  if (!normalizedHash) return null;
+  return ReferralLedger.findOne({ fingerprintHash: normalizedHash })
+    .sort({ updatedAt: -1 })
+    .lean();
+}
+
+async function upsertReferralLedgerEntry({
+  fingerprintHash = "",
+  ipHash = "",
+  user = null,
+  referrer = null,
+  referralCode = "",
+  status = "seen",
+  reason = "",
+  rewardDownloadId = null,
+  rewardAmount = 0,
+  installRewardedAt = null,
+  metadata = {},
+} = {}) {
+  const normalizedFingerprintHash = String(fingerprintHash || "").trim();
+  const normalizedReferralCode = String(referralCode || "").trim();
+  const query = normalizedFingerprintHash
+    ? { fingerprintHash: normalizedFingerprintHash }
+    : { claimantUserId: user?._id || null, referralCode: normalizedReferralCode };
+  await ReferralLedger.findOneAndUpdate(
+    query,
+    {
+      $set: {
+        ...(normalizedFingerprintHash ? { fingerprintHash: normalizedFingerprintHash } : {}),
+        ipHash: String(ipHash || "").trim(),
+        claimantUserId: user?._id || null,
+        claimantEmail: String(user?.email || "").trim().toLowerCase(),
+        referrerUserId: referrer?._id || null,
+        referralCode: normalizedReferralCode,
+        rewardDownloadId: rewardDownloadId || null,
+        rewardAmount: Number(rewardAmount || 0),
+        installRewardedAt: installRewardedAt || null,
+        status: String(status || "seen").trim(),
+        reason: String(reason || "").trim(),
+        device: String(metadata?.device || metadata?.clientDeviceClass || "").trim(),
+        platform: String(metadata?.platform || "").trim(),
+        browser: String(metadata?.browser || "").trim(),
+        userAgent: String(metadata?.userAgent || "").trim(),
+        metadata: metadata && typeof metadata === "object" ? metadata : {},
+      },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
+}
+
+function getReferralFraudMessage() {
+  return "This device has already been used for a referral install. Use a first-time install on a different device.";
+}
+
 function buildRichUsageIdentity(req) {
   const userAgent = String(req.headers["user-agent"] || "").trim();
   return {
@@ -2247,6 +2347,11 @@ app.post("/api/downloads", async (req, res) => {
     const source = String(req.body?.source || "web").trim() || "web";
     const platform = String(req.body?.platform || "").trim();
     const installState = String(req.body?.metadata?.installState || "").trim().toLowerCase();
+    const referralSignals = extractReferralSignals(
+      req.body?.metadata || {},
+      String(req.headers["user-agent"] || "").trim(),
+      req,
+    );
     const fallbackEmail = String(req.body?.email || "").trim().toLowerCase();
     const fallbackName = String(req.body?.name || "").trim();
     const fallbackIsPro = Boolean(req.body?.isPro);
@@ -2259,7 +2364,7 @@ app.post("/api/downloads", async (req, res) => {
       type,
       platform,
       source,
-      metadata: req.body?.metadata || {},
+      metadata: referralSignals.metadata,
     });
 
     if (req.user?._id && type === "pwa" && installState === "installed") {
@@ -2275,6 +2380,50 @@ app.post("/api/downloads", async (req, res) => {
         if (referredByCode && !alreadyRewarded) {
           const referrer = await User.findOne({ referralCode: referredByCode });
           if (referrer && String(referrer._id) !== String(installedUser._id)) {
+            const priorDeviceEntry = await findReferralLedgerForFingerprint(
+              referralSignals.fingerprintHash,
+            );
+            const deviceAlreadyUsedByAnotherUser = Boolean(
+              priorDeviceEntry &&
+                priorDeviceEntry.claimantUserId &&
+                String(priorDeviceEntry.claimantUserId) !== String(installedUser._id),
+            );
+            const deviceAlreadyRewarded = Boolean(
+              priorDeviceEntry &&
+                priorDeviceEntry.installRewardedAt &&
+                String(priorDeviceEntry.claimantUserId || "") !== String(installedUser._id),
+            );
+            if (deviceAlreadyUsedByAnotherUser || deviceAlreadyRewarded) {
+              await upsertReferralLedgerEntry({
+                fingerprintHash: referralSignals.fingerprintHash,
+                ipHash: referralSignals.ipHash,
+                user: installedUser,
+                referrer,
+                referralCode: referredByCode,
+                status: "blocked",
+                reason: "device-reused",
+                metadata: {
+                  ...referralSignals.metadata,
+                  downloadId: record._id,
+                  blockingReason: "device-reused",
+                },
+              });
+              await createUsageLog({
+                user: installedUser,
+                email: installedUser.email,
+                name: installedUser.name,
+                isAnonymous: false,
+                isPro: Boolean(installedUser.isPro),
+                action: "referral-install-blocked",
+                summary: "referral reward blocked because this device was already used",
+                source: "referral",
+                metadata: {
+                  reason: "device-reused",
+                  fingerprintHash: referralSignals.fingerprintHash,
+                  downloadId: record._id,
+                },
+              });
+            } else {
             const priorReward = Array.isArray(referrer.referralRewards)
               ? referrer.referralRewards.some(
                   (entry) => String(entry?.referredUserId || "") === String(installedUser._id || ""),
@@ -2319,6 +2468,23 @@ app.post("/api/downloads", async (req, res) => {
                   referredUserId: installedUser._id,
                 },
               });
+              await upsertReferralLedgerEntry({
+                fingerprintHash: referralSignals.fingerprintHash,
+                ipHash: referralSignals.ipHash,
+                user: installedUser,
+                referrer,
+                referralCode: referredByCode,
+                status: "rewarded",
+                reason: "first-install",
+                rewardDownloadId: record._id,
+                rewardAmount: 0.01,
+                installRewardedAt: new Date(),
+                metadata: {
+                  ...referralSignals.metadata,
+                  downloadId: record._id,
+                },
+              });
+            }
             }
           }
         }
@@ -2400,8 +2566,53 @@ app.post("/api/referrals/claim", async (req, res) => {
     if (!referrer) {
       return res.status(404).json({ success: false, message: "Referral code was not found." });
     }
+    const referralSignals = extractReferralSignals(
+      req.body?.metadata || {},
+      String(req.headers["user-agent"] || "").trim(),
+      req,
+    );
+    const priorDeviceEntry = await findReferralLedgerForFingerprint(referralSignals.fingerprintHash);
+    const deviceClaimedByAnotherUser = Boolean(
+      priorDeviceEntry &&
+        priorDeviceEntry.claimantUserId &&
+        String(priorDeviceEntry.claimantUserId) !== String(user._id),
+    );
+    const deviceAlreadyRewarded = Boolean(
+      priorDeviceEntry &&
+        priorDeviceEntry.installRewardedAt &&
+        String(priorDeviceEntry.claimantUserId || "") !== String(user._id),
+    );
+    if (deviceClaimedByAnotherUser || deviceAlreadyRewarded) {
+      await upsertReferralLedgerEntry({
+        fingerprintHash: referralSignals.fingerprintHash,
+        ipHash: referralSignals.ipHash,
+        user,
+        referrer,
+        referralCode,
+        status: "blocked",
+        reason: "device-reused",
+        metadata: {
+          ...referralSignals.metadata,
+          blockingReason: "device-reused",
+        },
+      });
+      return res.status(409).json({
+        success: false,
+        message: getReferralFraudMessage(),
+      });
+    }
     user.referredByCode = referralCode;
     await user.save();
+    await upsertReferralLedgerEntry({
+      fingerprintHash: referralSignals.fingerprintHash,
+      ipHash: referralSignals.ipHash,
+      user,
+      referrer,
+      referralCode,
+      status: "claimed",
+      reason: "pending-install",
+      metadata: referralSignals.metadata,
+    });
     await createUsageLog({
       user,
       email: user.email,
