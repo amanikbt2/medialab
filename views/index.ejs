@@ -4577,7 +4577,6 @@
         const dropdown = document.getElementById("notification-dropdown");
         if (dropdown && !dropdown.classList.contains("hidden")) {
           fetchNotifications().catch(() => {});
-          markAllNotificationsRead({ silent: true });
         }
       });
       setInterval(() => {
