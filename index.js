@@ -1495,7 +1495,12 @@ function buildMarketplacePublicItem(item = {}, viewerId = "") {
 
 function shouldKeepMarketplaceListingAvailable(item = {}) {
   const authorEmail = String(item?.authorEmail || "").trim().toLowerCase();
-  return Boolean(item?.keepListedAfterPurchase) || authorEmail === "dev@gmail.com";
+  const authorName = String(item?.authorName || "").trim().toLowerCase();
+  return (
+    Boolean(item?.keepListedAfterPurchase) ||
+    authorEmail === ADMIN_EMAIL ||
+    authorName === "ml community"
+  );
 }
 
 function stripMarketplaceRootFolder(files = []) {
@@ -4846,6 +4851,12 @@ app.post("/api/marketplace/:id/purchase", publishRateLimit, express.json(), asyn
     if (!item || item.status !== "approved") {
       return res.status(404).json({ success: false, message: "Marketplace listing not found." });
     }
+    if (shouldKeepMarketplaceListingAvailable(item)) {
+      item.keepListedAfterPurchase = true;
+      if (!String(item.authorEmail || "").trim()) {
+        item.authorEmail = ADMIN_EMAIL;
+      }
+    }
     if (String(item.authorId) === String(req.user._id)) {
       return res.status(400).json({
         success: false,
@@ -5205,6 +5216,12 @@ app.patch(
       );
       if (!purchase) {
         return res.status(404).json({ success: false, message: "Purchase request not found." });
+      }
+      if (shouldKeepMarketplaceListingAvailable(item)) {
+        item.keepListedAfterPurchase = true;
+        if (!String(item.authorEmail || "").trim()) {
+          item.authorEmail = ADMIN_EMAIL;
+        }
       }
       purchase.status = nextStatus;
       purchase.reviewedAt = new Date();
