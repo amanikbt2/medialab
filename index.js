@@ -183,6 +183,10 @@ async function createUsageLog({
 
 async function createUserNotification({
   userId,
+  toEmail = "",
+  fromEmail = "",
+  fromName = "MediaLab",
+  deliveryScope = "system",
   type = "general",
   title = "",
   message = "",
@@ -192,8 +196,17 @@ async function createUserNotification({
 } = {}) {
   if (!userId || !String(title || "").trim()) return null;
   try {
+    let recipientEmail = String(toEmail || "").trim().toLowerCase();
+    if (!recipientEmail) {
+      const recipientUser = await User.findById(userId).select("email").lean();
+      recipientEmail = String(recipientUser?.email || "").trim().toLowerCase();
+    }
     const notification = await Notification.create({
       userId,
+      recipientEmail,
+      senderName: String(fromName || "MediaLab").trim(),
+      senderEmail: String(fromEmail || "").trim().toLowerCase(),
+      deliveryScope: String(deliveryScope || "system").trim().toLowerCase(),
       type: String(type || "general").trim(),
       title: String(title || "").trim(),
       message: String(message || "").trim(),
@@ -219,6 +232,10 @@ function serializeNotification(notification = {}) {
   return {
     _id: String(notification?._id || ""),
     userId: String(notification?.userId || ""),
+    recipientEmail: String(notification?.recipientEmail || "").trim().toLowerCase(),
+    senderName: String(notification?.senderName || "MediaLab").trim(),
+    senderEmail: String(notification?.senderEmail || "").trim().toLowerCase(),
+    deliveryScope: String(notification?.deliveryScope || "system").trim(),
     type: String(notification?.type || "general").trim(),
     title: String(notification?.title || "").trim(),
     message: String(notification?.message || "").trim(),
@@ -247,8 +264,16 @@ async function listUserNotifications(userId, limit = 10) {
 async function createBulkNotifications(userIds = [], payload = {}) {
   const uniqueIds = [...new Set((Array.isArray(userIds) ? userIds : []).map((id) => String(id || "").trim()).filter(Boolean))];
   if (!uniqueIds.length || !String(payload?.title || "").trim()) return [];
+  const recipientUsers = await User.find({ _id: { $in: uniqueIds } }).select("_id email").lean();
+  const recipientEmailMap = new Map(
+    recipientUsers.map((user) => [String(user?._id || ""), String(user?.email || "").trim().toLowerCase()]),
+  );
   const docs = uniqueIds.map((userId) => ({
     userId,
+    recipientEmail: recipientEmailMap.get(String(userId)) || "",
+    senderName: String(payload.fromName || "ML Community").trim(),
+    senderEmail: String(payload.fromEmail || "dev@gmail.com").trim().toLowerCase(),
+    deliveryScope: String(payload.deliveryScope || "all").trim().toLowerCase(),
     type: String(payload.type || "general").trim(),
     title: String(payload.title || "").trim(),
     message: String(payload.message || "").trim(),
@@ -275,6 +300,10 @@ async function createBulkNotifications(userIds = [], payload = {}) {
       uniqueIds.map((userId) =>
         createUserNotification({
           userId,
+          toEmail: recipientEmailMap.get(String(userId)) || "",
+          fromEmail: payload.fromEmail || "dev@gmail.com",
+          fromName: payload.fromName || "ML Community",
+          deliveryScope: payload.deliveryScope || "all",
           type: payload.type || "general",
           title: payload.title || "",
           message: payload.message || "",
@@ -2726,6 +2755,10 @@ app.post("/api/admin/notifications", adminRateLimit, requireAdminApi, express.js
       }
       const notification = await createUserNotification({
         userId: user._id,
+        toEmail: user.email || "",
+        fromEmail: "dev@gmail.com",
+        fromName: "ML Community",
+        deliveryScope: "individual",
         type: "admin",
         title: "New admin message",
         message,
@@ -2741,6 +2774,9 @@ app.post("/api/admin/notifications", adminRateLimit, requireAdminApi, express.js
     const notifications = await createBulkNotifications(
       users.map((user) => user._id),
       {
+        fromEmail: "dev@gmail.com",
+        fromName: "ML Community",
+        deliveryScope: "all",
         type: "admin",
         title: "New admin announcement",
         message,
