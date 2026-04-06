@@ -8819,6 +8819,46 @@
           readAt: item?.readAt || null,
         };
       }
+      function getNotificationCacheKey(user = currentUser || {}) {
+        const userId = String(user?._id || "").trim();
+        const email = String(user?.email || "").trim().toLowerCase();
+        const identity = userId || email;
+        if (!identity) return "";
+        return `medialab_notifications_cache_${identity}`;
+      }
+      function persistNotificationCache(user = currentUser || {}) {
+        const cacheKey = getNotificationCacheKey(user);
+        if (!cacheKey) return;
+        try {
+          window.localStorage.setItem(
+            cacheKey,
+            JSON.stringify({
+              notifications: notificationsList.slice(0, 10).map((item) => normalizeNotificationItem(item)),
+              unreadCount: unreadNotificationCount,
+              savedAt: new Date().toISOString(),
+            }),
+          );
+        } catch {}
+      }
+      function restoreNotificationCache(user = currentUser || {}) {
+        const cacheKey = getNotificationCacheKey(user);
+        if (!cacheKey) return [];
+        try {
+          const raw = window.localStorage.getItem(cacheKey);
+          if (!raw) return [];
+          const parsed = JSON.parse(raw);
+          const cached = Array.isArray(parsed?.notifications)
+            ? parsed.notifications.map((item) => normalizeNotificationItem(item)).slice(0, 10)
+            : [];
+          notificationsList = cached;
+          unreadNotificationCount = Number(
+            parsed?.unreadCount ?? cached.filter((item) => !item.isRead).length,
+          );
+          return cached;
+        } catch {
+          return [];
+        }
+      }
       function upsertNotificationFromSocket(payload = {}) {
         if (!payload?._id) return;
         const existingIndex = notificationsList.findIndex(
@@ -8833,12 +8873,11 @@
         }
         notificationsList = [nextItem, ...notificationsList].slice(0, 10);
         unreadNotificationCount = notificationsList.filter((item) => !item.isRead).length;
+        persistNotificationCache();
         renderNotificationsUi();
       }
       async function fetchNotifications() {
         if (!loggedIn || !currentUser) {
-          notificationsList = [];
-          unreadNotificationCount = 0;
           renderNotificationsUi();
           return [];
         }
@@ -8861,10 +8900,12 @@
           unreadNotificationCount = Number(
             data.unreadCount ?? notificationsList.filter((item) => !item.isRead).length,
           );
+          persistNotificationCache();
           renderNotificationsUi();
           return notificationsList;
         } catch (error) {
           console.warn("Notification fetch skipped:", error.message);
+          restoreNotificationCache();
           renderNotificationsUi();
           return notificationsList;
         } finally {
@@ -8892,6 +8933,7 @@
           markSessionHealthy();
           notificationsList = notificationsList.map((item) => ({ ...item, isRead: true, readAt: new Date().toISOString() }));
           unreadNotificationCount = Number(data.unreadCount || 0);
+          persistNotificationCache();
           renderNotificationsUi();
         } catch (error) {
           if (!silent) {
@@ -8951,6 +8993,7 @@
           0,
           notificationsList.filter((item) => !item.isRead).length,
         );
+        persistNotificationCache();
         renderNotificationsUi();
         closeNotificationsDrawer();
         const targetType = String(notification.targetType || "").trim();
@@ -9036,6 +9079,7 @@
         if (currentUser?._id) {
           socket.emit("register-user", currentUser._id);
         }
+        restoreNotificationCache(currentUser);
         userSection?.classList.remove("hidden");
         startBtn?.classList.add("hidden");
         const picSrc =
@@ -9069,6 +9113,7 @@
             : "fas fa-crown text-cyan-300";
         }
         renderGithubStorageStatus();
+        renderNotificationsUi();
         fetchNotifications();
         updateAccountModalUi();
         maybePromptRenderHostingOnboarding();
