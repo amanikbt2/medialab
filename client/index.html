@@ -9657,6 +9657,7 @@
             loggedIn = true;
             currentUser = data.user;
             updateUserProfileUi();
+            await fetchNotifications().catch(() => []);
             return true;
           }
           return Boolean(loggedIn || currentUser);
@@ -10895,6 +10896,7 @@
             currentUser = devData.user || null;
             await fetchPremiumRequestStatus();
             updateUserProfileUi();
+            await fetchNotifications().catch(() => []);
             startAdsenseStatusSyncLoop();
             startUserWalletRefreshLoop();
             currentUser.builderDrafts = currentUser.builderDrafts || [];
