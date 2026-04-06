@@ -22,6 +22,7 @@ const UpgradeRequestSchema = new mongoose.Schema({
   },
   reviewedAt: { type: Date, default: null },
   reviewedBy: { type: String, default: "", trim: true },
+  deniedReason: { type: String, default: "", trim: true },
   createdAt: { type: Date, default: Date.now },
 });
 

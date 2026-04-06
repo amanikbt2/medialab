@@ -4420,6 +4420,13 @@
           String(currentPremiumRequest?.status || "").toLowerCase() === "denied"
         );
       }
+      function getPremiumDeniedMessage() {
+        if (!hasDeniedPremiumRequest()) return "";
+        const deniedReason = String(currentPremiumRequest?.deniedReason || "").trim();
+        return deniedReason
+          ? `Your recent premium request was unsuccessful. ${deniedReason}`
+          : "Your recent premium request was unsuccessful.";
+      }
       function updateStudioToolSwitches() {
         document.querySelectorAll("[data-tool-switch]").forEach((node) => {
           node.classList.toggle(
@@ -4473,13 +4480,13 @@
           ? `<div class="feature-gate-status feature-gate-status--pending">Pending. Your premium request is being processed. You'll get feedback within 48 hours.</div>`
           : "";
         const deniedMessage = hasDeniedPremiumRequest()
-          ? `<div class="feature-gate-status">You're not eligible for premium features.</div>`
+          ? `<div class="feature-gate-status">${escapeHtml(getPremiumDeniedMessage())}</div>`
           : "";
         const actionButton = hasPendingPremiumRequest()
           ? ""
           : hasDeniedPremiumRequest()
             ? `<button onclick="requestPremiumReview()" class="feature-gate-button feature-gate-button--premium relative hover:scale-[1.03] transition-all">
-                <span>Request Review</span>
+                <span>Request Again</span>
                 <i class="fas fa-arrow-right"></i>
               </button>`
             : `<button onclick="${loggedIn ? "upgradePlan()" : "showLogin()"}" class="feature-gate-button feature-gate-button--premium relative hover:scale-[1.03] transition-all">

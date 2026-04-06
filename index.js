@@ -7312,10 +7312,19 @@ app.patch("/api/admin/upgrade-requests/:id", adminRateLimit, requireAdminApi, as
         .json({ success: false, message: "Invalid request status." });
     }
 
+    const deniedReason = String(req.body?.deniedReason || "").trim();
+    if (nextStatus === "denied" && deniedReason.length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: "Add a short reason so the user understands why the premium request was denied.",
+      });
+    }
+
     const updates = {
       status: nextStatus,
       reviewedAt: new Date(),
       reviewedBy: "admin",
+      deniedReason: nextStatus === "denied" ? deniedReason : "",
     };
 
     const request = await UpgradeRequest.findByIdAndUpdate(
@@ -7340,6 +7349,14 @@ app.patch("/api/admin/upgrade-requests/:id", adminRateLimit, requireAdminApi, as
         },
         { $set: { isPro: true } },
       );
+      await createUserNotification({
+        userId: request.userId,
+        type: "premium-granted",
+        title: "Premium request approved",
+        message: "Your premium request was approved. Premium tools are now available on your account.",
+        targetType: "premium",
+        metadata: { requestId: request._id, status: nextStatus },
+      });
     } else if (nextStatus === "denied") {
       await User.updateMany(
         {
@@ -7350,6 +7367,20 @@ app.patch("/api/admin/upgrade-requests/:id", adminRateLimit, requireAdminApi, as
         },
         { $set: { isPro: false } },
       );
+      await createUserNotification({
+        userId: request.userId,
+        type: "premium-denied",
+        title: "Premium request was unsuccessful",
+        message: deniedReason
+          ? `Your recent premium request was unsuccessful. ${deniedReason}`
+          : "Your recent premium request was unsuccessful.",
+        targetType: "premium",
+        metadata: {
+          requestId: request._id,
+          status: nextStatus,
+          deniedReason,
+        },
+      });
     }
 
     await createUsageLog({
@@ -7360,7 +7391,7 @@ app.patch("/api/admin/upgrade-requests/:id", adminRateLimit, requireAdminApi, as
       action: `premium-request-${nextStatus}`,
       summary: `${nextStatus} premium request for ${request.requestedFeature}`,
       source: "admin-premium-requests",
-      metadata: { requestId: request._id, status: nextStatus },
+      metadata: { requestId: request._id, status: nextStatus, deniedReason: updates.deniedReason || "" },
     });
     io.emit("admin:premium-request-updated", request);
 

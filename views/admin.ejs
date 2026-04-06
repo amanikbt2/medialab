@@ -1276,7 +1276,12 @@
                   <div><span class="text-slate-500">Source:</span> ${escapeHtml(item.source || "studio")}</div>
                   <div><span class="text-slate-500">Requested:</span> ${escapeHtml(formatDate(item.createdAt))}</div>
                   <div><span class="text-slate-500">Message:</span> ${escapeHtml(item.message || "Request premium join.")}</div>
+                  ${item.deniedReason ? `<div><span class="text-slate-500">Last denial reason:</span> <span class="text-rose-300 break-words">${escapeHtml(item.deniedReason)}</span></div>` : ""}
                 </div>
+              <div class="mt-4">
+                <label class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-2">Denial Reason</label>
+                <textarea id="premium-denial-reason-${item._id}" class="w-full min-h-[96px] rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none focus:border-rose-400/40" placeholder="Explain why this premium request was unsuccessful...">${escapeHtml(item.deniedReason || "")}</textarea>
+              </div>
               <div class="flex flex-wrap gap-2 mt-4">
                 <button onclick="updatePremiumRequest('${item._id}', 'granted')" class="px-3.5 py-2 rounded-xl bg-emerald-400 text-slate-950 text-xs sm:text-sm font-bold hover:bg-emerald-300 transition-all">Grant</button>
                 <button onclick="updatePremiumRequest('${item._id}', 'denied')" class="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-xs sm:text-sm font-bold hover:bg-white/10 transition-all">Request Denied</button>
@@ -2399,10 +2404,18 @@
       }
 
       async function updatePremiumRequest(id, status) {
+        const nextStatus = String(status || "").trim().toLowerCase();
+        const deniedReason = String(
+          document.getElementById(`premium-denial-reason-${id}`)?.value || "",
+        ).trim();
+        if (nextStatus === "denied" && !deniedReason) {
+          showAdminToast("Add a denial reason before rejecting the premium request.", "error");
+          return;
+        }
         const res = await fetch(`/api/admin/upgrade-requests/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", ...getAdminHeaders() },
-          body: JSON.stringify({ status }),
+          body: JSON.stringify({ status: nextStatus, deniedReason }),
         });
         const data = await res.json();
         if (!data.success) {
@@ -2410,6 +2423,12 @@
           return;
         }
         await loadAdminData();
+        showAdminToast(
+          nextStatus === "denied"
+            ? "Premium request denied and reason saved."
+            : "Premium request updated.",
+          "success",
+        );
       }
 
       async function updateWithdrawalStatus(id, status) {
