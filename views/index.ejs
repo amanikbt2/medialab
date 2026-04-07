@@ -8891,6 +8891,25 @@
           renderNotificationsUi();
         }
       }
+      async function fetchNotificationsWithRetry(attempts = 3, delayMs = 900) {
+        let lastResult = [];
+        for (let attempt = 0; attempt < Math.max(1, Number(attempts || 1)); attempt += 1) {
+          lastResult = await fetchNotifications().catch(() => []);
+          if (
+            Array.isArray(lastResult) &&
+            lastResult.length > 0
+          ) {
+            return lastResult;
+          }
+          if (Number(unreadNotificationCount || 0) > 0) {
+            return lastResult;
+          }
+          if (attempt < Number(attempts || 1) - 1) {
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+          }
+        }
+        return lastResult;
+      }
       async function markAllNotificationsRead(options = {}) {
         const { silent = false } = options;
         if (!loggedIn || !currentUser) return;
@@ -8939,7 +8958,7 @@
         dropdown.style.display = shouldOpen ? "flex" : "none";
         if (shouldOpen) {
           queueNotificationAutoHide();
-          await fetchNotifications();
+          await fetchNotificationsWithRetry(2, 500);
           await markAllNotificationsRead({ silent: true });
         } else {
           clearTimeout(notificationDropdownTimer);
@@ -9090,7 +9109,7 @@
         }
         renderGithubStorageStatus();
         renderNotificationsUi();
-        fetchNotifications();
+        fetchNotificationsWithRetry(3, 900);
         updateAccountModalUi();
         maybePromptRenderHostingOnboarding();
         startRenderProjectSyncPolling();
@@ -9668,7 +9687,7 @@
             loggedIn = true;
             currentUser = data.user;
             updateUserProfileUi();
-            await fetchNotifications().catch(() => []);
+            await fetchNotificationsWithRetry(3, 900).catch(() => []);
             return true;
           }
           return Boolean(loggedIn || currentUser);
@@ -10907,7 +10926,7 @@
             currentUser = devData.user || null;
             await fetchPremiumRequestStatus();
             updateUserProfileUi();
-            await fetchNotifications().catch(() => []);
+            await fetchNotificationsWithRetry(3, 900).catch(() => []);
             startAdsenseStatusSyncLoop();
             startUserWalletRefreshLoop();
             currentUser.builderDrafts = currentUser.builderDrafts || [];
