@@ -8852,7 +8852,8 @@
         unreadNotificationCount = notificationsList.filter((item) => !item.isRead).length;
         renderNotificationsUi();
       }
-      async function fetchNotifications() {
+      async function fetchNotifications(options = {}) {
+        const { allowSessionRecovery = true } = options;
         if (!loggedIn || !currentUser) {
           notificationsList = [];
           unreadNotificationCount = 0;
@@ -8869,7 +8870,16 @@
           });
           const data = await res.json();
           if (res.status === 401) {
+            if (allowSessionRecovery) {
+              const sessionRecovered = await syncServerSessionState({ silent: true }).catch(() => false);
+              if (sessionRecovered && loggedIn && currentUser) {
+                return fetchNotifications({ allowSessionRecovery: false });
+              }
+            }
             await handleAuthSessionFailure(data.message || "Your session ended. Please sign in again.");
+            notificationsList = [];
+            unreadNotificationCount = 0;
+            renderNotificationsUi();
             return [];
           }
           if (!res.ok || !data.success) {
