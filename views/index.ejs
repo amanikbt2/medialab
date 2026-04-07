@@ -8823,6 +8823,19 @@
           readAt: item?.readAt || null,
         };
       }
+      function trimNotificationFeed(items = []) {
+        const normalizedItems = (Array.isArray(items) ? items : []).map((item) =>
+          normalizeNotificationItem(item),
+        );
+        const unreadItems = normalizedItems.filter((item) => !item.isRead);
+        const readItems = normalizedItems
+          .filter((item) => item.isRead)
+          .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0))
+          .slice(0, 10);
+        return [...unreadItems, ...readItems].sort(
+          (left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0),
+        );
+      }
       function upsertNotificationFromSocket(payload = {}) {
         if (!payload?._id) return;
         const existingIndex = notificationsList.findIndex(
@@ -8835,7 +8848,7 @@
         if (existingIndex >= 0) {
           notificationsList.splice(existingIndex, 1);
         }
-        notificationsList = [nextItem, ...notificationsList].slice(0, 10);
+        notificationsList = trimNotificationFeed([nextItem, ...notificationsList]);
         unreadNotificationCount = notificationsList.filter((item) => !item.isRead).length;
         renderNotificationsUi();
       }
@@ -8863,9 +8876,7 @@
             throw new Error(data.message || "Could not load notifications.");
           }
           markSessionHealthy();
-          notificationsList = Array.isArray(data.notifications)
-            ? data.notifications.map((item) => normalizeNotificationItem(item)).slice(0, 10)
-            : [];
+          notificationsList = trimNotificationFeed(Array.isArray(data.notifications) ? data.notifications : []);
           unreadNotificationCount = Number(
             data.unreadCount ?? notificationsList.filter((item) => !item.isRead).length,
           );

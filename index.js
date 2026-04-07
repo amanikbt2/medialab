@@ -254,11 +254,31 @@ function serializeNotification(notification = {}) {
 async function listUserNotifications(userId, limit = 10) {
   if (!userId) return [];
   const safeLimit = Math.max(1, Math.min(10, Number(limit || 10)));
-  const notifications = await Notification.find({ userId })
-    .sort({ createdAt: -1 })
-    .limit(safeLimit)
-    .lean();
+  const [unreadNotifications, readNotifications] = await Promise.all([
+    Notification.find({ userId, isRead: false })
+      .sort({ createdAt: -1 })
+      .lean(),
+    Notification.find({ userId, isRead: true })
+      .sort({ createdAt: -1 })
+      .limit(safeLimit)
+      .lean(),
+  ]);
+  const notifications = [...unreadNotifications, ...readNotifications]
+    .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
   return notifications.map((item) => serializeNotification(item));
+}
+
+async function trimUserNotifications(userId) {
+  if (!userId) return;
+  const staleReadNotifications = await Notification.find({ userId, isRead: true })
+    .sort({ createdAt: -1 })
+    .skip(10)
+    .lean();
+  if (staleReadNotifications.length) {
+    await Notification.deleteMany({
+      _id: { $in: staleReadNotifications.map((item) => item._id) },
+    });
+  }
 }
 
 async function createBulkNotifications(userIds = [], payload = {}) {
@@ -314,18 +334,6 @@ async function createBulkNotifications(userIds = [], payload = {}) {
       ),
     );
     return fallbackNotifications.filter(Boolean);
-  }
-}
-
-async function trimUserNotifications(userId) {
-  if (!userId) return;
-  const keep = await Notification.find({ userId })
-    .sort({ createdAt: -1 })
-    .skip(10)
-    .select("_id")
-    .lean();
-  if (keep.length) {
-    await Notification.deleteMany({ _id: { $in: keep.map((item) => item._id) } });
   }
 }
 
