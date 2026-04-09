@@ -12892,9 +12892,36 @@
                 </button>
             </div>
             <div id="canvas-container" onclick="deselectAll(event)" class="flex-1 overflow-y-auto overflow-x-hidden flex justify-center items-start px-2 sm:px-4 pt-2 sm:pt-4 pb-20 sm:pb-28 cursor-default custom-scrollbar" style="touch-action: pan-x pan-y pinch-zoom;">
-                <div class="flex w-full max-w-[1680px] flex-col items-center">
-                    <div class="px-1 sm:px-2 pb-2 flex items-center justify-between">
-                        <div class="text-[10px] font-black uppercase tracking-[0.22em] text-gray-500">Desktop Canvas</div>
+                <div class="relative flex w-full max-w-[1680px] flex-col items-center">
+                    <div class="w-full px-1 sm:px-2 pb-2 flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            <button id="builder-viewport-toggle" type="button" onclick="toggleBuilderViewportPanel()" class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-400 hover:text-cyan-200 hover:border-cyan-400/30 transition-colors">
+                                <i class="fas fa-chevron-down text-[10px]"></i>
+                            </button>
+                            <div id="builder-canvas-size-label" class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Desktop Canvas</div>
+                            <div id="builder-viewport-panel" class="hidden items-center gap-2 rounded-lg border border-white/10 bg-[#071122]/95 px-2.5 py-1.5 shadow-[0_18px_38px_rgba(2,6,23,0.45)]">
+                                <label class="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">
+                                    <i class="fas fa-laptop-code text-cyan-300"></i>
+                                    <select id="builder-device-select" onchange="setBuilderViewportMode(this.value)" class="bg-transparent text-[10px] font-black uppercase tracking-[0.2em] text-slate-200 outline-none">
+                                        <option value="desktop" class="bg-slate-950 text-slate-100">Desktop</option>
+                                        <option value="laptop" class="bg-slate-950 text-slate-100">Laptop 1440</option>
+                                        <option value="tablet" class="bg-slate-950 text-slate-100">iPad 1024</option>
+                                        <option value="tablet-portrait" class="bg-slate-950 text-slate-100">iPad 768</option>
+                                        <option value="mobile" class="bg-slate-950 text-slate-100">iPhone 14 Pro Max</option>
+                                        <option value="mobile-small" class="bg-slate-950 text-slate-100">iPhone SE</option>
+                                        <option value="pixel" class="bg-slate-950 text-slate-100">Pixel 7</option>
+                                        <option value="galaxy" class="bg-slate-950 text-slate-100">Galaxy S8</option>
+                                        <option value="responsive" class="bg-slate-950 text-slate-100">Responsive</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+                        <div id="builder-responsive-controls" class="hidden items-center gap-2 rounded-lg border border-cyan-400/20 bg-cyan-500/[0.08] px-2.5 py-1.5">
+                            <span class="text-[9px] font-black uppercase tracking-[0.2em] text-cyan-200">Responsive Width</span>
+                            <input id="builder-responsive-width" type="range" min="320" max="1680" value="1280" oninput="setBuilderViewportWidth(this.value)" class="h-1.5 w-36 accent-cyan-400" />
+                            <input id="builder-responsive-width-number" type="number" min="320" max="1680" value="1280" oninput="setBuilderViewportWidth(this.value)" class="w-20 rounded-md border border-white/10 bg-slate-950/80 px-2 py-1 text-[10px] font-black text-slate-200 outline-none focus:border-cyan-400" />
+                            <span class="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-200">px</span>
+                        </div>
                         <div class="hidden sm:flex items-center gap-2 text-[10px] font-bold text-gray-500">
                             <span class="px-3 py-1.5 rounded-full bg-white/5 border border-white/5">Precision Drag</span>
                             <span class="px-3 py-1.5 rounded-full bg-white/5 border border-white/5">Semantic Export</span>
@@ -14692,6 +14719,9 @@
       let selectionBoxEl = null;
       let builderConfirmAction = null;
       let builderConfirmSecondaryAction = null;
+      let builderViewportMode = "desktop";
+      let builderResponsiveWidth = 1280;
+      let builderViewportPanelOpen = false;
       let feedbackRating = 5;
       let feedbackExitPending = false;
       let feedbackPromptTimer = null;
@@ -16107,6 +16137,101 @@
         guideXEl?.classList.add("hidden");
         guideYEl?.classList.add("hidden");
       }
+      function getBuilderViewportPreset(mode = "desktop") {
+        const presets = {
+          desktop: { label: "Desktop Canvas", width: 0 },
+          laptop: { label: "Laptop", width: 1440 },
+          tablet: { label: "iPad Landscape", width: 1024 },
+          "tablet-portrait": { label: "iPad Portrait", width: 768 },
+          mobile: { label: "iPhone 14 Pro Max", width: 430 },
+          "mobile-small": { label: "iPhone SE", width: 375 },
+          pixel: { label: "Pixel 7", width: 412 },
+          galaxy: { label: "Galaxy S8", width: 360 },
+          responsive: { label: "Responsive", width: builderResponsiveWidth },
+        };
+        return presets[mode] || presets.desktop;
+      }
+      function toggleBuilderViewportPanel(forceOpen) {
+        const panel = document.getElementById("builder-viewport-panel");
+        const toggle = document.getElementById("builder-viewport-toggle");
+        if (!panel || !toggle) return;
+        const nextState =
+          typeof forceOpen === "boolean" ? forceOpen : !builderViewportPanelOpen;
+        builderViewportPanelOpen = nextState;
+        panel.classList.toggle("hidden", !nextState);
+        panel.classList.toggle("inline-flex", nextState);
+        toggle.innerHTML = `<i class="fas fa-chevron-${nextState ? "up" : "down"} text-[10px]"></i>`;
+      }
+      function setBuilderViewportMode(mode = "desktop") {
+        builderViewportMode = String(mode || "desktop").trim() || "desktop";
+        if (builderViewportMode !== "responsive") {
+          const preset = getBuilderViewportPreset(builderViewportMode);
+          if (preset.width) builderResponsiveWidth = preset.width;
+        }
+        applyBuilderViewportToCanvas();
+      }
+      function setBuilderViewportWidth(value) {
+        const nextValue = Math.min(
+          1680,
+          Math.max(320, parseInt(String(value || "1280"), 10) || 1280),
+        );
+        builderResponsiveWidth = nextValue;
+        if (builderViewportMode !== "responsive") {
+          builderViewportMode = "responsive";
+          const select = document.getElementById("builder-device-select");
+          if (select) select.value = "responsive";
+        }
+        applyBuilderViewportToCanvas();
+      }
+      function applyBuilderViewportToCanvas() {
+        const canvas = document.getElementById("web-canvas");
+        const select = document.getElementById("builder-device-select");
+        const label = document.getElementById("builder-canvas-size-label");
+        const controls = document.getElementById("builder-responsive-controls");
+        const widthRange = document.getElementById("builder-responsive-width");
+        const widthInput = document.getElementById("builder-responsive-width-number");
+        if (!canvas) return;
+        if (select && select.value !== builderViewportMode) {
+          select.value = builderViewportMode;
+        }
+        if (widthRange) widthRange.value = String(builderResponsiveWidth);
+        if (widthInput) widthInput.value = String(builderResponsiveWidth);
+        const preset = getBuilderViewportPreset(builderViewportMode);
+        const viewportWidth =
+          builderViewportMode === "responsive"
+            ? builderResponsiveWidth
+            : preset.width || 0;
+        const isDesktop = builderViewportMode === "desktop";
+        if (isDesktop) {
+          canvas.style.width = "100%";
+          canvas.style.maxWidth = "1680px";
+        } else {
+          canvas.style.width = `${viewportWidth}px`;
+          canvas.style.maxWidth = `${viewportWidth}px`;
+        }
+        if (controls) {
+          controls.classList.toggle(
+            "hidden",
+            builderViewportMode !== "responsive",
+          );
+          controls.classList.toggle(
+            "inline-flex",
+            builderViewportMode === "responsive",
+          );
+        }
+        if (label) {
+          label.textContent = isDesktop
+            ? "Desktop Canvas"
+            : `${preset.label} • ${viewportWidth}px`;
+        }
+      }
+      document.addEventListener("mousedown", (event) => {
+        const panel = document.getElementById("builder-viewport-panel");
+        const toggle = document.getElementById("builder-viewport-toggle");
+        if (!panel || !toggle || !builderViewportPanelOpen) return;
+        if (panel.contains(event.target) || toggle.contains(event.target)) return;
+        toggleBuilderViewportPanel(false);
+      });
       function clearLayoutDropGuides() {
         layoutGuideOverlayEl?.classList.add("hidden");
         layoutGuideOverlayEl?.classList.remove("grid", "flex");
@@ -19244,6 +19369,7 @@ console.log("Triggered ${eventName}", { source, event });
         if (canvas) {
           canvas.classList.toggle("builder-grid", builderSnapEnabled);
           refreshCanvasBackground();
+          applyBuilderViewportToCanvas();
         }
         if (canvasContainer)
           canvasContainer.classList.toggle("hidden", builderCodeMode);
