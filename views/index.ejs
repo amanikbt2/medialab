@@ -13106,11 +13106,6 @@
                             <input id="builder-responsive-width-number" type="number" min="320" max="1680" value="1280" oninput="setBuilderViewportWidth(this.value)" class="w-20 rounded-md border border-white/10 bg-slate-950/80 px-2 py-1 text-[10px] font-black text-slate-200 outline-none focus:border-cyan-400" />
                             <span class="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-200">px</span>
                         </div>
-                        <div class="hidden sm:flex items-center gap-2 text-[10px] font-bold text-gray-500">
-                            <span class="px-3 py-1.5 rounded-full bg-white/5 border border-white/5">Precision Drag</span>
-                            <span class="px-3 py-1.5 rounded-full bg-white/5 border border-white/5">Semantic Export</span>
-                            <span class="px-3 py-1.5 rounded-full bg-white/5 border border-white/5">Mobile Safe</span>
-                        </div>
                     </div>
                     <div id="web-canvas" data-page-background="#ffffff" class="builder-grid bg-white relative shadow-[0_60px_150px_rgba(0,0,0,0.55)] rounded-[1.2rem] sm:rounded-[2rem] overflow-hidden transition-transform duration-500">
                     </div>
@@ -21954,6 +21949,93 @@ ${payload.interactionScript ? `\n${payload.interactionScript}` : ""}
   </body>
 </html>`;
       }
+      function buildBuilderAccurateRunDocument() {
+        const canvas = document.getElementById("web-canvas");
+        if (!canvas) return "";
+        const clone = canvas.cloneNode(true);
+        clone.removeAttribute("id");
+        clone.style.margin = "0 auto";
+        clone.style.maxWidth = "none";
+        clone.style.borderRadius = "0";
+        clone.style.boxShadow = "none";
+        clone.style.overflow = "visible";
+        clone.querySelectorAll(
+          ".resizer, .drag-handle, .builder-selection-chip, .builder-guide, .builder-layout-guide-overlay, .builder-layout-slot-guide, .builder-selection-box, .builder-layout-scroll-assist, [contenteditable='true']",
+        ).forEach((node) => {
+          if (node.hasAttribute?.("contenteditable")) {
+            node.removeAttribute("contenteditable");
+            return;
+          }
+          node.remove();
+        });
+        const pageBackground = getCanvasPageStyleState(canvas).background;
+        const width = Math.max(canvas.scrollWidth, canvas.offsetWidth, parseFloat(canvas.style.width || "0") || 0);
+        const height = Math.max(canvas.scrollHeight, canvas.offsetHeight, parseFloat(canvas.style.height || "0") || 0);
+        const interactionEntries = [];
+        canvas
+          .querySelectorAll(":scope > .canvas-element")
+          .forEach((sourceNode) => {
+            const clonedNodeId = sourceNode.id;
+            if (!clonedNodeId) return;
+            Object.entries(
+              normalizeElementInteractions(
+                JSON.parse(sourceNode.dataset.interactions || "{}"),
+              ),
+            ).forEach(([eventName, action]) => {
+              interactionEntries.push({
+                sourceId: clonedNodeId,
+                eventName,
+                action,
+              });
+            });
+          });
+        const interactionScript = buildInteractionScriptForExport(interactionEntries);
+        return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MediaLab Run Preview</title>
+    <style>
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        background: ${pageBackground};
+        overflow: auto;
+      }
+      body {
+        position: relative;
+        font-family: Inter, system-ui, sans-serif;
+      }
+      .canvas-element,
+      .absolute {
+        position: absolute;
+      }
+      .canvas-element.in-layout-flow {
+        position: static !important;
+      }
+      .element-body {
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
+      }
+      #medialab-run-stage {
+        position: relative;
+        width: ${Math.max(320, Math.round(width))}px;
+        min-width: ${Math.max(320, Math.round(width))}px;
+        height: ${Math.max(320, Math.round(height))}px;
+        min-height: ${Math.max(320, Math.round(height))}px;
+        background: ${pageBackground};
+        overflow: visible;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="medialab-run-stage">${clone.innerHTML}</div>
+${interactionScript ? `\n${interactionScript}` : ""}
+  </body>
+</html>`;
+      }
       function openBuilderPublishModal() {
         if (!loggedIn || !currentUser) {
           showLogin();
@@ -22570,12 +22652,12 @@ ${payload.interactionScript ? `\n${payload.interactionScript}` : ""}
           openBuilderRunModeWithHtml(builderRawImportDocument);
           return;
         }
-        const payload = buildExportPayload("medialab-page");
-        if (!payload?.body?.trim()) {
+        const accurateRunDocument = buildBuilderAccurateRunDocument();
+        if (!String(accurateRunDocument || "").trim()) {
           showBuilderSnackbar("Add content to the canvas before running the site.", "error");
           return;
         }
-        openBuilderRunModeWithHtml(buildCodeModeDocument());
+        openBuilderRunModeWithHtml(accurateRunDocument);
       }
       function openBuilderRunModeWithHtml(documentHtml = "") {
         const modal = document.getElementById("builder-run-modal");
@@ -22604,7 +22686,7 @@ ${payload.interactionScript ? `\n${payload.interactionScript}` : ""}
             ? builderTemplateRuntimeDocument
             : builderImportedProject?.rootHtml ||
               builderRawImportDocument ||
-              buildCodeModeDocument();
+              buildBuilderAccurateRunDocument();
         if (!String(runDocument || "").trim()) {
           showBuilderSnackbar("Add content to the canvas before running the site.", "error");
           return;
