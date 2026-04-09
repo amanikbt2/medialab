@@ -193,6 +193,7 @@
       let terminalSnapshot = null;
       let terminalMirrorTimer = null;
       let terminalSyncLock = false;
+      let terminalSnapshotPollTimer = null;
       const terminalChannel =
         typeof BroadcastChannel === "function" ? new BroadcastChannel(CHANNEL_NAME) : null;
 
@@ -402,6 +403,45 @@
           return null;
         }
       }
+      function getStoredFileUpdate() {
+        try {
+          return JSON.parse(localStorage.getItem(FILE_UPDATE_KEY) || "null");
+        } catch {
+          return null;
+        }
+      }
+      async function applyStoredFileUpdate(payload = null) {
+        const update = payload || getStoredFileUpdate();
+        if (!update || !terminalWebContainer) return;
+        const folder = normalizeProjectSeed(update.projectName || terminalActiveFolder);
+        if (folder !== terminalActiveFolder) return;
+        const relativePath = String(update.path || "index.html").trim().replace(/^\/+/, "");
+        if (!relativePath) return;
+        await ensureDirectory(`/${folder}/${relativePath}`.split("/").slice(0, -1).join("/"));
+        await terminalWebContainer.fs.writeFile(
+          `/${folder}/${relativePath}`,
+          String(update.content || ""),
+        );
+      }
+      function startSnapshotPolling() {
+        clearInterval(terminalSnapshotPollTimer);
+        let lastSnapshotStamp = 0;
+        let lastFileStamp = 0;
+        terminalSnapshotPollTimer = setInterval(() => {
+          const snapshot = getStoredSnapshot();
+          if (snapshot?.timestamp && snapshot.timestamp > lastSnapshotStamp) {
+            lastSnapshotStamp = snapshot.timestamp;
+            applySnapshot(snapshot, { preserveOutput: false }).catch((error) => {
+              setStatus(error.message || "Project sync failed.");
+            });
+          }
+          const fileUpdate = getStoredFileUpdate();
+          if (fileUpdate?.timestamp && fileUpdate.timestamp > lastFileStamp) {
+            lastFileStamp = fileUpdate.timestamp;
+            applyStoredFileUpdate(fileUpdate).catch(() => {});
+          }
+        }, 900);
+      }
 
       window.requestProjectBootstrap = requestProjectBootstrap;
 
@@ -411,6 +451,10 @@
           applySnapshot(payload.payload, { preserveOutput: false }).catch((error) => {
             setStatus(error.message || "Project sync failed.");
           });
+          return;
+        }
+        if (payload.type === "terminal-file-update") {
+          applyStoredFileUpdate(payload).catch(() => {});
         }
       });
 
@@ -434,7 +478,18 @@
       }
 
       queueMirrorLoop();
+      startSnapshotPolling();
       requestProjectBootstrap();
+
+      window.addEventListener("error", (event) => {
+        const message = String(event?.error?.message || event?.message || "").trim();
+        if (message) setStatus(message);
+      });
+
+      window.addEventListener("unhandledrejection", (event) => {
+        const message = String(event?.reason?.message || event?.reason || "").trim();
+        if (message) setStatus(message);
+      });
     </script>
   </body>
 </html>
