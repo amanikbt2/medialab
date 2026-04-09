@@ -836,8 +836,17 @@
         letter-spacing: 0.08em;
         text-transform: uppercase;
         padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
         transition: all 0.2s ease;
         box-shadow: 0 10px 24px rgba(2, 6, 23, 0.34);
+      }
+      .inspector-mode-tab svg {
+        width: 14px;
+        height: 14px;
+        pointer-events: none;
       }
       .inspector-mode-tab.active {
         background: rgba(6,182,212,0.16);
@@ -13217,11 +13226,24 @@
                          <div id="inspector-preview" class="relative w-full h-full transition-all duration-300 px-5 py-4"></div>
                     </div>
                     <div class="inspector-mode-corner">
-                        <button id="inspector-mode-css" type="button" onclick="setInspectorMode('css')" class="inspector-mode-tab active">CSS</button>
-                        <button id="inspector-mode-keyframes" type="button" onclick="setInspectorMode('keyframes')" class="inspector-mode-tab">KF</button>
+                        <button id="inspector-mode-css" type="button" onclick="setInspectorMode('css')" class="inspector-mode-tab active" title="CSS">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 4 5 20"></path>
+                                <path d="M19 4 15 20"></path>
+                                <path d="M21 9H7"></path>
+                                <path d="M17 15H3"></path>
+                            </svg>
+                        </button>
+                        <button id="inspector-mode-keyframes" type="button" onclick="setInspectorMode('keyframes')" class="inspector-mode-tab" title="Keyframes">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M5 17 11 7 13 12 19 4"></path>
+                                <path d="M19 4v5"></path>
+                                <path d="M14 19h5"></path>
+                            </svg>
+                        </button>
                     </div>
                     <div class="p-5 sm:p-6 flex-1 min-h-0 flex flex-col">
-                        <div id="inspector-controls" class="flex-1 min-h-0 overflow-hidden pr-1 flex flex-col gap-3">
+                        <div id="inspector-controls" class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 flex flex-col gap-3 custom-scrollbar">
                             </div>
                        
                         <div class="mt-5 pt-4 border-t border-white/5 shrink-0">
@@ -19254,7 +19276,7 @@ console.log("Triggered ${eventName}", { source, event });
                 ? inspectorAnimationPresets.transform
                 : inspectorAnimationPresets.motion;
         normalizeAnimationStack(s.animationStack).forEach((layer, index) => {
-          h += `<div class="rounded-[1.2rem] border border-white/8 bg-white/[0.03] p-3.5 space-y-3">
+          h += `<div class="space-y-3 px-1 py-1.5">
             <div class="flex items-center justify-between gap-3">
               <div class="text-[9px] font-black uppercase tracking-[0.22em] text-cyan-300">Layer ${index + 1}</div>
               <div class="text-[9px] text-slate-500">${layer.name === "none" ? "Inactive" : "Active"}</div>
@@ -22064,6 +22086,22 @@ ${payload.interactionScript ? `\n${payload.interactionScript}` : ""}
           node.remove();
         });
         const pageBackground = getCanvasPageStyleState(canvas).background;
+        const animationKeyframesCss = `
+      @keyframes mlFadePulse { 0%, 100% { opacity: 0.28; transform: translateY(0px) scale(0.98); } 50% { opacity: 1; transform: translateY(-4px) scale(1); } }
+      @keyframes mlBlinkSoft { 0%, 48%, 100% { opacity: 1; } 50%, 52% { opacity: 0.18; } }
+      @keyframes mlHueShift { 0% { filter: hue-rotate(0deg) saturate(1); } 50% { filter: hue-rotate(90deg) saturate(1.15); } 100% { filter: hue-rotate(180deg) saturate(1); } }
+      @keyframes mlFloatBob { 0%, 100% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(0, -14px, 0); } }
+      @keyframes mlRotateDrift { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(8deg) scale(1.03); } 100% { transform: rotate(-8deg) scale(1); } }
+      @keyframes mlSlideSweep { 0% { transform: translateX(-28px); opacity: 0; } 35% { opacity: 1; } 100% { transform: translateX(28px); opacity: 0.88; } }
+      @keyframes mlWidthBreathe { 0%, 100% { transform: scaleX(0.86); } 50% { transform: scaleX(1.08); } }
+      @keyframes mlOrbitTilt { 0% { transform: rotate(0deg) translateY(0px) scale(1); } 25% { transform: rotate(4deg) translateY(-6px) scale(1.02); } 50% { transform: rotate(0deg) translateY(-12px) scale(1.04); } 75% { transform: rotate(-4deg) translateY(-6px) scale(1.02); } 100% { transform: rotate(0deg) translateY(0px) scale(1); } }
+      @keyframes mlBackgroundGlow { 0%, 100% { filter: brightness(1) saturate(1); } 50% { filter: brightness(1.18) saturate(1.22); } }
+      @keyframes mlAuroraFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+      @keyframes mlBounceLift { 0%, 100% { transform: translateY(0); } 30% { transform: translateY(-18px); } 55% { transform: translateY(0); } 72% { transform: translateY(-8px); } }
+      @keyframes mlMagicHover { 0%, 100% { transform: translateY(0) rotate(0deg); filter: drop-shadow(0 0 0 rgba(34,211,238,0)); } 50% { transform: translateY(-10px) rotate(1.6deg); filter: drop-shadow(0 0 18px rgba(34,211,238,0.35)); } }
+      @keyframes mlElasticPop { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.12, 0.9); } 50% { transform: scale(0.96, 1.04); } 72% { transform: scale(1.04, 0.98); } }
+      @keyframes mlSwingArc { 0%, 100% { transform: rotate(0deg); transform-origin: top center; } 25% { transform: rotate(6deg); } 75% { transform: rotate(-6deg); } }
+      @keyframes mlGhostTrail { 0%, 100% { opacity: 1; filter: blur(0px); } 50% { opacity: 0.42; filter: blur(1.5px); } }`;
         const width = Math.max(canvas.scrollWidth, canvas.offsetWidth, parseFloat(canvas.style.width || "0") || 0);
         const height = Math.max(canvas.scrollHeight, canvas.offsetHeight, parseFloat(canvas.style.height || "0") || 0);
         const interactionEntries = [];
@@ -22114,6 +22152,7 @@ ${payload.interactionScript ? `\n${payload.interactionScript}` : ""}
         height: 100%;
         box-sizing: border-box;
       }
+${animationKeyframesCss}
       #medialab-run-stage {
         position: relative;
         width: ${Math.max(320, Math.round(width))}px;
