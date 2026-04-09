@@ -9052,9 +9052,9 @@
         return lastResult;
       }
       async function markAllNotificationsRead(options = {}) {
-        const { silent = false } = options;
+        const { silent = false, force = false } = options;
         if (!loggedIn || !currentUser) return;
-        if (!notificationsList.some((item) => !item.isRead)) return;
+        if (!force && !notificationsList.some((item) => !item.isRead)) return;
         try {
           const res = await fetch("/api/notifications/read", {
             method: "POST",
@@ -9101,6 +9101,7 @@
         if (shouldOpen) {
           queueNotificationAutoHide();
           await fetchNotificationsWithRetry(2, 500);
+          await markAllNotificationsRead({ silent: true, force: true });
           notificationsList = notificationsList.map((item) =>
             item.isRead
               ? item
@@ -9109,7 +9110,6 @@
           unreadNotificationCount = 0;
           persistNotificationCache();
           renderNotificationsUi();
-          await markAllNotificationsRead({ silent: true });
         } else {
           clearTimeout(notificationDropdownTimer);
         }
