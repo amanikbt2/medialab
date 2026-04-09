@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MediaLab Marketplace</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <link rel="icon" href="/favicon.png" type="image/png" />
+    <style>
+      body {
+        font-family: "Inter", system-ui, sans-serif;
+        background: #020617;
+        color: #e2e8f0;
+      }
+      .market-card {
+        transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+      }
+      .market-card:hover {
+        transform: translateY(-6px);
+        border-color: rgba(34, 211, 238, 0.24);
+        box-shadow: 0 26px 60px rgba(2, 6, 23, 0.45);
+      }
+      .price-stamp {
+        position: absolute;
+        right: 1rem;
+        top: 1rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 86px;
+        padding: 0.8rem 1rem;
+        border-radius: 1rem 1rem 1.2rem 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        backdrop-filter: blur(14px);
+        box-shadow:
+          0 20px 40px rgba(2, 6, 23, 0.38),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        transform: rotate(-3deg);
+      }
+      .price-stamp::before {
+        content: "";
+        position: absolute;
+        top: -10px;
+        left: 50%;
+        width: 26px;
+        height: 12px;
+        border-radius: 999px;
+        transform: translateX(-50%) rotate(4deg);
+        background: rgba(255, 255, 255, 0.28);
+        box-shadow: 0 4px 12px rgba(255, 255, 255, 0.12);
+      }
+      .price-stamp--paid {
+        background: rgba(34, 211, 238, 0.16);
+        color: #cffafe;
+        border-color: rgba(34, 211, 238, 0.28);
+      }
+      .price-stamp--free {
+        background: rgba(34, 197, 94, 0.18);
+        color: #dcfce7;
+        border-color: rgba(34, 197, 94, 0.28);
+      }
+      .line-clamp-3 {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen bg-slate-950 text-slate-100">
+    <div class="animate-fadeIn relative space-y-8 px-4 py-6 sm:px-6 lg:px-8">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 class="text-3xl font-semibold tracking-tighter text-white">
+            Project Marketplace
+          </h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            class="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-slate-200 transition-all hover:border-cyan-400/25 hover:text-cyan-200"
+          >
+            <i class="fas fa-search"></i>
+          </button>
+        </div>
+      </div>
+
+      <div
+        class="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(15,23,42,0.92))] p-5 shadow-[0_24px_80px_rgba(2,6,23,0.34)] sm:p-6"
+      >
+        <div class="flex flex-wrap gap-3">
+          <button
+            type="button"
+            class="rounded-2xl bg-cyan-500 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-slate-950"
+          >
+            On Sale
+          </button>
+          <button
+            type="button"
+            class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-slate-200"
+          >
+            My Sales
+          </button>
+          <button
+            type="button"
+            class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-slate-200"
+          >
+            Purchased
+          </button>
+          <button
+            type="button"
+            class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-slate-200"
+          >
+            Add New Sale +
+          </button>
+        </div>
+
+        <div
+          class="mt-4 flex flex-col gap-3 rounded-[1.5rem] border border-white/10 bg-slate-950/55 p-3 sm:flex-row"
+        >
+          <select
+            class="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none focus:border-cyan-400 sm:w-44"
+          >
+            <option>Project title</option>
+            <option>Author name</option>
+            <option>Category</option>
+            <option>Free only</option>
+          </select>
+          <input
+            class="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-400"
+            placeholder="Search by project title"
+          />
+        </div>
+
+        <div
+          id="marketplace-pane"
+          class="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3"
+        >
+          <article
+            class="group market-card cursor-pointer overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/95 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
+          >
+            <div class="flex items-center gap-3 border-b border-white/8 px-5 py-4">
+              <div class="h-11 w-11 overflow-hidden rounded-full border border-white/10 bg-white/5">
+                <img
+                  src="/favicon.png"
+                  alt="author"
+                  class="h-full w-full object-cover"
+                />
+              </div>
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold text-white">ML Community</p>
+                <p class="truncate text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                  Game
+                </p>
+              </div>
+            </div>
+            <div class="px-5 pt-4">
+              <h3 class="text-lg font-semibold tracking-tight text-white">
+                Candy Crush Game
+              </h3>
+              <p class="mt-2 text-sm leading-6 text-slate-400">
+                Polished match-three starter with vibrant transitions and a clean
+                builder-ready structure.
+              </p>
+            </div>
+            <div class="relative mt-4 h-56 overflow-hidden bg-slate-900">
+              <img
+                src="https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=900&q=80"
+                alt="preview"
+                class="h-full w-full object-cover transition-all duration-[1400ms] ease-out group-hover:scale-[1.03]"
+              />
+              <div class="price-stamp price-stamp--free text-[11px] font-black uppercase tracking-[0.16em]">
+                Free
+              </div>
+            </div>
+            <div class="flex items-center justify-between gap-4 px-5 py-4">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 text-amber-300">
+                  <i class="fas fa-star text-xs"></i>
+                  <i class="fas fa-star text-xs"></i>
+                  <i class="fas fa-star text-xs"></i>
+                  <i class="fas fa-star text-xs"></i>
+                  <i class="fas fa-star-half-alt text-xs"></i>
+                </div>
+                <p class="mt-1 text-xs text-slate-400">92% rating from 31 users</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-200 transition-all hover:border-amber-300/30 hover:text-amber-300"
+                >
+                  <i class="fas fa-star text-sm"></i>
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-cyan-200 transition-all hover:bg-cyan-500/15"
+                >
+                  <i class="fas fa-arrow-right"></i>
+                  View
+                </button>
+              </div>
+            </div>
+          </article>
+
+          <article
+            class="group market-card cursor-pointer overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/95 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
+          >
+            <div class="flex items-center gap-3 border-b border-white/8 px-5 py-4">
+              <div class="h-11 w-11 overflow-hidden rounded-full border border-white/10 bg-white/5">
+                <img
+                  src="/favicon.png"
+                  alt="author"
+                  class="h-full w-full object-cover"
+                />
+              </div>
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold text-white">Amani Kibet</p>
+                <p class="truncate text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                  Social
+                </p>
+              </div>
+            </div>
+            <div class="px-5 pt-4">
+              <h3 class="text-lg font-semibold tracking-tight text-white">
+                Chatly ChatApp
+              </h3>
+              <p class="mt-2 text-sm leading-6 text-slate-400">
+                Marketplace-ready messaging interface with polished gradients and
+                clean panels for a modern launch.
+              </p>
+            </div>
+            <div class="relative mt-4 h-56 overflow-hidden bg-slate-900">
+              <img
+                src="https://images.unsplash.com/photo-1611746872915-64382b5c76da?auto=format&fit=crop&w=900&q=80"
+                alt="preview"
+                class="h-full w-full object-cover transition-all duration-[1400ms] ease-out group-hover:scale-[1.03]"
+              />
+              <div class="price-stamp price-stamp--paid text-[11px] font-black uppercase tracking-[0.16em]">
+                $12
+              </div>
+            </div>
+            <div class="flex items-center justify-between gap-4 px-5 py-4">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 text-amber-300">
+                  <i class="fas fa-star text-xs"></i>
+                  <i class="fas fa-star text-xs"></i>
+                  <i class="fas fa-star text-xs"></i>
+                  <i class="fas fa-star text-xs"></i>
+                  <i class="far fa-star text-xs"></i>
+                </div>
+                <p class="mt-1 text-xs text-slate-400">88% rating from 17 users</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-200 transition-all hover:border-amber-300/30 hover:text-amber-300"
+                >
+                  <i class="fas fa-star text-sm"></i>
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-cyan-200 transition-all hover:bg-cyan-500/15"
+                >
+                  <i class="fas fa-arrow-right"></i>
+                  View
+                </button>
+              </div>
+            </div>
+          </article>
+
+          <article
+            class="group market-card cursor-pointer overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/95 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
+          >
+            <div class="flex items-center gap-3 border-b border-white/8 px-5 py-4">
+              <div class="h-11 w-11 overflow-hidden rounded-full border border-white/10 bg-white/5">
+                <img
+                  src="/favicon.png"
+                  alt="author"
+                  class="h-full w-full object-cover"
+                />
+              </div>
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold text-white">ML Community</p>
+                <p class="truncate text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                  Portfolio
+                </p>
+              </div>
+            </div>
+            <div class="px-5 pt-4">
+              <h3 class="text-lg font-semibold tracking-tight text-white">
+                Creator Portfolio
+              </h3>
+              <p class="mt-2 text-sm leading-6 text-slate-400">
+                Bold portfolio experience with clean project reveals and a
+                builder-friendly composition for fast adaptation.
+              </p>
+            </div>
+            <div class="relative mt-4 h-56 overflow-hidden bg-slate-900">
+              <img
+                src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=900&q=80"
+                alt="preview"
+                class="h-full w-full object-cover transition-all duration-[1400ms] ease-out group-hover:scale-[1.03]"
+              />
+              <div class="price-stamp price-stamp--paid text-[11px] font-black uppercase tracking-[0.16em]">
+                $7
+              </div>
+            </div>
+            <div class="flex items-center justify-between gap-4 px-5 py-4">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 text-amber-300">
+                  <i class="fas fa-star text-xs"></i>
+                  <i class="fas fa-star text-xs"></i>
+                  <i class="fas fa-star text-xs"></i>
+                  <i class="fas fa-star text-xs"></i>
+                  <i class="fas fa-star text-xs"></i>
+                </div>
+                <p class="mt-1 text-xs text-slate-400">95% rating from 42 users</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-200 transition-all hover:border-amber-300/30 hover:text-amber-300"
+                >
+                  <i class="fas fa-star text-sm"></i>
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-cyan-200 transition-all hover:bg-cyan-500/15"
+                >
+                  <i class="fas fa-arrow-right"></i>
+                  View
+                </button>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

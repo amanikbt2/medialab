@@ -2897,6 +2897,9 @@ app.get("/", (_req, res) => {
 app.get("/admin", (_req, res) => {
   res.render("admin");
 });
+app.get("/example", (_req, res) => {
+  res.render("example");
+});
 app.get("/admin/marketplace", (_req, res) => {
   res.render("admin-marketplace");
 });

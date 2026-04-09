@@ -3454,6 +3454,7 @@
               <option value="redirect">Redirect</option>
               <option value="toggle">Toggle Visibility</option>
               <option value="playSound">Play Sound</option>
+              <option value="customCode">Custom JavaScript</option>
             </select>
           </label>
           <div id="interaction-action-fields" class="space-y-4"></div>
@@ -16460,9 +16461,18 @@
             value: String(config.value || "").trim(),
             url: String(config.url || "").trim(),
             soundUrl: String(config.soundUrl || "").trim(),
+            code: String(config.code || "").trim(),
           };
         });
         return normalized;
+      }
+      function getDefaultBuilderInteractionCode(eventName = "click") {
+        const label = getBuilderInteractionLabel(eventName);
+        return `// MediaLab custom interaction for ${label}
+console.log("Triggered ${eventName}", { source, event });
+// Example:
+// source.style.transform = "scale(1.05)";
+// source.textContent = "Updated from custom JS";`;
       }
       function getBuilderInteractionLabel(eventName) {
         return (
@@ -19690,6 +19700,8 @@
             body = `const target = document.getElementById(${JSON.stringify(action.targetId)}); if (target) target.classList.toggle(${JSON.stringify(action.value || "hidden")});`;
           } else if (action.actionType === "playSound" && action.soundUrl) {
             body = `const audio = new Audio(${JSON.stringify(action.soundUrl)}); audio.play().catch(() => {});`;
+          } else if (action.actionType === "customCode" && action.code) {
+            body = `try { ${escapeJsString(String(action.code || "").replace(/<\/script/gi, "<\\\\/script"))} } catch (error) { console.error("MediaLab custom interaction failed:", error); }`;
           }
           if (!body) return;
           lines.push(`(() => { const source = ${sourceRef}; if (!source) return; source.addEventListener(${JSON.stringify(eventName)}, (event) => { ${body} }); })();`);
@@ -20804,6 +20816,8 @@ ${payload.interactionScript ? `\n${payload.interactionScript}` : ""}
           value: existing.value || "",
           url: existing.url || "",
           soundUrl: existing.soundUrl || "",
+          code:
+            existing.code || getDefaultBuilderInteractionCode(eventName),
         };
         builderInteractionPickMode = false;
         const modal = document.getElementById("builder-interaction-modal");
@@ -20811,7 +20825,7 @@ ${payload.interactionScript ? `\n${payload.interactionScript}` : ""}
         const subtitle = document.getElementById("builder-interaction-subtitle");
         const select = document.getElementById("interaction-action-type");
         if (title) title.textContent = `${getBuilderInteractionLabel(eventName)} Action`;
-        if (subtitle) subtitle.textContent = "Map this trigger to a simple visual action.";
+        if (subtitle) subtitle.textContent = "Map this trigger to a visual action or write your own JavaScript below.";
         if (select) select.value = builderInteractionDraft.actionType;
         modal?.classList.remove("hidden");
         renderBuilderInteractionFields();
@@ -20826,6 +20840,14 @@ ${payload.interactionScript ? `\n${payload.interactionScript}` : ""}
         builderInteractionDraft.actionType = value || "alert";
         if (builderInteractionDraft.actionType !== "toggle") {
           builderInteractionDraft.targetId = "";
+        }
+        if (
+          builderInteractionDraft.actionType === "customCode" &&
+          !String(builderInteractionDraft.code || "").trim()
+        ) {
+          builderInteractionDraft.code = getDefaultBuilderInteractionCode(
+            builderInteractionDraft.eventName,
+          );
         }
         renderBuilderInteractionFields();
       }
@@ -20858,6 +20880,21 @@ ${payload.interactionScript ? `\n${payload.interactionScript}` : ""}
           </div>`;
         } else if (draft.actionType === "playSound") {
           html = `<label class="block"><span class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Sound URL</span><input value="${escapeAttr(draft.soundUrl || "")}" oninput="builderInteractionDraft.soundUrl = this.value" class="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-white outline-none focus:border-cyan-400" placeholder="https://..." /></label>`;
+        } else if (draft.actionType === "customCode") {
+          html = `<div class="space-y-4">
+            <div class="rounded-[1.6rem] border border-cyan-400/15 bg-cyan-500/[0.06] p-4">
+              <p class="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">Custom Event Code</p>
+              <p class="mt-2 text-sm leading-6 text-slate-300">Write your own JavaScript for this event. MediaLab passes <span class="font-black text-white">event</span> and <span class="font-black text-white">source</span> into your handler automatically.</p>
+            </div>
+            <label class="block">
+              <span class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">JavaScript</span>
+              <textarea rows="9" oninput="builderInteractionDraft.code = this.value" class="mt-2 w-full rounded-[1.6rem] border border-white/10 bg-slate-950/90 px-4 py-3 text-sm leading-6 text-white outline-none focus:border-cyan-400 font-mono" placeholder="console.log(event, source);">${escapeHtmlText(draft.code || getDefaultBuilderInteractionCode(draft.eventName))}</textarea>
+            </label>
+            <div class="rounded-[1.4rem] border border-white/10 bg-white/[0.03] px-4 py-3 text-xs leading-6 text-slate-400">
+              <span class="font-black uppercase tracking-[0.14em] text-slate-300">Available:</span>
+              <span class="ml-2"><span class="font-black text-white">event</span>, <span class="font-black text-white">source</span>, <span class="font-black text-white">window</span>, <span class="font-black text-white">document</span></span>
+            </div>
+          </div>`;
         }
         container.innerHTML = html;
       }
@@ -20887,6 +20924,13 @@ ${payload.interactionScript ? `\n${payload.interactionScript}` : ""}
           showBuilderSnackbar("Enter a sound URL first.", "error");
           return;
         }
+        if (
+          draft.actionType === "customCode" &&
+          !String(draft.code || "").trim()
+        ) {
+          showBuilderSnackbar("Write your custom JavaScript first.", "error");
+          return;
+        }
         currentInspectorState.attributes.interactions =
           currentInspectorState.attributes.interactions || {};
         currentInspectorState.attributes.interactions[draft.eventName] = {
@@ -20895,6 +20939,7 @@ ${payload.interactionScript ? `\n${payload.interactionScript}` : ""}
           value: draft.value || "",
           url: draft.url || "",
           soundUrl: draft.soundUrl || "",
+          code: draft.code || "",
         };
         syncInspectorUI(true);
         closeBuilderInteractionModal();
