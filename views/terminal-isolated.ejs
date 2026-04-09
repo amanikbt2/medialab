@@ -217,6 +217,140 @@
       function writeLine(value = "") {
         if (terminalTerm) terminalTerm.writeln(String(value || ""));
       }
+      function stripAnsiSequences(value = "") {
+        return String(value || "").replace(
+          // eslint-disable-next-line no-control-regex
+          /\u001b\[[0-9;?]*[ -/]*[@-~]/g,
+          "",
+        );
+      }
+      function createFallbackTerminalConstructor() {
+        return class FallbackTerminal {
+          constructor(options = {}) {
+            this.options = options;
+            this.host = null;
+            this.viewport = null;
+            this.output = null;
+            this.input = null;
+            this.dataHandler = null;
+          }
+          loadAddon(addon) {
+            if (addon && typeof addon.activate === "function") {
+              addon.activate(this);
+            }
+          }
+          open(host) {
+            this.host = host;
+            host.innerHTML = "";
+            const shell = document.createElement("div");
+            shell.style.width = "100%";
+            shell.style.height = "100%";
+            shell.style.display = "flex";
+            shell.style.flexDirection = "column";
+            shell.style.borderRadius = "16px";
+            shell.style.overflow = "hidden";
+            shell.style.background = "#030712";
+
+            const viewport = document.createElement("div");
+            viewport.style.flex = "1";
+            viewport.style.overflow = "auto";
+            viewport.style.padding = "16px";
+            viewport.style.whiteSpace = "pre-wrap";
+            viewport.style.wordBreak = "break-word";
+            viewport.style.fontFamily =
+              this.options.fontFamily || "Consolas, Menlo, Monaco, monospace";
+            viewport.style.fontSize = `${this.options.fontSize || 14}px`;
+            viewport.style.lineHeight = String(this.options.lineHeight || 1.3);
+            viewport.style.color = this.options.theme?.foreground || "#22d3ee";
+            viewport.style.background = this.options.theme?.background || "#030712";
+            viewport.style.outline = "none";
+            viewport.tabIndex = 0;
+
+            const output = document.createElement("pre");
+            output.style.margin = "0";
+            output.style.minHeight = "100%";
+            output.style.whiteSpace = "pre-wrap";
+            output.style.wordBreak = "break-word";
+            output.style.font = "inherit";
+            output.style.color = "inherit";
+            output.style.background = "transparent";
+
+            const input = document.createElement("textarea");
+            input.setAttribute("aria-label", "Terminal input");
+            input.spellcheck = false;
+            input.autocapitalize = "off";
+            input.autocomplete = "off";
+            input.style.position = "absolute";
+            input.style.left = "-9999px";
+            input.style.width = "1px";
+            input.style.height = "1px";
+            input.style.opacity = "0";
+
+            viewport.addEventListener("pointerdown", () => input.focus());
+            viewport.addEventListener("keydown", (event) => {
+              if (event.key.length === 1) {
+                this.dataHandler?.(event.key);
+                event.preventDefault();
+                return;
+              }
+              if (event.key === "Enter") {
+                this.dataHandler?.("\r");
+                event.preventDefault();
+                return;
+              }
+              if (event.key === "Backspace") {
+                this.dataHandler?.("\u007f");
+                event.preventDefault();
+                return;
+              }
+              if (event.key === "Tab") {
+                this.dataHandler?.("\t");
+                event.preventDefault();
+              }
+            });
+            input.addEventListener("input", () => {
+              const value = input.value || "";
+              if (value) this.dataHandler?.(value);
+              input.value = "";
+            });
+
+            viewport.appendChild(output);
+            shell.appendChild(viewport);
+            shell.appendChild(input);
+            host.appendChild(shell);
+            this.viewport = viewport;
+            this.output = output;
+            this.input = input;
+            viewport.focus();
+          }
+          write(value = "") {
+            if (!this.output) return;
+            this.output.textContent += stripAnsiSequences(value);
+            this.viewport.scrollTop = this.viewport.scrollHeight;
+          }
+          writeln(value = "") {
+            this.write(`${value}\n`);
+          }
+          reset() {
+            if (this.output) this.output.textContent = "";
+          }
+          onData(handler) {
+            this.dataHandler = typeof handler === "function" ? handler : null;
+          }
+        };
+      }
+      function createFallbackFitAddonConstructor() {
+        return class FallbackFitAddon {
+          activate(term) {
+            this.term = term;
+          }
+          fit() {
+            if (this.term?.viewport) {
+              this.term.viewport.scrollTop = this.term.viewport.scrollHeight;
+            }
+          }
+        };
+      }
 
       async function ensureWebContainerModule() {
         try {
@@ -228,14 +362,13 @@
 
       async function ensureRuntime() {
         if (terminalTerm && terminalWebContainer) return;
-        if (!window.Terminal || !window.FitAddon?.FitAddon) {
-          throw new Error("Xterm failed to load in isolated terminal.");
-        }
         const host = document.getElementById("terminal-instance");
         const { WebContainer } = await ensureWebContainerModule();
+        const TerminalCtor = window.Terminal || createFallbackTerminalConstructor();
+        const FitAddonCtor = window.FitAddon?.FitAddon || createFallbackFitAddonConstructor();
 
         if (!terminalTerm) {
-          terminalTerm = new window.Terminal({
+          terminalTerm = new TerminalCtor({
             convertEol: true,
             cursorBlink: true,
             fontFamily: "Consolas, Menlo, Monaco, monospace",
@@ -247,10 +380,13 @@
               cursor: "#22d3ee",
             },
           });
-          terminalFitAddon = new window.FitAddon.FitAddon();
+          terminalFitAddon = new FitAddonCtor();
           terminalTerm.loadAddon(terminalFitAddon);
           terminalTerm.open(host);
           terminalFitAddon.fit();
+          if (!window.Terminal) {
+            setStatus("Using built-in terminal renderer...");
+          }
         }
 
         if (!terminalWebContainer) {
@@ -335,6 +471,11 @@
             }
           })().catch((error) => {
             console.warn("Terminal output loop stopped:", error.message);
+          });
+        }
+        if (typeof terminalTerm?.onData === "function") {
+          terminalTerm.onData((value) => {
+            writeShell(value).catch(() => {});
           });
         }
       }
