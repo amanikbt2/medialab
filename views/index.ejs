@@ -185,6 +185,107 @@
         border-color: rgba(34, 211, 238, 0.24) !important;
         color: #cffafe !important;
       }
+      .builder-collab-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.85rem;
+        border-radius: 999px;
+        border: 1px solid rgba(248, 113, 113, 0.22);
+        background: rgba(127, 29, 29, 0.18);
+        color: #fecaca;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .builder-collab-badge .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #f87171;
+        box-shadow: 0 0 0 6px rgba(248, 113, 113, 0.12);
+      }
+      .collaboration-pulse-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: #22c55e;
+        box-shadow: 0 0 0 rgba(34, 197, 94, 0.45);
+        animation: collaborationPulse 1.8s infinite;
+      }
+      .builder-collaboration-dropdown {
+        position: fixed;
+        z-index: 1700;
+        width: min(92vw, 360px);
+        border-radius: 1.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background:
+          radial-gradient(circle at top right, rgba(34, 211, 238, 0.12), transparent 28%),
+          linear-gradient(180deg, rgba(8, 15, 30, 0.98), rgba(2, 6, 23, 0.98));
+        box-shadow: 0 24px 80px rgba(2, 6, 23, 0.52);
+        backdrop-filter: blur(26px);
+      }
+      .builder-collab-user {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.85rem;
+        padding: 0.85rem 0.9rem;
+        border-radius: 1.1rem;
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .builder-collab-user + .builder-collab-user {
+        margin-top: 0.55rem;
+      }
+      .builder-collab-user-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        flex: 0 0 12px;
+      }
+      .builder-collab-cursor-layer {
+        position: absolute;
+        inset: 0;
+        z-index: 35;
+        pointer-events: none;
+        overflow: hidden;
+      }
+      .builder-collab-cursor {
+        position: absolute;
+        transform: translate(-18%, -10%);
+        display: inline-flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+      }
+      .builder-collab-cursor-icon {
+        width: 16px;
+        height: 16px;
+        clip-path: polygon(0 0, 100% 45%, 58% 58%, 74% 100%, 56% 100%, 43% 64%, 0 100%);
+        box-shadow: 0 12px 28px rgba(2, 6, 23, 0.28);
+      }
+      .builder-collab-cursor-label {
+        padding: 0.2rem 0.5rem;
+        border-radius: 999px;
+        background: rgba(2, 6, 23, 0.82);
+        color: #f8fafc;
+        font-size: 10px;
+        font-weight: 700;
+        white-space: nowrap;
+        box-shadow: 0 10px 24px rgba(2, 6, 23, 0.22);
+      }
+      #web-canvas.collaboration-view-only {
+        pointer-events: none;
+      }
+      @keyframes collaborationPulse {
+        0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45); }
+        70% { box-shadow: 0 0 0 12px rgba(34, 197, 94, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+      }
       @keyframes fadeIn {
         from {
           opacity: 0;
@@ -4458,6 +4559,28 @@
       let currentStudioToolId = "image-pdf";
       let currentLiveProjectDetail = null;
       let currentLiveProjectMonitor = null;
+      const COLLAB_SHARE_BASE_URL = "https://medialab-6b20.onrender.com/studio";
+      const collaborationGuestPalette = [
+        "#22d3ee",
+        "#60a5fa",
+        "#34d399",
+        "#f59e0b",
+        "#f472b6",
+        "#a78bfa",
+      ];
+      let collaborationRoomId = "";
+      let collaborationShareLink = "";
+      let collaborationUsers = [];
+      let collaborationIsHost = false;
+      let collaborationCanEdit = true;
+      let collaborationJoined = false;
+      let collaborationDropdownOpen = false;
+      let collaborationGuestIdentity = null;
+      let collaborationCursorMap = new Map();
+      let collaborationCursorTrackingBound = false;
+      let collaborationCursorFrame = 0;
+      let collaborationSyncTimer = null;
+      let collaborationApplyingRemoteUpdate = false;
       let currentRenderHostingProject = null;
       let currentRenderLiveProject = null;
       let renderProjectSyncPoller = null;
@@ -4864,6 +4987,9 @@
         if (loggedIn && currentUser?._id) {
           socket.emit("register-user", currentUser._id);
         }
+        if (collaborationRoomId) {
+          joinCollaborationRoom(collaborationIsHost);
+        }
         if (authBootstrapReady && loggedIn && currentUser?._id) {
           fetchNotifications().catch(() => {});
         }
@@ -4889,6 +5015,434 @@
         if (document.hidden) return;
         if (!authBootstrapReady || !loggedIn || !currentUser?._id) return;
         fetchNotificationsWithRetry(3, 700).catch(() => {});
+      });
+      function getCollaborationRoomParam() {
+        try {
+          return String(new URL(window.location.href).searchParams.get("room") || "")
+            .trim()
+            .replace(/[^a-zA-Z0-9-]/g, "")
+            .slice(0, 120);
+        } catch {
+          return "";
+        }
+      }
+      function hasCollaborationRoomParam() {
+        return Boolean(getCollaborationRoomParam());
+      }
+      function ensureGuestCollaborationIdentity() {
+        if (collaborationGuestIdentity) return collaborationGuestIdentity;
+        try {
+          const cached = JSON.parse(
+            sessionStorage.getItem("medialab_collab_guest_identity") || "null",
+          );
+          if (cached?.displayName && cached?.color) {
+            collaborationGuestIdentity = cached;
+            return collaborationGuestIdentity;
+          }
+        } catch {}
+        const displayName = `Guest-${Math.floor(1000 + Math.random() * 9000)}`;
+        const color =
+          collaborationGuestPalette[
+            Math.floor(Math.random() * collaborationGuestPalette.length)
+          ] || "#22d3ee";
+        collaborationGuestIdentity = {
+          userId: "",
+          displayName,
+          color,
+          isGuest: true,
+        };
+        try {
+          sessionStorage.setItem(
+            "medialab_collab_guest_identity",
+            JSON.stringify(collaborationGuestIdentity),
+          );
+        } catch {}
+        return collaborationGuestIdentity;
+      }
+      function getCollaborationIdentity() {
+        if (loggedIn && currentUser) {
+          return {
+            userId: String(currentUser._id || "").trim(),
+            displayName:
+              String(currentUser.name || currentUser.email || "MediaLab User").trim() ||
+              "MediaLab User",
+            color: "#22d3ee",
+            isGuest: false,
+          };
+        }
+        return ensureGuestCollaborationIdentity();
+      }
+      function isCollaborationActive() {
+        return Boolean(collaborationRoomId);
+      }
+      function isCollaborationViewOnly() {
+        return isCollaborationActive() && !collaborationCanEdit;
+      }
+      function getCollaborationProjectName() {
+        if (typeof getActiveTerminalProjectContext === "function") {
+          return getActiveTerminalProjectContext().name || "medialab";
+        }
+        return "medialab";
+      }
+      function buildCollaborationSnapshot() {
+        const canvas = document.getElementById("web-canvas");
+        const editor = document.getElementById("builder-code-editor");
+        return {
+          roomId: collaborationRoomId,
+          projectName: getCollaborationProjectName(),
+          html: canvas?.innerHTML || "",
+          pageBackground: canvas ? getCanvasPageStyleState(canvas).background : "#ffffff",
+          code: String(editor?.value || ""),
+          activePath: String(
+            normalizeBuilderFilePath(activeBuilderFilePath || "index.html") || "index.html",
+          ),
+          codeMode: Boolean(builderCodeMode),
+        };
+      }
+      function positionCollaborationDropdown() {
+        const panel = document.getElementById("builder-collaboration-dropdown");
+        const toggle = document.getElementById("builder-collaboration-toggle");
+        if (!panel || !toggle) return;
+        const rect = toggle.getBoundingClientRect();
+        const width = Math.min(window.innerWidth - 16, 360);
+        panel.style.top = `${rect.bottom + 12}px`;
+        panel.style.left = `${Math.max(8, Math.min(window.innerWidth - width - 8, rect.right - width))}px`;
+      }
+      function closeCollaborationDropdown() {
+        collaborationDropdownOpen = false;
+        const panel = document.getElementById("builder-collaboration-dropdown");
+        if (panel) panel.classList.add("hidden");
+      }
+      function renderCollaborationCursors() {
+        const layer = document.getElementById("builder-collab-cursor-layer");
+        const canvas = document.getElementById("web-canvas");
+        if (!layer || !canvas || !isCollaborationActive()) {
+          if (layer) layer.innerHTML = "";
+          return;
+        }
+        const activeSockets = new Set(collaborationUsers.map((user) => String(user.socketId || "")));
+        collaborationCursorMap.forEach((_value, key) => {
+          if (!activeSockets.has(key)) collaborationCursorMap.delete(key);
+        });
+        const width = canvas.offsetWidth || 1;
+        const height = canvas.offsetHeight || 1;
+        layer.innerHTML = Array.from(collaborationCursorMap.values())
+          .map((entry) => {
+            const left = Math.max(0, Math.min(100, Number(entry.x || 0) * 100));
+            const top = Math.max(0, Math.min(100, Number(entry.y || 0) * 100));
+            return `<div class="builder-collab-cursor" style="left:${(left / 100) * width}px;top:${(top / 100) * height}px;">
+              <div class="builder-collab-cursor-icon" style="background:${escapeAttr(entry.color || "#22d3ee")}"></div>
+              <div class="builder-collab-cursor-label">${escapeHtmlText(entry.displayName || "Guest")}</div>
+            </div>`;
+          })
+          .join("");
+      }
+      function renderCollaborationDropdown() {
+        const panel = document.getElementById("builder-collaboration-dropdown");
+        if (!panel) return;
+        if (!collaborationDropdownOpen || !isCollaborationActive()) {
+          panel.classList.add("hidden");
+          return;
+        }
+        const usersMarkup = collaborationUsers.length
+          ? collaborationUsers
+              .map((user) => {
+                const socketId = String(user.socketId || "").trim();
+                const isSelf = socketId === socket.id;
+                const controls =
+                  collaborationIsHost && !user.isHost && !isSelf
+                    ? `<div class="flex items-center gap-2">
+                        <button onclick="setCollaborationPermission('${escapeAttr(socketId)}', true)" class="rounded-xl bg-emerald-500/15 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-200 hover:bg-emerald-500/25">Grant Edit</button>
+                        <button onclick="setCollaborationPermission('${escapeAttr(socketId)}', false)" class="rounded-xl bg-rose-500/15 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-rose-200 hover:bg-rose-500/25">Restrict to View</button>
+                      </div>`
+                    : `<span class="text-[10px] font-black uppercase tracking-[0.14em] ${user.canEdit ? "text-emerald-300" : "text-slate-500"}">${user.isHost ? "Host" : user.canEdit ? "Editor" : "Viewer"}</span>`;
+                return `<div class="builder-collab-user">
+                  <div class="min-w-0 flex items-center gap-3">
+                    <span class="builder-collab-user-chip" style="background:${escapeAttr(user.color || "#22d3ee")}"></span>
+                    <div class="min-w-0">
+                      <div class="truncate text-sm font-semibold text-white">${escapeHtmlText(user.displayName || "Guest")}${isSelf ? ' <span class="text-cyan-300">(You)</span>' : ""}</div>
+                      <div class="text-[10px] uppercase tracking-[0.16em] ${user.isHost ? "text-cyan-300" : "text-slate-500"}">${user.isHost ? "Host" : "Guest session"}</div>
+                    </div>
+                  </div>
+                  <div class="shrink-0">${controls}</div>
+                </div>`;
+              })
+              .join("")
+          : `<div class="rounded-[1.1rem] bg-white/[0.03] px-4 py-5 text-sm text-slate-400">Waiting for collaborators to join.</div>`;
+        panel.innerHTML = `
+          <div class="border-b border-white/10 px-4 py-4">
+            <div class="flex items-center gap-3">
+              <span class="collaboration-pulse-dot"></span>
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-300">Live Session Active</p>
+                <p class="mt-1 text-sm text-slate-300">${escapeHtmlText(collaborationShareLink || `${COLLAB_SHARE_BASE_URL}?room=${collaborationRoomId}`)}</p>
+              </div>
+            </div>
+          </div>
+          <div class="max-h-[52vh] overflow-y-auto px-4 py-4 custom-scrollbar">${usersMarkup}</div>
+        `;
+        panel.classList.remove("hidden");
+        positionCollaborationDropdown();
+      }
+      function updateCollaborationUi() {
+        const toggle = document.getElementById("builder-collaboration-toggle");
+        const badge = document.getElementById("builder-view-only-badge");
+        const editor = document.getElementById("builder-code-editor");
+        const canvas = document.getElementById("web-canvas");
+        const role = document.getElementById("builder-collaboration-role");
+        const linkWrap = document.getElementById("builder-share-link-wrap");
+        const linkInput = document.getElementById("builder-collaboration-link");
+        if (toggle) {
+          toggle.classList.toggle("terminal-toggle-active", isCollaborationActive());
+          toggle.title = isCollaborationActive()
+            ? "Open collaboration session"
+            : "Collaborate on project";
+        }
+        if (badge) {
+          badge.classList.toggle("hidden", !isCollaborationViewOnly());
+        }
+        if (editor) {
+          editor.readOnly = isCollaborationViewOnly();
+        }
+        if (canvas) {
+          canvas.classList.toggle("collaboration-view-only", isCollaborationViewOnly());
+        }
+        if (role) {
+          role.textContent = !isCollaborationActive()
+            ? "Host inactive"
+            : collaborationIsHost
+              ? "Host active"
+              : collaborationCanEdit
+                ? "Editor active"
+                : "Viewer active";
+        }
+        if (linkWrap) linkWrap.classList.toggle("hidden", !collaborationShareLink);
+        if (linkInput) linkInput.value = collaborationShareLink || "";
+        renderCollaborationDropdown();
+        renderCollaborationCursors();
+      }
+      function openCollaborationModal() {
+        const modal = document.getElementById("builder-collaboration-modal");
+        if (!modal) return;
+        modal.classList.remove("hidden");
+        updateCollaborationUi();
+      }
+      function closeCollaborationModal() {
+        document.getElementById("builder-collaboration-modal")?.classList.add("hidden");
+      }
+      function toggleCollaborationPanel(event) {
+        event?.stopPropagation?.();
+        if (!isCollaborationActive()) {
+          openCollaborationModal();
+          return;
+        }
+        collaborationDropdownOpen = !collaborationDropdownOpen;
+        renderCollaborationDropdown();
+      }
+      function joinCollaborationRoom(forceHost = false) {
+        if (!collaborationRoomId || !socket.connected) return;
+        const identity = getCollaborationIdentity();
+        socket.emit("collaboration:join-room", {
+          roomId: collaborationRoomId,
+          isHost: Boolean(forceHost || collaborationIsHost),
+          userId: identity.userId,
+          displayName: identity.displayName,
+          color: identity.color,
+          isGuest: identity.isGuest,
+          canEdit: Boolean(forceHost || collaborationIsHost),
+        });
+      }
+      function generateCollaborationLink() {
+        collaborationRoomId = String(globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+        collaborationShareLink = `${COLLAB_SHARE_BASE_URL}?room=${collaborationRoomId}`;
+        collaborationIsHost = true;
+        collaborationCanEdit = true;
+        collaborationJoined = false;
+        joinCollaborationRoom(true);
+        updateCollaborationUi();
+      }
+      async function copyCollaborationLink() {
+        if (!collaborationShareLink) {
+          showBuilderSnackbar("Generate a shareable link first.", "error");
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(collaborationShareLink);
+          showBuilderSnackbar("Copied!", "success");
+        } catch {
+          showBuilderSnackbar("Could not copy that link.", "error");
+        }
+      }
+      function setCollaborationPermission(targetSocketId = "", canEdit = false) {
+        if (!collaborationRoomId || !collaborationIsHost) return;
+        socket.emit("collaboration:set-permission", {
+          roomId: collaborationRoomId,
+          targetSocketId,
+          canEdit: Boolean(canEdit),
+        });
+      }
+      function scheduleCollaborationContentSync(_reason = "update", delay = 140) {
+        if (
+          !collaborationRoomId ||
+          !collaborationCanEdit ||
+          collaborationApplyingRemoteUpdate ||
+          currentStudioToolId !== "web-builder"
+        ) {
+          return;
+        }
+        clearTimeout(collaborationSyncTimer);
+        collaborationSyncTimer = setTimeout(() => {
+          socket.emit("collaboration:content-sync", buildCollaborationSnapshot());
+        }, delay);
+      }
+      function applyRemoteCollaborationSnapshot(snapshot = {}) {
+        const canvas = document.getElementById("web-canvas");
+        if (!canvas) return;
+        collaborationApplyingRemoteUpdate = true;
+        try {
+          if (snapshot.projectName) {
+            builderProjectName = String(snapshot.projectName || "").trim() || builderProjectName;
+            syncBuilderProjectNameLabel();
+          }
+          builderCodeMode = Boolean(snapshot.codeMode);
+          canvas.innerHTML = String(snapshot.html || "");
+          applyCanvasPageBackground(snapshot.pageBackground || "#ffffff", true);
+          ensureBuilderGuides(canvas);
+          initCanvasSelection(canvas);
+          hydrateCanvasElements();
+          const editor = document.getElementById("builder-code-editor");
+          if (editor) {
+            editor.value = String(snapshot.code || "");
+          }
+          refreshBuilderCodeMode();
+          updateBuilderUI();
+        } finally {
+          collaborationApplyingRemoteUpdate = false;
+        }
+      }
+      function bindCollaborationCursorTracking() {
+        const container = document.getElementById("canvas-container");
+        const canvas = document.getElementById("web-canvas");
+        if (!container || !canvas || container.dataset.collabCursorBound === "true") return;
+        const emitCursor = (event) => {
+          if (!collaborationRoomId) return;
+          const rect = canvas.getBoundingClientRect();
+          if (!rect.width || !rect.height) return;
+          const x = (event.clientX - rect.left) / rect.width;
+          const y = (event.clientY - rect.top) / rect.height;
+          if (x < 0 || y < 0 || x > 1 || y > 1) return;
+          socket.emit("collaboration:cursor-update", {
+            roomId: collaborationRoomId,
+            x,
+            y,
+          });
+        };
+        container.addEventListener("mousemove", emitCursor);
+        container.dataset.collabCursorBound = "true";
+      }
+      async function activateCollaborationFromUrl() {
+        const roomId = getCollaborationRoomParam();
+        if (!roomId) return false;
+        collaborationRoomId = roomId;
+        collaborationShareLink = `${COLLAB_SHARE_BASE_URL}?room=${roomId}`;
+        collaborationIsHost = false;
+        collaborationCanEdit = false;
+        if (!loggedIn) {
+          ensureGuestCollaborationIdentity();
+        }
+        goToStudio("web-builder");
+        setTimeout(() => {
+          try {
+            launchBossMode();
+          } catch {}
+          joinCollaborationRoom(false);
+          updateCollaborationUi();
+        }, 120);
+        return true;
+      }
+      document.addEventListener("click", (event) => {
+        const panel = document.getElementById("builder-collaboration-dropdown");
+        const toggle = document.getElementById("builder-collaboration-toggle");
+        if (
+          collaborationDropdownOpen &&
+          panel &&
+          toggle &&
+          !panel.contains(event.target) &&
+          !toggle.contains(event.target)
+        ) {
+          closeCollaborationDropdown();
+        }
+      });
+      window.addEventListener("resize", () => {
+        if (collaborationDropdownOpen) positionCollaborationDropdown();
+        cancelAnimationFrame(collaborationCursorFrame);
+        collaborationCursorFrame = requestAnimationFrame(renderCollaborationCursors);
+      });
+      socket.on("collaboration:joined", (payload = {}) => {
+        if (String(payload.roomId || "") !== collaborationRoomId) return;
+        collaborationJoined = true;
+        collaborationCanEdit = Boolean(payload.user?.canEdit);
+        collaborationIsHost = Boolean(payload.user?.isHost);
+        if (payload.latestSnapshot?.html) {
+          applyRemoteCollaborationSnapshot(payload.latestSnapshot);
+        }
+        updateCollaborationUi();
+      });
+      socket.on("collaboration:room-state", (payload = {}) => {
+        if (String(payload.roomId || "") !== collaborationRoomId) return;
+        collaborationUsers = Array.isArray(payload.users) ? payload.users : [];
+        const self = collaborationUsers.find(
+          (user) => String(user.socketId || "") === String(socket.id || ""),
+        );
+        if (self) {
+          collaborationCanEdit = Boolean(self.canEdit);
+          collaborationIsHost = Boolean(self.isHost);
+        }
+        updateCollaborationUi();
+      });
+      socket.on("collaboration:permit-edit", (payload = {}) => {
+        if (String(payload.roomId || "") !== collaborationRoomId) return;
+        collaborationCanEdit = true;
+        updateCollaborationUi();
+        showBuilderSnackbar("You now have edit access!", "success");
+      });
+      socket.on("permit-edit", (payload = {}) => {
+        if (String(payload.roomId || "") !== collaborationRoomId) return;
+        collaborationCanEdit = true;
+        updateCollaborationUi();
+        showBuilderSnackbar("You now have edit access!", "success");
+      });
+      socket.on("collaboration:restrict-view", (payload = {}) => {
+        if (String(payload.roomId || "") !== collaborationRoomId) return;
+        collaborationCanEdit = false;
+        updateCollaborationUi();
+        showBuilderSnackbar("You are now in view only mode.", "info");
+      });
+      socket.on("restrict-view", (payload = {}) => {
+        if (String(payload.roomId || "") !== collaborationRoomId) return;
+        collaborationCanEdit = false;
+        updateCollaborationUi();
+        showBuilderSnackbar("You are now in view only mode.", "info");
+      });
+      socket.on("collaboration:cursor-update", (payload = {}) => {
+        if (String(payload.roomId || "") !== collaborationRoomId) return;
+        const user = payload.user || {};
+        if (String(user.socketId || "") === String(socket.id || "")) return;
+        collaborationCursorMap.set(String(user.socketId || ""), {
+          displayName: user.displayName || "Guest",
+          color: user.color || "#22d3ee",
+          x: Number(payload.x || 0),
+          y: Number(payload.y || 0),
+        });
+        cancelAnimationFrame(collaborationCursorFrame);
+        collaborationCursorFrame = requestAnimationFrame(renderCollaborationCursors);
+      });
+      socket.on("collaboration:content-sync", (payload = {}) => {
+        if (String(payload.roomId || "") !== collaborationRoomId) return;
+        if (payload.user?.socketId && String(payload.user.socketId) === String(socket.id || "")) {
+          return;
+        }
+        applyRemoteCollaborationSnapshot(payload);
       });
       // UNIVERSAL PROGRESS LISTENER
       socket.on("conversion-progress", (data) => {
@@ -11248,6 +11802,10 @@
       }
       // Login Functions
       function showLogin() {
+        if (hasCollaborationRoomParam() && !loggedIn) {
+          showBuilderSnackbar("Sign in is optional in this collaboration room.", "info");
+          return;
+        }
         logUsageActivity("login-modal-open", "opened login modal", "auth");
         document.getElementById("login-modal").classList.remove("hidden");
       }
@@ -11262,7 +11820,7 @@
       }
       function startGuestLoginReminderLoop() {
         stopGuestLoginReminderLoop();
-        if (loggedIn || currentUser) return;
+        if (loggedIn || currentUser || hasCollaborationRoomParam()) return;
         guestLoginReminderTimer = setInterval(() => {
           if (loggedIn || currentUser) {
             stopGuestLoginReminderLoop();
@@ -12970,6 +13528,10 @@
                             <span class="text-[8px] font-black text-cyan-500 uppercase tracking-widest">Studio Engine v3.0</span>
                             <span id="builder-status" class="text-[7px] text-gray-500 font-bold uppercase tracking-widest">Freeform Builder Ready</span>
                         </div>
+                        <div id="builder-view-only-badge" class="builder-collab-badge hidden">
+                            <span class="dot"></span>
+                            <span>View Only Mode</span>
+                        </div>
                     </div>
                     <div id="builder-panel-insert" class="builder-popover hidden">
                         <div class="builder-popover-grid">
@@ -13051,6 +13613,38 @@
                 </div>
                 <div class="terminal-surface">
                     <div id="terminal-instance" class="terminal-instance"></div>
+                </div>
+            </div>
+            <div id="builder-collaboration-dropdown" class="builder-collaboration-dropdown hidden"></div>
+            <div id="builder-collaboration-modal" class="hidden absolute inset-0 z-[160] bg-slate-950/78 p-4 backdrop-blur-xl" onclick="if (event.target === this) closeCollaborationModal();">
+                <div class="mx-auto mt-10 w-full max-w-xl rounded-[2rem] border border-white/10 bg-[#08111f] shadow-[0_28px_90px_rgba(2,6,23,0.58)]">
+                    <div class="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Collaborate on Project</p>
+                            <h3 class="mt-2 text-xl font-semibold text-white">Real-time builder session</h3>
+                            <p class="mt-1 text-sm text-slate-400">Generate a shareable room link, invite guests, and control edit access live.</p>
+                        </div>
+                        <button onclick="closeCollaborationModal()" class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="space-y-5 px-5 py-5">
+                        <div class="rounded-[1.6rem] border border-cyan-400/15 bg-cyan-500/[0.06] p-4">
+                            <p class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Session Link</p>
+                            <p class="mt-2 text-sm leading-6 text-slate-300">Guests open this room link and join as viewers by default. You can grant edit access from the live session menu.</p>
+                            <div class="mt-4 flex flex-wrap items-center gap-3">
+                                <button id="builder-generate-share-link" onclick="generateCollaborationLink()" class="rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-black text-slate-950 hover:bg-cyan-400">Generate Shareable Link</button>
+                                <span id="builder-collaboration-role" class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Host inactive</span>
+                            </div>
+                        </div>
+                        <div id="builder-share-link-wrap" class="hidden rounded-[1.6rem] border border-white/10 bg-white/[0.03] p-4">
+                            <label class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Share this link</label>
+                            <div class="mt-3 flex items-center gap-3">
+                                <input id="builder-collaboration-link" readonly class="min-w-0 flex-1 rounded-2xl border border-white/10 bg-slate-950/85 px-4 py-3 text-sm text-cyan-100 outline-none" value="" />
+                                <button onclick="copyCollaborationLink()" class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white hover:bg-white/10">Copy</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div id="builder-explorer-shell" class="builder-explorer-shell hidden">
@@ -13159,6 +13753,9 @@
                             <button id="builder-terminal-toggle" type="button" onclick="toggleTerminalDrawer()" class="toolbar-item inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-[10px] font-black uppercase tracking-[0.18em] text-slate-300 hover:text-cyan-100">
                                 <i class="fas fa-terminal text-[11px]"></i>
                             </button>
+                            <button id="builder-collaboration-toggle" type="button" onclick="toggleCollaborationPanel(event)" class="toolbar-item inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-[10px] font-black uppercase tracking-[0.18em] text-slate-300 hover:text-cyan-100">
+                                <i class="fas fa-globe-americas text-[11px]"></i>
+                            </button>
                         </div>
                         <div id="builder-responsive-controls" class="hidden items-center gap-2 rounded-lg border border-cyan-400/20 bg-cyan-500/[0.08] px-2.5 py-1.5">
                             <span class="text-[9px] font-black uppercase tracking-[0.2em] text-cyan-200">Responsive Width</span>
@@ -13167,9 +13764,13 @@
                             <span class="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-200">px</span>
                         </div>
                     </div>
-                    <div id="web-canvas" data-page-background="#ffffff" class="builder-grid bg-white relative shadow-[0_60px_150px_rgba(0,0,0,0.55)] rounded-[1.2rem] sm:rounded-[2rem] overflow-hidden transition-transform duration-500">
+                    <div class="relative">
+                        <div id="builder-collab-cursor-layer" class="builder-collab-cursor-layer"></div>
+                        <div id="web-canvas" data-page-background="#ffffff" class="builder-grid bg-white relative shadow-[0_60px_150px_rgba(0,0,0,0.55)] rounded-[1.2rem] sm:rounded-[2rem] overflow-hidden transition-transform duration-500">
+                        </div>
                     </div>
                 </div>
+            </div>
             </div>
             <div id="element-picker" class="hidden fixed z-[120] bg-gray-950/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] sm:rounded-[3rem] shadow-2xl p-4 sm:p-6 w-[92vw] max-w-[360px] max-h-[72vh] overflow-y-auto animate-fadeIn ring-1 ring-cyan-500/20">
                 <p class="text-[9px] font-black text-gray-500 uppercase tracking-[0.3em] mb-5 text-center">UI Component Library</p>
@@ -14766,9 +15367,10 @@
           }
           window.history.replaceState({}, document.title, "/");
         }
+        const collaborationActivated = await activateCollaborationFromUrl();
         try {
           const lastTool = String(sessionStorage.getItem("medialab:lastTool") || "").trim();
-          if (lastTool && lastTool !== currentStudioToolId) {
+          if (!collaborationActivated && lastTool && lastTool !== currentStudioToolId) {
             await switchTool(lastTool);
           }
         } catch {}
@@ -16596,6 +17198,9 @@
         }
         updateTerminalDrawerUI();
         scheduleTerminalProjectSync(120);
+        bindCollaborationCursorTracking();
+        updateCollaborationUi();
+        scheduleCollaborationContentSync("launch", 180);
         scheduleBuilderTutorial();
       }
       function performExitStudio() {
@@ -16837,6 +17442,7 @@
         canvas.onpointerdown = (e) => {
           if (e.target !== canvas) return;
           if (builderCodeMode) return;
+          if (isCollaborationViewOnly()) return;
           const rect = canvas.getBoundingClientRect();
           const startX = e.clientX - rect.left + canvas.scrollLeft;
           const startY = e.clientY - rect.top + canvas.scrollTop;
@@ -19851,6 +20457,7 @@ console.log("Triggered ${eventName}", { source, event });
       // ====================== 5. INTERACTION ENGINE ======================
       function handleObjectInteraction(e, el) {
         if (e.button !== undefined && e.button !== 0) return;
+        if (isCollaborationViewOnly()) return;
         if (el.classList.contains("locked")) return;
         if (e.target.isContentEditable) return;
         if (builderInteractionPickMode && builderInteractionDraft) {
@@ -20005,6 +20612,7 @@ console.log("Triggered ${eventName}", { source, event });
             }
           }
           showBuilderGuides(el.offsetLeft, el.offsetTop);
+          scheduleCollaborationContentSync("move", 60);
         };
         const onPointerUp = () => {
           if (activeLayoutPreview && !isResizer && !movingSelection) {
@@ -20646,13 +21254,18 @@ console.log("Triggered ${eventName}", { source, event });
           canvas.classList.toggle("builder-grid", builderSnapEnabled);
           refreshCanvasBackground();
           applyBuilderViewportToCanvas();
+          canvas.classList.toggle("collaboration-view-only", isCollaborationViewOnly());
         }
+        const editor = document.getElementById("builder-code-editor");
+        if (editor) editor.readOnly = isCollaborationViewOnly();
         if (canvasContainer)
           canvasContainer.classList.toggle("hidden", builderCodeMode);
         if (codePanel) codePanel.classList.toggle("hidden", !builderCodeMode);
         syncLayoutScrollAssist();
         syncLayoutChildSnapAssist();
         syncBuilderCodeFileLabel();
+        bindCollaborationCursorTracking();
+        updateCollaborationUi();
       }
       function restoreCanvasSnapshot(index) {
         const canvas = document.getElementById("web-canvas");
@@ -22509,6 +23122,7 @@ ${interactionScript ? `\n${interactionScript}` : ""}
         const highlight = document.getElementById("builder-code-highlight");
         const lineGutter = document.getElementById("builder-code-lines");
         if (!editor || !highlight) return;
+        if (isCollaborationViewOnly()) return;
         highlight.innerHTML = highlightBuilderCode(editor.value);
         if (lineGutter)
           lineGutter.textContent = buildCodeLineNumbers(editor.value);
@@ -22543,6 +23157,7 @@ ${interactionScript ? `\n${interactionScript}` : ""}
           } catch (error) {
             renderRawImportedHtmlPreview(editor.value);
           }
+          scheduleCollaborationContentSync("code", 120);
         }, 500);
       }
       function syncCodeEditorScroll() {
@@ -23257,6 +23872,7 @@ ${interactionScript ? `\n${interactionScript}` : ""}
         historyIndex++;
         if (builderCodeMode) refreshBuilderCodeMode();
         updateBuilderUI();
+        scheduleCollaborationContentSync("history", 120);
       }
       function changeInspectorPage(dir) {
         const pages = getActiveInspectorPages();

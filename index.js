@@ -71,6 +71,99 @@ const io = new Server(httpServer, {
   },
 });
 const USER_NOTIFICATION_ROOM_PREFIX = "user:";
+const COLLAB_ROOM_PREFIX = "collab:";
+const collaborationRooms = new Map();
+const socketCollaborationMembership = new Map();
+
+function normalizeCollaborationRoomId(value = "") {
+  return String(value || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9-]/g, "")
+    .slice(0, 120);
+}
+
+function ensureCollaborationRoom(roomId = "") {
+  const normalizedRoomId = normalizeCollaborationRoomId(roomId);
+  if (!normalizedRoomId) return null;
+  if (!collaborationRooms.has(normalizedRoomId)) {
+    collaborationRooms.set(normalizedRoomId, {
+      id: normalizedRoomId,
+      hostSocketId: "",
+      users: new Map(),
+      latestSnapshot: null,
+      createdAt: new Date(),
+    });
+  }
+  return collaborationRooms.get(normalizedRoomId);
+}
+
+function serializeCollaborationUser(user = {}) {
+  return {
+    socketId: String(user.socketId || "").trim(),
+    userId: String(user.userId || "").trim(),
+    displayName: String(user.displayName || "Guest").trim() || "Guest",
+    color: String(user.color || "#22d3ee").trim() || "#22d3ee",
+    isHost: Boolean(user.isHost),
+    canEdit: Boolean(user.canEdit),
+    isGuest: Boolean(user.isGuest),
+  };
+}
+
+function buildCollaborationRoomState(room) {
+  const users = Array.from(room?.users?.values?.() || [])
+    .map((user) => serializeCollaborationUser(user))
+    .sort((a, b) => {
+      if (a.isHost && !b.isHost) return -1;
+      if (!a.isHost && b.isHost) return 1;
+      return a.displayName.localeCompare(b.displayName);
+    });
+  return {
+    roomId: room?.id || "",
+    hostSocketId: String(room?.hostSocketId || "").trim(),
+    users,
+    latestSnapshot: room?.latestSnapshot || null,
+  };
+}
+
+function emitCollaborationRoomState(roomId = "") {
+  const room = collaborationRooms.get(roomId);
+  if (!room) return;
+  io.to(`${COLLAB_ROOM_PREFIX}${roomId}`).emit(
+    "collaboration:room-state",
+    buildCollaborationRoomState(room),
+  );
+}
+
+function removeSocketFromCollaborationRoom(socketId = "") {
+  const roomId = socketCollaborationMembership.get(socketId);
+  if (!roomId) return;
+  const room = collaborationRooms.get(roomId);
+  socketCollaborationMembership.delete(socketId);
+  if (!room) return;
+  room.users.delete(socketId);
+  if (room.hostSocketId === socketId) {
+    room.hostSocketId = "";
+    const nextHost = Array.from(room.users.values())[0] || null;
+    if (nextHost) {
+      nextHost.isHost = true;
+      nextHost.canEdit = true;
+      room.hostSocketId = nextHost.socketId;
+      io.to(nextHost.socketId).emit("collaboration:permit-edit", {
+        roomId,
+        grantedBy: "system",
+      });
+      io.to(nextHost.socketId).emit("collaboration:host-changed", {
+        roomId,
+        hostSocketId: nextHost.socketId,
+      });
+    }
+  }
+  if (!room.users.size) {
+    collaborationRooms.delete(roomId);
+    return;
+  }
+  emitCollaborationRoomState(roomId);
+}
 
 function createMemoryRateLimiter({
   windowMs = 60 * 1000,
@@ -2968,6 +3061,9 @@ app.use(passport.session());
 
 // Serving
 app.get("/", (_req, res) => {
+  res.render("index");
+});
+app.get("/studio", (_req, res) => {
   res.render("index");
 });
 app.get("/studio-terminal", (_req, res) => {
@@ -7770,7 +7866,113 @@ io.on("connection", (socket) => {
     if (!normalizedUserId) return;
     socket.join(`${USER_NOTIFICATION_ROOM_PREFIX}${normalizedUserId}`);
   });
+  socket.on("collaboration:join-room", (payload = {}) => {
+    try {
+      const roomId = normalizeCollaborationRoomId(payload.roomId);
+      if (!roomId) return;
+      const room = ensureCollaborationRoom(roomId);
+      if (!room) return;
+      const requestedHost = Boolean(payload.isHost);
+      removeSocketFromCollaborationRoom(socket.id);
+      socket.join(`${COLLAB_ROOM_PREFIX}${roomId}`);
+      const hasHost = Boolean(room.hostSocketId && room.users.has(room.hostSocketId));
+      const isHost = requestedHost || !hasHost;
+      const entry = {
+        socketId: socket.id,
+        userId: String(payload.userId || "").trim(),
+        displayName: String(payload.displayName || "Guest").trim().slice(0, 80) || "Guest",
+        color: String(payload.color || "#22d3ee").trim().slice(0, 24) || "#22d3ee",
+        isGuest: Boolean(payload.isGuest),
+        isHost,
+        canEdit: isHost ? true : Boolean(payload.canEdit),
+        joinedAt: new Date(),
+      };
+      if (isHost) {
+        room.hostSocketId = socket.id;
+      }
+      room.users.set(socket.id, entry);
+      socketCollaborationMembership.set(socket.id, roomId);
+      socket.emit("collaboration:joined", {
+        roomId,
+        user: serializeCollaborationUser(entry),
+        latestSnapshot: room.latestSnapshot || null,
+      });
+      emitCollaborationRoomState(roomId);
+      if (room.latestSnapshot) {
+        socket.emit("collaboration:content-sync", {
+          ...room.latestSnapshot,
+          roomId,
+        });
+      }
+    } catch (error) {
+      console.warn("Collaboration join failed:", error.message);
+    }
+  });
+  socket.on("collaboration:set-permission", (payload = {}) => {
+    const roomId = normalizeCollaborationRoomId(payload.roomId);
+    if (!roomId) return;
+    const room = collaborationRooms.get(roomId);
+    if (!room) return;
+    const actingUser = room.users.get(socket.id);
+    if (!actingUser?.isHost) return;
+    const targetSocketId = String(payload.targetSocketId || "").trim();
+    const target = room.users.get(targetSocketId);
+    if (!target || target.isHost) return;
+    const canEdit = Boolean(payload.canEdit);
+    target.canEdit = canEdit;
+    const permissionPayload = {
+      roomId,
+      grantedBy: actingUser.displayName,
+    };
+    io.to(targetSocketId).emit(
+      canEdit ? "collaboration:permit-edit" : "collaboration:restrict-view",
+      permissionPayload,
+    );
+    io.to(targetSocketId).emit(
+      canEdit ? "permit-edit" : "restrict-view",
+      permissionPayload,
+    );
+    emitCollaborationRoomState(roomId);
+  });
+  socket.on("collaboration:cursor-update", (payload = {}) => {
+    const roomId = normalizeCollaborationRoomId(payload.roomId);
+    if (!roomId) return;
+    const room = collaborationRooms.get(roomId);
+    const user = room?.users?.get(socket.id);
+    if (!room || !user) return;
+    socket.to(`${COLLAB_ROOM_PREFIX}${roomId}`).emit("collaboration:cursor-update", {
+      roomId,
+      user: serializeCollaborationUser(user),
+      x: Number(payload.x || 0),
+      y: Number(payload.y || 0),
+      updatedAt: Date.now(),
+    });
+  });
+  socket.on("collaboration:content-sync", (payload = {}) => {
+    const roomId = normalizeCollaborationRoomId(payload.roomId);
+    if (!roomId) return;
+    const room = collaborationRooms.get(roomId);
+    const user = room?.users?.get(socket.id);
+    if (!room || !user || (!user.canEdit && !user.isHost)) return;
+    const snapshot = {
+      projectName: String(payload.projectName || "").trim().slice(0, 140),
+      html: String(payload.html || ""),
+      pageBackground: String(payload.pageBackground || "").trim(),
+      code: String(payload.code || ""),
+      activePath: String(payload.activePath || "index.html").trim().slice(0, 200),
+      codeMode: Boolean(payload.codeMode),
+      updatedBy: user.displayName,
+      updatedAt: Date.now(),
+    };
+    room.latestSnapshot = snapshot;
+    socket.to(`${COLLAB_ROOM_PREFIX}${roomId}`).emit("collaboration:content-sync", {
+      roomId,
+      ...snapshot,
+      user: serializeCollaborationUser(user),
+    });
+  });
   socket.on("disconnect", () => {
+    removeSocketFromCollaborationRoom(socket.id);
     console.log(`🔌 Client disconnected: ${socket.id}`);
   });
 });
