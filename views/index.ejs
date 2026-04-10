@@ -4559,7 +4559,7 @@
       let currentStudioToolId = "image-pdf";
       let currentLiveProjectDetail = null;
       let currentLiveProjectMonitor = null;
-      const COLLAB_SHARE_BASE_URL = "https://medialab-6b20.onrender.com/studio";
+      const COLLAB_SHARE_BASE_URL = "https://medialab-6b20.onrender.com";
       const collaborationGuestPalette = [
         "#22d3ee",
         "#60a5fa",
@@ -5084,6 +5084,18 @@
         }
         return "medialab";
       }
+      function buildCollaborationShareLink(roomId = "") {
+        const normalizedRoomId = String(roomId || "").trim();
+        if (!normalizedRoomId) return "";
+        try {
+          const base = new URL(window.location.origin || COLLAB_SHARE_BASE_URL);
+          base.pathname = "/";
+          base.search = `?room=${encodeURIComponent(normalizedRoomId)}`;
+          return base.toString();
+        } catch {
+          return `${COLLAB_SHARE_BASE_URL}/?room=${encodeURIComponent(normalizedRoomId)}`;
+        }
+      }
       function buildCollaborationSnapshot() {
         const canvas = document.getElementById("web-canvas");
         const editor = document.getElementById("builder-code-editor");
@@ -5175,7 +5187,7 @@
               <span class="collaboration-pulse-dot"></span>
               <div>
                 <p class="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-300">Live Session Active</p>
-                <p class="mt-1 text-sm text-slate-300">${escapeHtmlText(collaborationShareLink || `${COLLAB_SHARE_BASE_URL}?room=${collaborationRoomId}`)}</p>
+                <p class="mt-1 text-sm text-slate-300">${escapeHtmlText(collaborationShareLink || buildCollaborationShareLink(collaborationRoomId))}</p>
               </div>
             </div>
           </div>
@@ -5254,7 +5266,7 @@
       }
       function generateCollaborationLink() {
         collaborationRoomId = String(globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`);
-        collaborationShareLink = `${COLLAB_SHARE_BASE_URL}?room=${collaborationRoomId}`;
+        collaborationShareLink = buildCollaborationShareLink(collaborationRoomId);
         collaborationIsHost = true;
         collaborationCanEdit = true;
         collaborationJoined = false;
@@ -5344,7 +5356,7 @@
         const roomId = getCollaborationRoomParam();
         if (!roomId) return false;
         collaborationRoomId = roomId;
-        collaborationShareLink = `${COLLAB_SHARE_BASE_URL}?room=${roomId}`;
+        collaborationShareLink = buildCollaborationShareLink(roomId);
         collaborationIsHost = false;
         collaborationCanEdit = false;
         if (!loggedIn) {
