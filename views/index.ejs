@@ -19271,92 +19271,95 @@ console.log("Triggered ${eventName}", { source, event });
           pageKey === "Opacity"
             ? inspectorAnimationPresets.opacity
             : pageKey === "Color"
-              ? inspectorAnimationPresets.color
-              : pageKey === "Transform"
-                ? inspectorAnimationPresets.transform
-                : inspectorAnimationPresets.motion;
-        normalizeAnimationStack(s.animationStack).forEach((layer, index) => {
-          h += `<div class="space-y-3 px-1 py-1.5">
-            <div class="flex items-center justify-between gap-3">
-              <div class="text-[9px] font-black uppercase tracking-[0.22em] text-cyan-300">Layer ${index + 1}</div>
-              <div class="text-[9px] text-slate-500">${layer.name === "none" ? "Inactive" : "Active"}</div>
-            </div>
-            ${renderBuilderSelect(
-              "Preset",
-              `animation-layer-${index}-name`,
-              layer.name,
-              presetOptions,
-              `updateAnimationLayer(${index}, 'name', this.value)`,
+            ? inspectorAnimationPresets.color
+            : pageKey === "Transform"
+              ? inspectorAnimationPresets.transform
+              : inspectorAnimationPresets.motion;
+        const layerIndex = Math.max(
+          0,
+          Math.min(inspectorPageIndex, inspectorAnimationPages.length - 1),
+        );
+        const layer = normalizeAnimationStack(s.animationStack)[layerIndex];
+        h += `<div class="space-y-3 px-1 py-1.5">
+          <div class="flex items-center justify-between gap-3">
+            <div class="text-[9px] font-black uppercase tracking-[0.22em] text-cyan-300">${pageKey} Animation</div>
+            <div class="text-[9px] text-slate-500">${layer.name === "none" ? "Inactive" : "Active"}</div>
+          </div>
+          ${renderBuilderSelect(
+            "Preset",
+            `animation-page-${layerIndex}-name`,
+            layer.name,
+            presetOptions,
+            `updateAnimationLayer(${layerIndex}, 'name', this.value)`,
+          )}
+          <div class="grid grid-cols-2 gap-3">
+            ${renderBuilderInput(
+              "Duration",
+              "text",
+              layer.duration,
+              `updateAnimationLayer(${layerIndex}, 'duration', normalizeCssSize(this.value, '1.6s'))`,
             )}
-            <div class="grid grid-cols-2 gap-3">
-              ${renderBuilderInput(
-                "Duration",
-                "text",
-                layer.duration,
-                `updateAnimationLayer(${index}, 'duration', normalizeCssSize(this.value, '1.6s'))`,
-              )}
-              ${renderBuilderInput(
-                "Delay",
-                "text",
-                layer.delay,
-                `updateAnimationLayer(${index}, 'delay', normalizeCssSize(this.value, '0s'))`,
-              )}
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              ${renderBuilderSelect(
-                "Repeat",
-                `animation-layer-${index}-repeat`,
-                layer.iterationCount,
-                [
-                  ["1", "Once"],
-                  ["2", "2 Times"],
-                  ["3", "3 Times"],
-                  ["5", "5 Times"],
-                  ["infinite", "Infinity"],
-                ],
-                `updateAnimationLayer(${index}, 'iterationCount', this.value)`,
-              )}
-              ${renderBuilderSelect(
-                "Reverse",
-                `animation-layer-${index}-direction`,
-                layer.direction,
-                [
-                  ["normal", "Normal"],
-                  ["reverse", "Reverse"],
-                  ["alternate", "Alternate"],
-                  ["alternate-reverse", "Alt Reverse"],
-                ],
-                `updateAnimationLayer(${index}, 'direction', this.value)`,
-              )}
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              ${renderBuilderSelect(
-                "Timing",
-                `animation-layer-${index}-timing`,
-                layer.timingFunction,
-                [
-                  ["ease", "Ease"],
-                  ["ease-in", "Ease In"],
-                  ["ease-out", "Ease Out"],
-                  ["ease-in-out", "Ease In Out"],
-                  ["linear", "Linear"],
-                  ["cubic-bezier(0.22, 1, 0.36, 1)", "Expressive"],
-                ],
-                `updateAnimationLayer(${index}, 'timingFunction', this.value)`,
-              )}
-              ${renderBuilderSelect(
-                "Start",
-                `animation-layer-${index}-play`,
-                layer.playState,
-                [
-                  ["running", "Start"],
-                  ["paused", "Paused"],
-                ],
-                `updateAnimationLayer(${index}, 'playState', this.value)`,
-              )}
-            </div>
-          </div>`;
-        });
+            ${renderBuilderInput(
+              "Delay",
+              "text",
+              layer.delay,
+              `updateAnimationLayer(${layerIndex}, 'delay', normalizeCssSize(this.value, '0s'))`,
+            )}
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            ${renderBuilderSelect(
+              "Repeat",
+              `animation-page-${layerIndex}-repeat`,
+              layer.iterationCount,
+              [
+                ["1", "Once"],
+                ["2", "2 Times"],
+                ["3", "3 Times"],
+                ["5", "5 Times"],
+                ["infinite", "Infinity"],
+              ],
+              `updateAnimationLayer(${layerIndex}, 'iterationCount', this.value)`,
+            )}
+            ${renderBuilderSelect(
+              "Reverse",
+              `animation-page-${layerIndex}-direction`,
+              layer.direction,
+              [
+                ["normal", "Normal"],
+                ["reverse", "Reverse"],
+                ["alternate", "Alternate"],
+                ["alternate-reverse", "Alt Reverse"],
+              ],
+              `updateAnimationLayer(${layerIndex}, 'direction', this.value)`,
+            )}
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            ${renderBuilderSelect(
+              "Timing",
+              `animation-page-${layerIndex}-timing`,
+              layer.timingFunction,
+              [
+                ["ease", "Ease"],
+                ["ease-in", "Ease In"],
+                ["ease-out", "Ease Out"],
+                ["ease-in-out", "Ease In Out"],
+                ["linear", "Linear"],
+                ["cubic-bezier(0.22, 1, 0.36, 1)", "Expressive"],
+              ],
+              `updateAnimationLayer(${layerIndex}, 'timingFunction', this.value)`,
+            )}
+            ${renderBuilderSelect(
+              "Start",
+              `animation-page-${layerIndex}-play`,
+              layer.playState,
+              [
+                ["running", "Start"],
+                ["paused", "Paused"],
+              ],
+              `updateAnimationLayer(${layerIndex}, 'playState', this.value)`,
+            )}
+          </div>
+        </div>`;
         h += `</div>`;
         return h;
       }
@@ -20075,7 +20078,7 @@ console.log("Triggered ${eventName}", { source, event });
       }
       function normalizeAnimationStack(stack = []) {
         const safeStack = Array.isArray(stack) ? stack : [];
-        return Array.from({ length: 3 }, (_, index) => {
+        return Array.from({ length: 4 }, (_, index) => {
           const item = safeStack[index] || {};
           return {
             name: String(item.name || "none"),
