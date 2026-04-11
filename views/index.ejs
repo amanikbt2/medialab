@@ -5706,15 +5706,19 @@
         if (linkWrap) linkWrap.classList.toggle("hidden", !collaborationShareLink);
         if (linkInput) linkInput.value = collaborationShareLink || "";
         if (audioToggle) {
-          audioToggle.classList.toggle("hidden", !isCollaborationActive());
+          audioToggle.classList.toggle("opacity-40", !isCollaborationActive());
+          audioToggle.classList.toggle("pointer-events-none", !isCollaborationActive());
           audioToggle.classList.toggle("terminal-toggle-active", collaborationAudioEnabled && !collaborationVideoEnabled);
           audioToggle.classList.toggle("text-emerald-200", collaborationAudioEnabled || collaborationVideoEnabled);
+          audioToggle.classList.toggle("text-slate-300", !(collaborationAudioEnabled || collaborationVideoEnabled));
           audioToggle.title = collaborationAudioEnabled || collaborationVideoEnabled ? "Turn audio off" : "Turn audio on";
         }
         if (videoToggle) {
-          videoToggle.classList.toggle("hidden", !isCollaborationActive());
+          videoToggle.classList.toggle("opacity-40", !isCollaborationActive());
+          videoToggle.classList.toggle("pointer-events-none", !isCollaborationActive());
           videoToggle.classList.toggle("terminal-toggle-active", collaborationVideoEnabled);
           videoToggle.classList.toggle("text-cyan-100", collaborationVideoEnabled);
+          videoToggle.classList.toggle("text-slate-300", !collaborationVideoEnabled);
           videoToggle.title = collaborationVideoEnabled ? "Turn video off" : "Turn video on";
         }
         renderCollaborationDropdown();
@@ -14287,10 +14291,10 @@
                             <button id="builder-collaboration-toggle" type="button" onclick="toggleCollaborationPanel(event)" class="toolbar-item inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-[10px] font-black uppercase tracking-[0.18em] text-slate-300 hover:text-cyan-100">
                                 <i class="fas fa-globe-americas text-[11px]"></i>
                             </button>
-                            <button id="builder-collab-audio-toggle" type="button" onclick="toggleCollaborationAudio()" class="toolbar-item hidden inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 hover:text-emerald-200">
+                            <button id="builder-collab-audio-toggle" type="button" onclick="toggleCollaborationAudio()" class="toolbar-item inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 hover:text-emerald-200 opacity-40 pointer-events-none">
                                 <i class="fas fa-microphone text-[11px] animate-pulse"></i>
                             </button>
-                            <button id="builder-collab-video-toggle" type="button" onclick="toggleCollaborationVideo()" class="toolbar-item hidden inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 hover:text-cyan-100">
+                            <button id="builder-collab-video-toggle" type="button" onclick="toggleCollaborationVideo()" class="toolbar-item inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 hover:text-cyan-100 opacity-40 pointer-events-none">
                                 <i class="fas fa-video text-[11px] animate-pulse"></i>
                             </button>
                         </div>
