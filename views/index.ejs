@@ -371,6 +371,110 @@
         font-weight: 800;
         color: #e0f2fe;
       }
+      .builder-collab-audio-badge {
+        position: fixed;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        min-width: 150px;
+        max-width: 220px;
+        padding: 0.72rem 0.9rem;
+        border-radius: 1.2rem;
+        border: 1px solid rgba(34, 211, 238, 0.18);
+        background: linear-gradient(180deg, rgba(8, 15, 30, 0.94), rgba(2, 6, 23, 0.94));
+        box-shadow:
+          0 16px 44px rgba(2, 6, 23, 0.38),
+          0 0 0 1px rgba(34, 211, 238, 0.08);
+        backdrop-filter: blur(12px);
+        pointer-events: none;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+      }
+      .builder-collab-audio-badge.is-speaking {
+        border-color: rgba(34, 211, 238, 0.36);
+        box-shadow:
+          0 18px 52px rgba(2, 6, 23, 0.42),
+          0 0 24px rgba(34, 211, 238, 0.16);
+        transform: translateY(-2px);
+      }
+      .builder-collab-audio-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.2rem;
+        height: 2.2rem;
+        border-radius: 999px;
+        background: rgba(34, 211, 238, 0.12);
+        color: #67e8f9;
+        border: 1px solid rgba(34, 211, 238, 0.2);
+        flex-shrink: 0;
+      }
+      .builder-collab-audio-bars {
+        display: flex;
+        align-items: flex-end;
+        gap: 0.18rem;
+        height: 1rem;
+        margin-left: auto;
+      }
+      .builder-collab-audio-bars span {
+        width: 0.18rem;
+        height: calc(0.28rem + (var(--level, 0.12) * 0.9rem));
+        border-radius: 999px;
+        background: linear-gradient(180deg, #67e8f9, #06b6d4);
+        opacity: 0.42;
+        transition: height 0.12s linear, opacity 0.12s linear;
+      }
+      .builder-collab-audio-badge.is-speaking .builder-collab-audio-bars span {
+        opacity: 1;
+      }
+      .builder-collab-media-prompt {
+        position: fixed;
+        inset: 0;
+        z-index: 1695;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.2rem;
+        background: rgba(2, 6, 23, 0.34);
+        backdrop-filter: blur(8px);
+      }
+      .builder-collab-media-prompt-card {
+        width: min(92vw, 420px);
+        border-radius: 1.8rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: linear-gradient(180deg, rgba(8, 15, 30, 0.98), rgba(2, 6, 23, 0.96));
+        box-shadow: 0 30px 90px rgba(2, 6, 23, 0.52);
+        overflow: hidden;
+      }
+      .builder-collab-media-prompt-option {
+        display: flex;
+        align-items: center;
+        gap: 0.9rem;
+        width: 100%;
+        text-align: left;
+        padding: 0.95rem 1rem;
+        border-radius: 1.2rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+        color: #e2e8f0;
+        transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
+      }
+      .builder-collab-media-prompt-option.is-on {
+        border-color: rgba(34, 211, 238, 0.34);
+        background: rgba(34, 211, 238, 0.09);
+        transform: translateY(-1px);
+      }
+      .builder-collab-media-prompt-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.6rem;
+        height: 2.6rem;
+        border-radius: 999px;
+        border: 1px solid rgba(34, 211, 238, 0.2);
+        background: rgba(34, 211, 238, 0.08);
+        color: #67e8f9;
+        flex-shrink: 0;
+      }
       .builder-collab-lobby-card {
         border-radius: 1.5rem;
         border: 1px solid rgba(255, 255, 255, 0.08);
@@ -4744,8 +4848,13 @@
       let collaborationLocalStream = null;
       let collaborationPeerConnections = new Map();
       let collaborationRemoteStreams = new Map();
+      let collaborationAudioMeters = new Map();
+      let collaborationAudioMeterFrame = 0;
+      let collaborationAudioContext = null;
       let collaborationVideoDragState = null;
       let collaborationLocalVideoWindowPosition = null;
+      let collaborationMediaPromptDismissed = false;
+      let collaborationMediaPromptShownForRoom = "";
       const collaborationIceConfiguration = {
         iceServers: [
           { urls: "stun:stun.relay.metered.ca:80" },
@@ -5336,6 +5445,18 @@
         const top = Math.max(98, Math.min(window.innerHeight - 196, 118 + row * 154));
         return { left, top };
       }
+      function getCollaborationAudioBadgePosition(key = "") {
+        let hash = 7;
+        const text = String(key || "audio-peer");
+        for (let index = 0; index < text.length; index += 1) {
+          hash = (hash * 37 + text.charCodeAt(index)) >>> 0;
+        }
+        const column = hash % 4;
+        const row = Math.floor(hash / 4) % 3;
+        const left = Math.max(12, Math.min(window.innerWidth - 236, 20 + column * 178));
+        const top = Math.max(112, Math.min(window.innerHeight - 96, 132 + row * 92));
+        return { left, top };
+      }
       async function pushCollaborationMediaState() {
         if (!collaborationRoomId) return;
         socket.emit("collaboration:set-media-state", {
@@ -5344,50 +5465,98 @@
           videoEnabled: collaborationVideoEnabled,
         });
       }
-      async function toggleCollaborationAudio() {
-        if (!isCollaborationActive()) return;
-        if (collaborationAudioEnabled || collaborationVideoEnabled) {
-          collaborationAudioEnabled = false;
-          collaborationVideoEnabled = false;
-          stopCollaborationLocalTracksOnly();
-          await pushCollaborationMediaState();
-          await syncCollaborationPeerMesh(true);
-          updateCollaborationUi();
+      function getRequestedCollaborationMediaMode() {
+        if (collaborationVideoEnabled) return "video";
+        if (collaborationAudioEnabled) return "audio";
+        return "none";
+      }
+      function openCollaborationMediaPrompt() {
+        const prompt = document.getElementById("builder-collab-media-prompt");
+        if (!prompt) return;
+        prompt.classList.remove("hidden");
+        renderCollaborationMediaPrompt();
+      }
+      function closeCollaborationMediaPrompt() {
+        collaborationMediaPromptDismissed = true;
+        document.getElementById("builder-collab-media-prompt")?.classList.add("hidden");
+      }
+      function renderCollaborationMediaPrompt() {
+        const audioButton = document.getElementById("builder-collab-prompt-audio");
+        const videoButton = document.getElementById("builder-collab-prompt-video");
+        audioButton?.classList.toggle("is-on", collaborationAudioEnabled);
+        videoButton?.classList.toggle("is-on", collaborationVideoEnabled);
+      }
+      function maybeShowCollaborationMediaPrompt() {
+        if (
+          !collaborationRoomId ||
+          !collaborationJoined ||
+          currentStudioToolId !== "web-builder" ||
+          collaborationMediaPromptDismissed ||
+          collaborationMediaPromptShownForRoom === collaborationRoomId
+        ) {
           return;
         }
-        try {
-          await ensureCollaborationLocalMedia("audio");
-          collaborationAudioEnabled = true;
-          collaborationVideoEnabled = false;
-          await pushCollaborationMediaState();
-          await syncCollaborationPeerMesh(true);
-          updateCollaborationUi();
-        } catch {}
+        collaborationMediaPromptShownForRoom = collaborationRoomId;
+        setTimeout(() => {
+          if (
+            collaborationRoomId &&
+            collaborationJoined &&
+            currentStudioToolId === "web-builder" &&
+            !collaborationMediaPromptDismissed
+          ) {
+            openCollaborationMediaPrompt();
+          }
+        }, 360);
+      }
+      async function handleCollaborationMediaPromptToggle(kind = "audio") {
+        if (kind === "video") await toggleCollaborationVideo();
+        else await toggleCollaborationAudio();
+        renderCollaborationMediaPrompt();
+      }
+      async function toggleCollaborationAudio() {
+        if (!isCollaborationActive()) return;
+        collaborationAudioEnabled = !collaborationAudioEnabled;
+        if (!collaborationAudioEnabled && !collaborationVideoEnabled) {
+          stopCollaborationLocalTracksOnly();
+        } else {
+          try {
+            await ensureCollaborationLocalMedia(getRequestedCollaborationMediaMode());
+          } catch {
+            collaborationAudioEnabled = false;
+            updateCollaborationUi();
+            return;
+          }
+        }
+        await pushCollaborationMediaState();
+        await syncCollaborationPeerMesh(true);
+        updateCollaborationUi();
+        renderCollaborationMediaPrompt();
       }
       async function toggleCollaborationVideo() {
         if (!isCollaborationActive()) return;
-        if (collaborationVideoEnabled) {
-          collaborationVideoEnabled = false;
-          collaborationAudioEnabled = false;
+        collaborationVideoEnabled = !collaborationVideoEnabled;
+        if (!collaborationAudioEnabled && !collaborationVideoEnabled) {
           stopCollaborationLocalTracksOnly();
-          await pushCollaborationMediaState();
-          await syncCollaborationPeerMesh(true);
-          updateCollaborationUi();
-          return;
+        } else {
+          try {
+            await ensureCollaborationLocalMedia(getRequestedCollaborationMediaMode());
+          } catch {
+            collaborationVideoEnabled = false;
+            updateCollaborationUi();
+            return;
+          }
         }
-        try {
-          await ensureCollaborationLocalMedia("video");
-          collaborationAudioEnabled = true;
-          collaborationVideoEnabled = true;
-          await pushCollaborationMediaState();
-          await syncCollaborationPeerMesh(true);
-          updateCollaborationUi();
-        } catch {}
+        await pushCollaborationMediaState();
+        await syncCollaborationPeerMesh(true);
+        updateCollaborationUi();
+        renderCollaborationMediaPrompt();
       }
       function renderCollaborationVideoStage() {
         const stage = document.getElementById("builder-collab-video-stage");
         if (!stage) return;
         const windows = [];
+        const audioFeeds = [];
+        const audioBadges = [];
         if (collaborationLocalStream && collaborationLocalStream.getVideoTracks().length) {
           const localPosition = collaborationLocalVideoWindowPosition || {
             top: 150,
@@ -5402,8 +5571,39 @@
             muted: true,
           });
         }
+        if (
+          collaborationLocalStream &&
+          collaborationLocalStream.getAudioTracks().length &&
+          !collaborationLocalStream.getVideoTracks().length
+        ) {
+          const localBadgePosition = getCollaborationAudioBadgePosition("local-audio");
+          audioBadges.push({
+            socketId: "local-audio",
+            displayName: `${getCollaborationIdentity().displayName} (You)`,
+            stream: collaborationLocalStream,
+            top: localBadgePosition.top,
+            left: localBadgePosition.left,
+          });
+        }
         collaborationRemoteStreams.forEach((entry, socketId) => {
-          if (!entry?.stream || !entry.stream.getVideoTracks().length) return;
+          if (!entry?.stream) return;
+          if (entry.stream.getAudioTracks().length) {
+            audioFeeds.push({
+              socketId,
+              stream: entry.stream,
+            });
+          }
+          if (entry.stream.getAudioTracks().length && !entry.stream.getVideoTracks().length) {
+            const badgePosition = getCollaborationAudioBadgePosition(socketId);
+            audioBadges.push({
+              socketId,
+              displayName: entry.displayName || "Collaborator",
+              stream: entry.stream,
+              top: entry.audioTop || badgePosition.top,
+              left: entry.audioLeft || badgePosition.left,
+            });
+          }
+          if (!entry.stream.getVideoTracks().length) return;
           const fallback = getCollaborationWindowSeedPosition(socketId);
           windows.push({
             socketId,
@@ -5424,6 +5624,21 @@
               </div>
             </div>`,
           )
+          .join("") + audioFeeds
+          .map(
+            (entry) => `<audio data-collab-audio="${escapeAttr(entry.socketId)}" autoplay playsinline></audio>`,
+          )
+          .join("") + audioBadges
+          .map(
+            (entry) => `<div class="builder-collab-audio-badge" data-audio-badge="${escapeAttr(entry.socketId)}" style="top:${Number(entry.top || 140)}px;left:${Number(entry.left || 24)}px;--level:0.12;">
+              <span class="builder-collab-audio-icon"><i class="fas fa-wave-square"></i></span>
+              <div class="min-w-0">
+                <div class="truncate text-sm font-semibold text-white">${escapeHtmlText(entry.displayName || "Collaborator")}</div>
+                <div class="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-200">Audio Live</div>
+              </div>
+              <div class="builder-collab-audio-bars"><span></span><span></span><span></span><span></span></div>
+            </div>`,
+          )
           .join("");
         Array.from(stage.querySelectorAll(".builder-collab-video-window")).forEach((win) => {
           const id = String(win.dataset.socketId || "");
@@ -5440,6 +5655,22 @@
             meta.onpointerdown = (event) => startCollaborationVideoDrag(event, id);
           }
         });
+        Array.from(stage.querySelectorAll("audio[data-collab-audio]")).forEach((audio) => {
+          const id = String(audio.getAttribute("data-collab-audio") || "");
+          const entry = collaborationRemoteStreams.get(id) || null;
+          if (entry?.stream) {
+            audio.srcObject = entry.stream;
+            audio.play?.().catch(() => {});
+          }
+        });
+        const activeAudioBadgeIds = new Set(audioBadges.map((entry) => String(entry.socketId || "")));
+        audioBadges.forEach((entry) => ensureCollaborationAudioMeter(entry.socketId, entry.stream));
+        collaborationAudioMeters.forEach((_, socketId) => {
+          if (!activeAudioBadgeIds.has(String(socketId || ""))) {
+            cleanupCollaborationAudioMeter(socketId);
+          }
+        });
+        ensureCollaborationAudioMeterLoop();
       }
       function startCollaborationVideoDrag(event, socketId = "") {
         event.preventDefault();
@@ -5479,14 +5710,20 @@
         collaborationVideoDragState = null;
       }
       async function ensureCollaborationLocalMedia(mode = "audio") {
+        const wantsAudio = mode === "audio" || mode === "video";
         const wantsVideo = mode === "video";
+        const existingHasAudio = Boolean(collaborationLocalStream?.getAudioTracks?.().length);
         const existingHasVideo = Boolean(collaborationLocalStream?.getVideoTracks?.().length);
-        if (collaborationLocalStream && (!wantsVideo || existingHasVideo)) {
+        if (
+          collaborationLocalStream &&
+          existingHasAudio === wantsAudio &&
+          existingHasVideo === wantsVideo
+        ) {
           return collaborationLocalStream;
         }
         try {
           const nextStream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
+            audio: wantsAudio,
             video: wantsVideo,
           });
           stopCollaborationLocalTracksOnly();
@@ -5506,6 +5743,7 @@
         });
         collaborationLocalStream = null;
         collaborationLocalVideoWindowPosition = null;
+        cleanupCollaborationAudioMeter("local-audio");
       }
       function stopCollaborationLocalMediaTracks() {
         stopCollaborationLocalTracksOnly();
@@ -5523,7 +5761,83 @@
           } catch {}
         });
         collaborationPeerConnections.clear();
+        collaborationAudioMeters.forEach((_, socketId) => cleanupCollaborationAudioMeter(socketId));
         renderCollaborationVideoStage();
+      }
+      function resumeCollaborationAudioContext() {
+        if (!window.AudioContext && !window.webkitAudioContext) return null;
+        if (!collaborationAudioContext) {
+          const AudioCtor = window.AudioContext || window.webkitAudioContext;
+          collaborationAudioContext = new AudioCtor();
+        }
+        collaborationAudioContext.resume?.().catch?.(() => {});
+        return collaborationAudioContext;
+      }
+      function cleanupCollaborationAudioMeter(socketId = "") {
+        const entry = collaborationAudioMeters.get(String(socketId || ""));
+        if (!entry) return;
+        try {
+          entry.source?.disconnect?.();
+        } catch {}
+        try {
+          entry.analyser?.disconnect?.();
+        } catch {}
+        collaborationAudioMeters.delete(String(socketId || ""));
+      }
+      function ensureCollaborationAudioMeter(socketId = "", stream = null) {
+        const key = String(socketId || "").trim();
+        if (!key || !stream?.getAudioTracks?.().length) {
+          cleanupCollaborationAudioMeter(key);
+          return;
+        }
+        const existing = collaborationAudioMeters.get(key);
+        if (existing?.stream === stream) return existing;
+        cleanupCollaborationAudioMeter(key);
+        const context = resumeCollaborationAudioContext();
+        if (!context) return null;
+        try {
+          const analyser = context.createAnalyser();
+          analyser.fftSize = 256;
+          analyser.smoothingTimeConstant = 0.78;
+          const source = context.createMediaStreamSource(stream);
+          source.connect(analyser);
+          const meter = {
+            stream,
+            analyser,
+            source,
+            buffer: new Uint8Array(analyser.frequencyBinCount),
+            level: 0,
+          };
+          collaborationAudioMeters.set(key, meter);
+          return meter;
+        } catch {
+          return null;
+        }
+      }
+      function ensureCollaborationAudioMeterLoop() {
+        if (collaborationAudioMeterFrame) return;
+        collaborationAudioMeterFrame = requestAnimationFrame(stepCollaborationAudioMeters);
+      }
+      function stepCollaborationAudioMeters() {
+        collaborationAudioMeterFrame = 0;
+        let hasVisibleMeters = false;
+        collaborationAudioMeters.forEach((meter, socketId) => {
+          const badge = document.querySelector(`[data-audio-badge="${CSS.escape(String(socketId || ""))}"]`);
+          if (!badge) return;
+          hasVisibleMeters = true;
+          try {
+            meter.analyser.getByteFrequencyData(meter.buffer);
+            const peak = meter.buffer.reduce((max, value) => Math.max(max, value), 0) / 255;
+            meter.level = peak;
+          } catch {
+            meter.level = 0;
+          }
+          badge.style.setProperty("--level", String(Math.max(0.12, Math.min(1, meter.level))));
+          badge.classList.toggle("is-speaking", meter.level > 0.15);
+        });
+        if (hasVisibleMeters) {
+          collaborationAudioMeterFrame = requestAnimationFrame(stepCollaborationAudioMeters);
+        }
       }
       function updateCollaborationPeerSenders(pc) {
         if (!pc) return;
@@ -5616,8 +5930,7 @@
         if (!selfLive) {
           stopCollaborationLocalTracksOnly();
         } else {
-          const wantsVideo = collaborationVideoEnabled || Boolean(self.canVideo);
-          await ensureCollaborationLocalMedia(wantsVideo ? "video" : "audio");
+          await ensureCollaborationLocalMedia(getRequestedCollaborationMediaMode());
         }
         if (!selfLive && !anyRemoteLive) {
           stopCollaborationLocalMediaTracks();
@@ -5999,12 +6312,15 @@
       socket.on("collaboration:joined", (payload = {}) => {
         if (String(payload.roomId || "") !== collaborationRoomId) return;
         collaborationJoined = true;
+        collaborationMediaPromptDismissed = false;
+        collaborationMediaPromptShownForRoom = "";
         collaborationCanEdit = Boolean(payload.user?.canEdit);
         collaborationIsHost = Boolean(payload.user?.isHost);
         if (payload.latestSnapshot?.html) {
           applyRemoteCollaborationSnapshot(payload.latestSnapshot);
         }
         updateCollaborationUi();
+        maybeShowCollaborationMediaPrompt();
       });
       socket.on("collaboration:room-state", (payload = {}) => {
         if (String(payload.roomId || "") !== collaborationRoomId) return;
@@ -6012,6 +6328,21 @@
         const self = collaborationUsers.find(
           (user) => String(user.socketId || "") === String(socket.id || ""),
         );
+        const livePeerIds = new Set(
+          collaborationUsers
+            .filter(
+              (user) =>
+                String(user.socketId || "") !== String(socket.id || "") &&
+                collaborationUserHasLiveMedia(user),
+            )
+            .map((user) => String(user.socketId || "")),
+        );
+        collaborationRemoteStreams.forEach((entry, peerSocketId) => {
+          if (!livePeerIds.has(String(peerSocketId || ""))) {
+            collaborationRemoteStreams.delete(peerSocketId);
+            cleanupCollaborationAudioMeter(peerSocketId);
+          }
+        });
         if (self) {
           collaborationCanEdit = Boolean(self.canEdit);
           collaborationIsHost = Boolean(self.isHost);
@@ -6020,6 +6351,7 @@
         }
         updateCollaborationUi();
         syncCollaborationPeerMesh().catch(() => {});
+        maybeShowCollaborationMediaPrompt();
       });
       socket.on("collaboration:permit-edit", (payload = {}) => {
         if (String(payload.roomId || "") !== collaborationRoomId) return;
@@ -14486,6 +14818,35 @@
             </div>
             <div id="builder-collaboration-dropdown" class="builder-collaboration-dropdown hidden"></div>
             <div id="builder-collab-video-stage" class="builder-collab-video-stage"></div>
+            <div id="builder-collab-media-prompt" class="builder-collab-media-prompt hidden" onclick="if (event.target === this) closeCollaborationMediaPrompt();">
+                <div class="builder-collab-media-prompt-card">
+                    <div class="border-b border-white/10 px-5 py-4">
+                        <p class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Workspace Live Setup</p>
+                        <h3 class="mt-2 text-xl font-semibold text-white">Turn on audio or camera</h3>
+                        <p class="mt-2 text-sm leading-6 text-slate-400">Your room is ready. Pick what you want to share now. You can still change this anytime from the toolbar.</p>
+                    </div>
+                    <div class="space-y-3 px-5 py-5">
+                        <button type="button" id="builder-collab-prompt-audio" onclick="handleCollaborationMediaPromptToggle('audio')" class="builder-collab-media-prompt-option">
+                            <span class="builder-collab-media-prompt-icon"><i class="fas fa-microphone"></i></span>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-semibold text-white">Turn on Audio</span>
+                                <span class="mt-1 block text-xs leading-5 text-slate-400">Speak and be heard instantly in the room.</span>
+                            </span>
+                        </button>
+                        <button type="button" id="builder-collab-prompt-video" onclick="handleCollaborationMediaPromptToggle('video')" class="builder-collab-media-prompt-option">
+                            <span class="builder-collab-media-prompt-icon"><i class="fas fa-video"></i></span>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-semibold text-white">Turn on Camera</span>
+                                <span class="mt-1 block text-xs leading-5 text-slate-400">Show a floating live frame to everyone in this room.</span>
+                            </span>
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 border-t border-white/10 px-5 py-4">
+                        <button type="button" onclick="closeCollaborationMediaPrompt()" class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-slate-200 hover:bg-white/10">Not now</button>
+                        <button type="button" onclick="closeCollaborationMediaPrompt()" class="rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-black text-slate-950 hover:bg-cyan-400">Continue</button>
+                    </div>
+                </div>
+            </div>
             <div id="builder-collaboration-modal" class="hidden absolute inset-0 z-[160] bg-slate-950/78 p-4 backdrop-blur-xl" onclick="if (event.target === this) closeCollaborationModal();">
                 <div class="mx-auto mt-10 w-full max-w-xl rounded-[2rem] border border-white/10 bg-[#08111f] shadow-[0_28px_90px_rgba(2,6,23,0.58)]">
                     <div class="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
