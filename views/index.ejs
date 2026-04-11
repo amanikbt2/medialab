@@ -499,6 +499,43 @@
         box-shadow: 0 30px 90px rgba(2, 6, 23, 0.52);
         padding: 1.4rem;
       }
+      .builder-collab-join-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(2, 6, 23, 0.42);
+        backdrop-filter: blur(10px);
+      }
+      .builder-collab-join-card {
+        width: min(94vw, 480px);
+        border-radius: 1.9rem;
+        border: 1px solid rgba(34, 211, 238, 0.16);
+        background:
+          radial-gradient(circle at top left, rgba(34, 211, 238, 0.16), transparent 42%),
+          linear-gradient(180deg, rgba(8, 15, 30, 0.98), rgba(2, 6, 23, 0.97));
+        box-shadow: 0 30px 90px rgba(2, 6, 23, 0.52);
+        padding: 1.4rem;
+      }
+      .builder-collab-join-progress {
+        position: relative;
+        overflow: hidden;
+        border-radius: 999px;
+        height: 0.7rem;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .builder-collab-join-progress > span {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: var(--join-progress, 18%);
+        border-radius: inherit;
+        background: linear-gradient(90deg, #22d3ee, #67e8f9);
+        box-shadow: 0 0 24px rgba(34, 211, 238, 0.28);
+        transition: width 0.28s ease;
+      }
       .builder-collab-lobby-card {
         border-radius: 1.5rem;
         border: 1px solid rgba(255, 255, 255, 0.08);
@@ -4886,6 +4923,7 @@
       let collaborationMediaPromptAudioSelected = false;
       let collaborationMediaPromptVideoSelected = true;
       let collaborationInactiveOverlay = null;
+      let collaborationJoinProgressTimer = null;
       const collaborationIceConfiguration = {
         iceServers: [
           { urls: "stun:stun.relay.metered.ca:80" },
@@ -5552,6 +5590,7 @@
         closeCollaborationDropdown();
         closeCollaborationMediaPrompt();
         hideCollaborationInactiveOverlay();
+        hideCollaborationJoinProgress(0);
       }
       function continueAnywayFromCollaboration() {
         try {
@@ -5565,6 +5604,58 @@
         resetCollaborationClientState();
         collaborationRoomId = "";
         window.location.href = `${window.location.origin}${window.location.pathname}`;
+      }
+      function getCollaborationHostDisplayName() {
+        return (
+          collaborationUsers.find((user) => Boolean(user?.isHost))?.displayName ||
+          ""
+        );
+      }
+      function showCollaborationJoinProgress(message = "Preparing collaboration workspace...", progress = 18) {
+        const overlay = document.getElementById("builder-collab-join-overlay");
+        const title = document.getElementById("builder-collab-join-title");
+        const subtitle = document.getElementById("builder-collab-join-subtitle");
+        const status = document.getElementById("builder-collab-join-status");
+        const bar = document.getElementById("builder-collab-join-bar");
+        if (!overlay || !title || !subtitle || !status || !bar || !collaborationRoomId) return;
+        const hostName = getCollaborationHostDisplayName();
+        title.textContent = `Joining collaboration ID_${collaborationRoomId}`;
+        subtitle.textContent = hostName
+          ? `Hosted by ${hostName}`
+          : "Hosted session details are loading...";
+        status.textContent = message;
+        bar.style.setProperty("--join-progress", `${Math.max(8, Math.min(100, Number(progress || 0)))}%`);
+        overlay.classList.remove("hidden");
+      }
+      function beginCollaborationJoinProgress() {
+        clearInterval(collaborationJoinProgressTimer);
+        let stepIndex = 0;
+        const steps = [
+          { message: "Opening collaboration workspace...", progress: 18 },
+          { message: "Preparing Web Builder for shared editing...", progress: 34 },
+          { message: "Connecting to collaboration room...", progress: 56 },
+          { message: "Syncing project state and presence...", progress: 74 },
+        ];
+        showCollaborationJoinProgress(steps[0].message, steps[0].progress);
+        collaborationJoinProgressTimer = setInterval(() => {
+          if (!collaborationRoomId || collaborationJoined) {
+            clearInterval(collaborationJoinProgressTimer);
+            collaborationJoinProgressTimer = null;
+            return;
+          }
+          stepIndex = Math.min(stepIndex + 1, steps.length - 1);
+          const step = steps[stepIndex];
+          showCollaborationJoinProgress(step.message, step.progress);
+        }, 520);
+      }
+      function hideCollaborationJoinProgress(delay = 220) {
+        clearInterval(collaborationJoinProgressTimer);
+        collaborationJoinProgressTimer = null;
+        const overlay = document.getElementById("builder-collab-join-overlay");
+        if (!overlay) return;
+        setTimeout(() => {
+          overlay.classList.add("hidden");
+        }, Math.max(0, Number(delay || 0)));
       }
       function renderCollaborationMediaPrompt() {
         const audioButton = document.getElementById("builder-collab-prompt-audio");
@@ -6485,11 +6576,14 @@
         if (!loggedIn) {
           ensureGuestCollaborationIdentity();
         }
+        beginCollaborationJoinProgress();
+        showCollaborationJoinProgress("Launching collaboration workspace...", 24);
         goToStudio("web-builder");
         setTimeout(() => {
           try {
             launchBossMode();
           } catch {}
+          showCollaborationJoinProgress("Connecting to shared room...", 66);
           collaborationAutoReconnectEnabled = true;
           joinCollaborationRoom(false);
           updateCollaborationUi();
@@ -6520,6 +6614,7 @@
       socket.on("collaboration:joined", (payload = {}) => {
         if (String(payload.roomId || "") !== collaborationRoomId) return;
         hideCollaborationInactiveOverlay();
+        showCollaborationJoinProgress("Room connected. Finalizing workspace...", 92);
         collaborationJoined = true;
         collaborationMediaPromptDismissed = false;
         collaborationMediaPromptShownForRoom = "";
@@ -6530,9 +6625,11 @@
         }
         updateCollaborationUi();
         maybeShowCollaborationMediaPrompt();
+        hideCollaborationJoinProgress(360);
       });
       socket.on("collaboration:join-invalid", (payload = {}) => {
         if (String(payload.roomId || "") !== String(collaborationRoomId || "")) return;
+        hideCollaborationJoinProgress(0);
         collaborationJoined = false;
         collaborationAutoReconnectEnabled = false;
         stopCollaborationLocalMediaTracks();
@@ -6542,6 +6639,9 @@
       socket.on("collaboration:room-state", (payload = {}) => {
         if (String(payload.roomId || "") !== collaborationRoomId) return;
         collaborationUsers = Array.isArray(payload.users) ? payload.users : [];
+        if (!collaborationJoined) {
+          showCollaborationJoinProgress("Connected. Loading collaborators and project state...", 84);
+        }
         const self = collaborationUsers.find(
           (user) => String(user.socketId || "") === String(socket.id || ""),
         );
@@ -6572,6 +6672,7 @@
       });
       socket.on("collaboration:room-ended", (payload = {}) => {
         if (String(payload.roomId || "") !== String(collaborationRoomId || "")) return;
+        hideCollaborationJoinProgress(0);
         collaborationJoined = false;
         collaborationAutoReconnectEnabled = false;
         stopCollaborationLocalMediaTracks();
@@ -15067,6 +15168,29 @@
             </div>
             <div id="builder-collaboration-dropdown" class="builder-collaboration-dropdown hidden"></div>
             <div id="builder-collab-video-stage" class="builder-collab-video-stage"></div>
+            <div id="builder-collab-join-overlay" class="builder-collab-join-overlay hidden">
+                <div class="builder-collab-join-card">
+                    <div class="flex items-start gap-4">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-[1.2rem] border border-cyan-400/20 bg-cyan-500/10 text-cyan-200">
+                            <i class="fas fa-globe-americas text-lg"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Collaboration Session</p>
+                            <h3 id="builder-collab-join-title" class="mt-2 text-xl font-semibold text-white">Joining collaboration workspace</h3>
+                            <p id="builder-collab-join-subtitle" class="mt-2 text-sm leading-6 text-slate-300">Hosted session details are loading...</p>
+                        </div>
+                    </div>
+                    <div class="mt-5 rounded-[1.4rem] border border-white/10 bg-white/[0.03] p-4">
+                        <div class="flex items-center gap-3">
+                            <span class="builder-collab-spinner"></span>
+                            <p id="builder-collab-join-status" class="text-sm font-semibold text-white">Preparing collaboration workspace...</p>
+                        </div>
+                        <div id="builder-collab-join-bar" class="builder-collab-join-progress mt-4" style="--join-progress:18%;">
+                            <span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div id="builder-collab-media-prompt" class="builder-collab-media-prompt hidden" onclick="if (event.target === this) closeCollaborationMediaPrompt();">
                 <div class="builder-collab-media-prompt-card">
                     <div class="border-b border-white/10 px-5 py-4">
