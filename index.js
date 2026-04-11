@@ -106,6 +106,11 @@ function serializeCollaborationUser(user = {}) {
     isHost: Boolean(user.isHost),
     canEdit: Boolean(user.canEdit),
     isGuest: Boolean(user.isGuest),
+    canAudio: Boolean(user.canAudio),
+    canVideo: Boolean(user.canVideo),
+    awaitingApproval: Boolean(user.awaitingApproval),
+    pendingRequestKind:
+      String(user.pendingRequestKind || "").trim().slice(0, 40) || "",
   };
 }
 
@@ -7885,6 +7890,10 @@ io.on("connection", (socket) => {
         isGuest: Boolean(payload.isGuest),
         isHost,
         canEdit: isHost ? true : Boolean(payload.canEdit),
+        canAudio: Boolean(payload.canAudio && isHost),
+        canVideo: Boolean(payload.canVideo && isHost),
+        awaitingApproval: false,
+        pendingRequestKind: "",
         joinedAt: new Date(),
       };
       if (isHost) {
@@ -7933,6 +7942,154 @@ io.on("connection", (socket) => {
       permissionPayload,
     );
     emitCollaborationRoomState(roomId);
+  });
+  socket.on("request-to-join", (payload = {}) => {
+    const roomId = normalizeCollaborationRoomId(payload.roomId);
+    if (!roomId) return;
+    const room = collaborationRooms.get(roomId);
+    const user = room?.users?.get(socket.id);
+    if (!room || !user || user.isHost) return;
+    const hostSocketId = String(room.hostSocketId || "").trim();
+    if (!hostSocketId || !room.users.has(hostSocketId)) return;
+    const joinType =
+      String(payload.joinType || "")
+        .trim()
+        .toLowerCase() === "video"
+        ? "video"
+        : "audio";
+    user.awaitingApproval = true;
+    user.pendingRequestKind = `join-${joinType}`;
+    const requestPayload = {
+      roomId,
+      targetSocketId: socket.id,
+      requestKind: `join-${joinType}`,
+      joinType,
+      user: serializeCollaborationUser(user),
+      requestedAt: Date.now(),
+    };
+    io.to(hostSocketId).emit("collaboration:permission-request", requestPayload);
+    io.to(hostSocketId).emit("request-to-join", requestPayload);
+    emitCollaborationRoomState(roomId);
+  });
+  socket.on("collaboration:request-capability", (payload = {}) => {
+    const roomId = normalizeCollaborationRoomId(payload.roomId);
+    if (!roomId) return;
+    const room = collaborationRooms.get(roomId);
+    const user = room?.users?.get(socket.id);
+    if (!room || !user || user.isHost) return;
+    const hostSocketId = String(room.hostSocketId || "").trim();
+    if (!hostSocketId || !room.users.has(hostSocketId)) return;
+    const requestKind = String(payload.requestKind || "").trim().toLowerCase();
+    if (!["audio", "video", "manipulation"].includes(requestKind)) return;
+    user.awaitingApproval = true;
+    user.pendingRequestKind = requestKind;
+    const requestPayload = {
+      roomId,
+      targetSocketId: socket.id,
+      requestKind,
+      user: serializeCollaborationUser(user),
+      requestedAt: Date.now(),
+    };
+    io.to(hostSocketId).emit("collaboration:permission-request", requestPayload);
+    emitCollaborationRoomState(roomId);
+  });
+  socket.on("collaboration:respond-request", (payload = {}) => {
+    const roomId = normalizeCollaborationRoomId(payload.roomId);
+    if (!roomId) return;
+    const room = collaborationRooms.get(roomId);
+    const actingUser = room?.users?.get(socket.id);
+    if (!room || !actingUser?.isHost) return;
+    const targetSocketId = String(payload.targetSocketId || "").trim();
+    const target = room.users.get(targetSocketId);
+    if (!target || target.isHost) return;
+    const requestKind = String(payload.requestKind || "").trim().toLowerCase();
+    const allowedKinds = ["audio", "video", "manipulation", "join-audio", "join-video"];
+    if (!allowedKinds.includes(requestKind)) return;
+    const approved = String(payload.decision || "").trim().toLowerCase() === "allow";
+    target.awaitingApproval = false;
+    target.pendingRequestKind = "";
+    if (approved) {
+      if (requestKind === "manipulation") {
+        target.canEdit = true;
+      } else if (requestKind === "audio" || requestKind === "join-audio") {
+        target.canAudio = true;
+        target.canVideo = false;
+      } else if (requestKind === "video" || requestKind === "join-video") {
+        target.canAudio = true;
+        target.canVideo = true;
+      }
+    }
+    const responsePayload = {
+      roomId,
+      requestKind,
+      grantedBy: actingUser.displayName,
+      targetSocketId,
+      approved,
+      decidedAt: Date.now(),
+    };
+    io.to(targetSocketId).emit(
+      approved ? "permission-granted" : "permission-denied",
+      responsePayload,
+    );
+    if (approved && requestKind === "manipulation") {
+      io.to(targetSocketId).emit("collaboration:permit-edit", {
+        roomId,
+        grantedBy: actingUser.displayName,
+      });
+      io.to(targetSocketId).emit("permit-edit", {
+        roomId,
+        grantedBy: actingUser.displayName,
+      });
+    }
+    emitCollaborationRoomState(roomId);
+  });
+  socket.on("collaboration:revoke-capability", (payload = {}) => {
+    const roomId = normalizeCollaborationRoomId(payload.roomId);
+    if (!roomId) return;
+    const room = collaborationRooms.get(roomId);
+    const actingUser = room?.users?.get(socket.id);
+    if (!room || !actingUser?.isHost) return;
+    const targetSocketId = String(payload.targetSocketId || "").trim();
+    const capability = String(payload.capability || "").trim().toLowerCase();
+    const target = room.users.get(targetSocketId);
+    if (!target || target.isHost) return;
+    if (capability === "manipulation") {
+      target.canEdit = false;
+      io.to(targetSocketId).emit("collaboration:restrict-view", {
+        roomId,
+        grantedBy: actingUser.displayName,
+      });
+      io.to(targetSocketId).emit("restrict-view", {
+        roomId,
+        grantedBy: actingUser.displayName,
+      });
+    } else if (capability === "audio" || capability === "video") {
+      target.canAudio = false;
+      target.canVideo = false;
+      io.to(targetSocketId).emit("collaboration:media-revoked", {
+        roomId,
+        capability,
+        grantedBy: actingUser.displayName,
+      });
+    }
+    emitCollaborationRoomState(roomId);
+  });
+  socket.on("collaboration:webrtc-signal", (payload = {}) => {
+    const roomId = normalizeCollaborationRoomId(payload.roomId);
+    if (!roomId) return;
+    const room = collaborationRooms.get(roomId);
+    const user = room?.users?.get(socket.id);
+    if (!room || !user) return;
+    const targetSocketId = String(payload.targetSocketId || "").trim();
+    const target = room.users.get(targetSocketId);
+    if (!target) return;
+    io.to(targetSocketId).emit("collaboration:webrtc-signal", {
+      roomId,
+      sourceSocketId: socket.id,
+      signalType: String(payload.signalType || "").trim().slice(0, 40),
+      data: payload.data || null,
+      user: serializeCollaborationUser(user),
+    });
   });
   socket.on("collaboration:cursor-update", (payload = {}) => {
     const roomId = normalizeCollaborationRoomId(payload.roomId);

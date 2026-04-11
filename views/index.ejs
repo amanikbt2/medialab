@@ -247,6 +247,113 @@
         border-radius: 999px;
         flex: 0 0 12px;
       }
+      .builder-collab-mini-menu {
+        position: fixed;
+        z-index: 1705;
+        min-width: 190px;
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: linear-gradient(180deg, rgba(8, 15, 30, 0.98), rgba(2, 6, 23, 0.98));
+        box-shadow: 0 24px 80px rgba(2, 6, 23, 0.52);
+        backdrop-filter: blur(22px);
+        padding: 0.5rem;
+      }
+      .builder-collab-live-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 999px;
+        border: 1px solid rgba(34, 211, 238, 0.2);
+        background: rgba(34, 211, 238, 0.08);
+        color: #67e8f9;
+        box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.2);
+        animation: collaborationBeam 1.8s infinite;
+      }
+      .builder-collab-request-layer {
+        position: fixed;
+        top: 5.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1720;
+        width: min(92vw, 520px);
+        pointer-events: none;
+      }
+      .builder-collab-request-toast {
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.95rem 1rem;
+        border-radius: 1.2rem;
+        border: 1px solid rgba(34, 211, 238, 0.18);
+        background: linear-gradient(180deg, rgba(8, 15, 30, 0.96), rgba(2, 6, 23, 0.96));
+        box-shadow: 0 20px 70px rgba(2, 6, 23, 0.44);
+      }
+      .builder-collab-request-toast + .builder-collab-request-toast {
+        margin-top: 0.7rem;
+      }
+      .builder-collab-video-stage {
+        position: fixed;
+        inset: 0;
+        z-index: 1680;
+        pointer-events: none;
+      }
+      .builder-collab-video-window {
+        position: fixed;
+        width: 180px;
+        border-radius: 1.3rem;
+        overflow: hidden;
+        border: 1px solid rgba(34, 211, 238, 0.28);
+        background: rgba(2, 6, 23, 0.86);
+        box-shadow:
+          0 0 0 1px rgba(34, 211, 238, 0.14),
+          0 0 24px rgba(34, 211, 238, 0.22),
+          0 24px 70px rgba(2, 6, 23, 0.38);
+        backdrop-filter: blur(12px);
+        pointer-events: auto;
+      }
+      .builder-collab-video-window video {
+        width: 100%;
+        height: 118px;
+        object-fit: cover;
+        background: #020617;
+      }
+      .builder-collab-video-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0.55rem 0.7rem;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        font-weight: 800;
+        color: #e0f2fe;
+      }
+      .builder-collab-lobby-card {
+        border-radius: 1.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+        padding: 1.1rem;
+        transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+        cursor: pointer;
+      }
+      .builder-collab-lobby-card.active {
+        border-color: rgba(34, 211, 238, 0.34);
+        background: rgba(34, 211, 238, 0.09);
+        transform: translateY(-2px);
+      }
+      .builder-collab-spinner {
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        border: 2px solid rgba(34, 211, 238, 0.2);
+        border-top-color: #22d3ee;
+        animation: collaborationSpin 0.8s linear infinite;
+      }
       .builder-collab-cursor-layer {
         position: absolute;
         inset: 0;
@@ -278,6 +385,9 @@
         white-space: nowrap;
         box-shadow: 0 10px 24px rgba(2, 6, 23, 0.22);
       }
+      .builder-collab-cursor-label.locked {
+        color: #fecdd3;
+      }
       #web-canvas.collaboration-view-only {
         pointer-events: none;
       }
@@ -285,6 +395,15 @@
         0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45); }
         70% { box-shadow: 0 0 0 12px rgba(34, 197, 94, 0); }
         100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+      }
+      @keyframes collaborationBeam {
+        0% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.2); }
+        70% { box-shadow: 0 0 0 10px rgba(34, 211, 238, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+      }
+      @keyframes collaborationSpin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
       }
       @keyframes fadeIn {
         from {
@@ -4581,6 +4700,43 @@
       let collaborationCursorFrame = 0;
       let collaborationSyncTimer = null;
       let collaborationApplyingRemoteUpdate = false;
+      let collaborationAutoReconnectEnabled = false;
+      let collaborationLobbyVisible = false;
+      let collaborationLobbySelection = "audio";
+      let collaborationLobbyPending = false;
+      let collaborationPendingRequestKind = "";
+      let collaborationRequestQueue = [];
+      let collaborationLiveMenuOpen = false;
+      let collaborationLocalStream = null;
+      let collaborationPeerConnections = new Map();
+      let collaborationRemoteStreams = new Map();
+      let collaborationVideoDragState = null;
+      let collaborationLocalVideoWindowPosition = null;
+      const collaborationIceConfiguration = {
+        iceServers: [
+          { urls: "stun:stun.relay.metered.ca:80" },
+          {
+            urls: "turn:global.relay.metered.ca:80",
+            username: "ed8ade22a5f3311aa8b5224c",
+            credential: "ryeeze5nrrlbGFt0",
+          },
+          {
+            urls: "turn:global.relay.metered.ca:80?transport=tcp",
+            username: "ed8ade22a5f3311aa8b5224c",
+            credential: "ryeeze5nrrlbGFt0",
+          },
+          {
+            urls: "turn:global.relay.metered.ca:443",
+            username: "ed8ade22a5f3311aa8b5224c",
+            credential: "ryeeze5nrrlbGFt0",
+          },
+          {
+            urls: "turns:global.relay.metered.ca:443?transport=tcp",
+            username: "ed8ade22a5f3311aa8b5224c",
+            credential: "ryeeze5nrrlbGFt0",
+          },
+        ],
+      };
       let currentRenderHostingProject = null;
       let currentRenderLiveProject = null;
       let renderProjectSyncPoller = null;
@@ -4987,7 +5143,7 @@
         if (loggedIn && currentUser?._id) {
           socket.emit("register-user", currentUser._id);
         }
-        if (collaborationRoomId) {
+        if (collaborationRoomId && collaborationAutoReconnectEnabled) {
           joinCollaborationRoom(collaborationIsHost);
         }
         if (authBootstrapReady && loggedIn && currentUser?._id) {
@@ -5111,6 +5267,405 @@
           codeMode: Boolean(builderCodeMode),
         };
       }
+      function getCollaborationSelfUser() {
+        return (
+          collaborationUsers.find((user) => String(user.socketId || "") === String(socket.id || "")) ||
+          null
+        );
+      }
+      function collaborationUserHasLiveMedia(user = {}) {
+        return Boolean(user?.canAudio || user?.canVideo);
+      }
+      function closeCollaborationLiveMenu() {
+        collaborationLiveMenuOpen = false;
+        document.getElementById("builder-collab-live-menu")?.classList.add("hidden");
+      }
+      function openCollaborationLobby() {
+        collaborationLobbyVisible = true;
+        document.getElementById("builder-collab-lobby-modal")?.classList.remove("hidden");
+        setCollaborationLobbySelection(collaborationLobbySelection);
+        renderCollaborationLobbyStatus();
+      }
+      function closeCollaborationLobby() {
+        if (collaborationLobbyPending) return;
+        collaborationLobbyVisible = false;
+        document.getElementById("builder-collab-lobby-modal")?.classList.add("hidden");
+      }
+      function setCollaborationLobbySelection(selection = "audio") {
+        collaborationLobbySelection = selection === "video" ? "video" : "audio";
+        document
+          .getElementById("builder-collab-lobby-audio")
+          ?.classList.toggle("active", collaborationLobbySelection === "audio");
+        document
+          .getElementById("builder-collab-lobby-video")
+          ?.classList.toggle("active", collaborationLobbySelection === "video");
+        renderCollaborationLobbyStatus();
+      }
+      function renderCollaborationLobbyStatus(message = "") {
+        const status = document.getElementById("builder-collab-lobby-status");
+        const button = document.getElementById("builder-collab-enter-room");
+        if (!status || !button) return;
+        if (collaborationLobbyPending) {
+          status.innerHTML = `<div class="flex items-center gap-3"><span class="builder-collab-spinner"></span><span>Waiting for host approval...</span></div>`;
+          button.disabled = true;
+          button.classList.add("opacity-60", "cursor-not-allowed");
+          return;
+        }
+        button.disabled = false;
+        button.classList.remove("opacity-60", "cursor-not-allowed");
+        status.textContent =
+          message ||
+          (collaborationLobbySelection === "video"
+            ? "You will request video + audio presence from the host."
+            : "You will request audio access from the host.");
+      }
+      function renderCollaborationRequestLayer() {
+        const layer = document.getElementById("builder-collab-request-layer");
+        if (!layer) return;
+        if (!collaborationIsHost || !collaborationRequestQueue.length) {
+          layer.innerHTML = "";
+          return;
+        }
+        layer.innerHTML = collaborationRequestQueue
+          .map((request) => {
+            const labelMap = {
+              audio: "Audio",
+              video: "Video",
+              manipulation: "Manipulation",
+              "join-audio": "Audio",
+              "join-video": "Video",
+            };
+            const requestLabel = labelMap[request.requestKind] || "Access";
+            return `<div class="builder-collab-request-toast">
+              <div class="min-w-0">
+                <div class="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">Live Request</div>
+                <div class="mt-1 text-sm text-white"><span class="font-semibold">${escapeHtmlText(request.user?.displayName || "Guest")}</span> wants to join ${escapeHtmlText(requestLabel)}</div>
+              </div>
+              <div class="shrink-0 flex items-center gap-2">
+                <button onclick="respondToCollaborationRequest('${escapeAttr(request.targetSocketId || "")}','${escapeAttr(request.requestKind || "")}','allow')" class="rounded-xl bg-emerald-500/15 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-200 hover:bg-emerald-500/25">Allow</button>
+                <button onclick="respondToCollaborationRequest('${escapeAttr(request.targetSocketId || "")}','${escapeAttr(request.requestKind || "")}','deny')" class="rounded-xl bg-rose-500/15 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-rose-200 hover:bg-rose-500/25">Deny</button>
+              </div>
+            </div>`;
+          })
+          .join("");
+      }
+      function renderCollaborationLiveMenu() {
+        const menu = document.getElementById("builder-collab-live-menu");
+        const toggle = document.getElementById("builder-collab-live-toggle");
+        if (!menu || !toggle || !collaborationLiveMenuOpen || !isCollaborationActive()) {
+          menu?.classList.add("hidden");
+          return;
+        }
+        const rect = toggle.getBoundingClientRect();
+        menu.style.top = `${rect.bottom + 10}px`;
+        menu.style.left = `${Math.max(8, rect.left - 20)}px`;
+        menu.innerHTML = collaborationIsHost
+          ? `<div class="px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">Host controls live access from the session list.</div>`
+          : `
+            <button onclick="requestCollaborationCapability('audio')" class="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-slate-200 hover:bg-white/5"><i class="fas fa-microphone text-cyan-300"></i><span>Request Audio</span></button>
+            <button onclick="requestCollaborationCapability('video')" class="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-slate-200 hover:bg-white/5"><i class="fas fa-video text-cyan-300"></i><span>Request Video</span></button>
+            <button onclick="requestCollaborationCapability('manipulation')" class="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-slate-200 hover:bg-white/5"><i class="fas fa-hand-pointer text-cyan-300"></i><span>Request Manipulation</span></button>
+          `;
+        menu.classList.remove("hidden");
+      }
+      function renderCollaborationVideoStage() {
+        const stage = document.getElementById("builder-collab-video-stage");
+        if (!stage) return;
+        const windows = [];
+        if (collaborationLocalStream && collaborationLocalStream.getVideoTracks().length) {
+          const localPosition = collaborationLocalVideoWindowPosition || {
+            top: 150,
+            left: Math.max(24, window.innerWidth / 2 - 90),
+          };
+          windows.push({
+            socketId: "local",
+            displayName: `${getCollaborationIdentity().displayName} (You)`,
+            stream: collaborationLocalStream,
+            top: localPosition.top,
+            left: localPosition.left,
+            muted: true,
+          });
+        }
+        collaborationRemoteStreams.forEach((entry, socketId) => {
+          if (!entry?.stream || !entry.stream.getVideoTracks().length) return;
+          windows.push({
+            socketId,
+            displayName: entry.displayName || "Collaborator",
+            stream: entry.stream,
+            top: entry.top || 170,
+            left: entry.left || Math.max(24, window.innerWidth - 240),
+            muted: false,
+          });
+        });
+        stage.innerHTML = windows
+          .map(
+            (entry) => `<div class="builder-collab-video-window" data-socket-id="${escapeAttr(entry.socketId)}" style="top:${Number(entry.top || 160)}px;left:${Number(entry.left || 32)}px;">
+              <video playsinline ${entry.muted ? "muted" : ""} autoplay></video>
+              <div class="builder-collab-video-meta">
+                <span class="truncate">${escapeHtmlText(entry.displayName || "Collaborator")}</span>
+                <span>${entry.muted ? "Local" : "Live"}</span>
+              </div>
+            </div>`,
+          )
+          .join("");
+        Array.from(stage.querySelectorAll(".builder-collab-video-window")).forEach((win) => {
+          const id = String(win.dataset.socketId || "");
+          const entry =
+            id === "local"
+              ? { stream: collaborationLocalStream }
+              : collaborationRemoteStreams.get(id) || null;
+          const video = win.querySelector("video");
+          if (video && entry?.stream) {
+            video.srcObject = entry.stream;
+          }
+          const meta = win.querySelector(".builder-collab-video-meta");
+          if (meta) {
+            meta.onpointerdown = (event) => startCollaborationVideoDrag(event, id);
+          }
+        });
+      }
+      function startCollaborationVideoDrag(event, socketId = "") {
+        event.preventDefault();
+        const win = event.currentTarget?.closest?.(".builder-collab-video-window");
+        if (!win) return;
+        const rect = win.getBoundingClientRect();
+        collaborationVideoDragState = {
+          socketId,
+          offsetX: event.clientX - rect.left,
+          offsetY: event.clientY - rect.top,
+        };
+      }
+      function updateDraggedCollaborationVideo(event) {
+        if (!collaborationVideoDragState) return;
+        const nextLeft = Math.max(8, Math.min(window.innerWidth - 188, event.clientX - collaborationVideoDragState.offsetX));
+        const nextTop = Math.max(88, Math.min(window.innerHeight - 180, event.clientY - collaborationVideoDragState.offsetY));
+        if (collaborationVideoDragState.socketId === "local") {
+          collaborationLocalVideoWindowPosition = { left: nextLeft, top: nextTop };
+          const localWin = document.querySelector('.builder-collab-video-window[data-socket-id="local"]');
+          if (localWin) {
+            localWin.style.left = `${nextLeft}px`;
+            localWin.style.top = `${nextTop}px`;
+          }
+          return;
+        }
+        const entry = collaborationRemoteStreams.get(collaborationVideoDragState.socketId);
+        if (!entry) return;
+        entry.left = nextLeft;
+        entry.top = nextTop;
+        const win = document.querySelector(`.builder-collab-video-window[data-socket-id="${CSS.escape(collaborationVideoDragState.socketId)}"]`);
+        if (win) {
+          win.style.left = `${nextLeft}px`;
+          win.style.top = `${nextTop}px`;
+        }
+      }
+      function stopCollaborationVideoDrag() {
+        collaborationVideoDragState = null;
+      }
+      async function ensureCollaborationLocalMedia(mode = "audio") {
+        const wantsVideo = mode === "video";
+        const existingHasVideo = Boolean(collaborationLocalStream?.getVideoTracks?.().length);
+        if (collaborationLocalStream && (!wantsVideo || existingHasVideo)) {
+          return collaborationLocalStream;
+        }
+        try {
+          const nextStream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: wantsVideo,
+          });
+          stopCollaborationLocalMediaTracks();
+          collaborationLocalStream = nextStream;
+          renderCollaborationVideoStage();
+          return nextStream;
+        } catch (error) {
+          showBuilderSnackbar("Media access could not start on this device.", "error");
+          throw error;
+        }
+      }
+      function stopCollaborationLocalMediaTracks() {
+        collaborationLocalStream?.getTracks?.().forEach((track) => {
+          try {
+            track.stop();
+          } catch {}
+        });
+        collaborationLocalStream = null;
+        collaborationLocalVideoWindowPosition = null;
+        collaborationRemoteStreams.forEach((entry) => {
+          entry?.stream?.getTracks?.().forEach((track) => {
+            try {
+              track.stop();
+            } catch {}
+          });
+        });
+        collaborationRemoteStreams.clear();
+        collaborationPeerConnections.forEach((entry) => {
+          try {
+            entry?.pc?.close?.();
+          } catch {}
+        });
+        collaborationPeerConnections.clear();
+        renderCollaborationVideoStage();
+      }
+      function createCollaborationPeerConnection(peerSocketId = "") {
+        if (!peerSocketId) return null;
+        const cached = collaborationPeerConnections.get(peerSocketId);
+        if (cached?.pc) return cached.pc;
+        const pc = new RTCPeerConnection(collaborationIceConfiguration);
+        pc.onicecandidate = (event) => {
+          if (!event.candidate || !collaborationRoomId) return;
+          socket.emit("collaboration:webrtc-signal", {
+            roomId: collaborationRoomId,
+            targetSocketId: peerSocketId,
+            signalType: "candidate",
+            data: event.candidate,
+          });
+        };
+        pc.ontrack = (event) => {
+          const [stream] = event.streams || [];
+          if (!stream) return;
+          const peer = collaborationUsers.find((user) => String(user.socketId || "") === String(peerSocketId));
+          collaborationRemoteStreams.set(peerSocketId, {
+            stream,
+            displayName: peer?.displayName || "Collaborator",
+            left: collaborationRemoteStreams.get(peerSocketId)?.left || Math.max(24, window.innerWidth - 240),
+            top: collaborationRemoteStreams.get(peerSocketId)?.top || 170,
+          });
+          renderCollaborationVideoStage();
+        };
+        collaborationLocalStream?.getTracks?.().forEach((track) => {
+          try {
+            pc.addTrack(track, collaborationLocalStream);
+          } catch {}
+        });
+        collaborationPeerConnections.set(peerSocketId, { pc, offered: false });
+        return pc;
+      }
+      async function maybeOfferToCollaborationPeer(peerSocketId = "") {
+        const entry = collaborationPeerConnections.get(peerSocketId) || {};
+        const pc = createCollaborationPeerConnection(peerSocketId);
+        if (!pc || entry.offered) return;
+        const shouldInitiate = String(socket.id || "") > String(peerSocketId || "");
+        if (!shouldInitiate) return;
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        collaborationPeerConnections.set(peerSocketId, { pc, offered: true });
+        socket.emit("collaboration:webrtc-signal", {
+          roomId: collaborationRoomId,
+          targetSocketId: peerSocketId,
+          signalType: "offer",
+          data: offer,
+        });
+      }
+      async function syncCollaborationPeerMesh() {
+        const self = getCollaborationSelfUser();
+        if (!self || !collaborationUserHasLiveMedia(self)) {
+          stopCollaborationLocalMediaTracks();
+          return;
+        }
+        await ensureCollaborationLocalMedia(self.canVideo ? "video" : "audio");
+        const livePeers = collaborationUsers.filter(
+          (user) => String(user.socketId || "") !== String(socket.id || "") && collaborationUserHasLiveMedia(user),
+        );
+        const livePeerIds = new Set(livePeers.map((user) => String(user.socketId || "")));
+        collaborationPeerConnections.forEach((entry, peerSocketId) => {
+          if (!livePeerIds.has(peerSocketId)) {
+            try {
+              entry?.pc?.close?.();
+            } catch {}
+            collaborationPeerConnections.delete(peerSocketId);
+            collaborationRemoteStreams.delete(peerSocketId);
+          }
+        });
+        for (const peer of livePeers) {
+          await maybeOfferToCollaborationPeer(String(peer.socketId || ""));
+        }
+        renderCollaborationVideoStage();
+      }
+      async function handleCollaborationWebrtcSignal(payload = {}) {
+        const sourceSocketId = String(payload.sourceSocketId || "").trim();
+        const signalType = String(payload.signalType || "").trim();
+        if (!sourceSocketId || !signalType) return;
+        const self = getCollaborationSelfUser();
+        if (self && collaborationUserHasLiveMedia(self)) {
+          await ensureCollaborationLocalMedia(self.canVideo ? "video" : "audio");
+        }
+        const pc = createCollaborationPeerConnection(sourceSocketId);
+        if (!pc) return;
+        if (signalType === "offer" && payload.data) {
+          await pc.setRemoteDescription(new RTCSessionDescription(payload.data));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socket.emit("collaboration:webrtc-signal", {
+            roomId: collaborationRoomId,
+            targetSocketId: sourceSocketId,
+            signalType: "answer",
+            data: answer,
+          });
+          collaborationPeerConnections.set(sourceSocketId, { pc, offered: true });
+        } else if (signalType === "answer" && payload.data) {
+          await pc.setRemoteDescription(new RTCSessionDescription(payload.data));
+        } else if (signalType === "candidate" && payload.data) {
+          await pc.addIceCandidate(new RTCIceCandidate(payload.data));
+        }
+      }
+      function requestCollaborationCapability(requestKind = "audio") {
+        if (!collaborationRoomId || collaborationIsHost) return;
+        const normalizedKind = ["audio", "video", "manipulation"].includes(String(requestKind || "").trim())
+          ? String(requestKind || "").trim()
+          : "audio";
+        collaborationPendingRequestKind = normalizedKind;
+        socket.emit("collaboration:request-capability", {
+          roomId: collaborationRoomId,
+          requestKind: normalizedKind,
+        });
+        closeCollaborationLiveMenu();
+        showBuilderSnackbar(`Requested ${normalizedKind} access from the host.`, "info");
+        updateCollaborationUi();
+      }
+      function respondToCollaborationRequest(targetSocketId = "", requestKind = "", decision = "deny") {
+        if (!collaborationRoomId || !collaborationIsHost) return;
+        socket.emit("collaboration:respond-request", {
+          roomId: collaborationRoomId,
+          targetSocketId,
+          requestKind,
+          decision,
+        });
+        collaborationRequestQueue = collaborationRequestQueue.filter(
+          (entry) =>
+            !(
+              String(entry.targetSocketId || "") === String(targetSocketId || "") &&
+              String(entry.requestKind || "") === String(requestKind || "")
+            ),
+        );
+        renderCollaborationRequestLayer();
+      }
+      function revokeCollaborationCapability(targetSocketId = "", capability = "manipulation") {
+        if (!collaborationRoomId || !collaborationIsHost) return;
+        socket.emit("collaboration:revoke-capability", {
+          roomId: collaborationRoomId,
+          targetSocketId,
+          capability,
+        });
+      }
+      async function submitCollaborationLobbyRequest() {
+        if (!collaborationRoomId) return;
+        collaborationLobbyPending = true;
+        collaborationPendingRequestKind = `join-${collaborationLobbySelection}`;
+        renderCollaborationLobbyStatus();
+        collaborationAutoReconnectEnabled = true;
+        if (!collaborationJoined) {
+          joinCollaborationRoom(false);
+        }
+        socket.emit("request-to-join", {
+          roomId: collaborationRoomId,
+          joinType: collaborationLobbySelection,
+        });
+      }
+      function toggleCollaborationLiveMenu(event) {
+        event?.stopPropagation?.();
+        if (!isCollaborationActive()) return;
+        collaborationLiveMenuOpen = !collaborationLiveMenuOpen;
+        renderCollaborationLiveMenu();
+      }
       function positionCollaborationDropdown() {
         const panel = document.getElementById("builder-collaboration-dropdown");
         const toggle = document.getElementById("builder-collaboration-toggle");
@@ -5142,9 +5697,10 @@
           .map((entry) => {
             const left = Math.max(0, Math.min(100, Number(entry.x || 0) * 100));
             const top = Math.max(0, Math.min(100, Number(entry.y || 0) * 100));
+            const locked = !entry.canEdit;
             return `<div class="builder-collab-cursor" style="left:${(left / 100) * width}px;top:${(top / 100) * height}px;">
               <div class="builder-collab-cursor-icon" style="background:${escapeAttr(entry.color || "#22d3ee")}"></div>
-              <div class="builder-collab-cursor-label">${escapeHtmlText(entry.displayName || "Guest")}</div>
+              <div class="builder-collab-cursor-label ${locked ? "locked" : ""}">${locked ? '<i class="fas fa-lock mr-1 text-[9px]"></i>' : ""}${escapeHtmlText(entry.displayName || "Guest")}</div>
             </div>`;
           })
           .join("");
@@ -5161,11 +5717,14 @@
               .map((user) => {
                 const socketId = String(user.socketId || "").trim();
                 const isSelf = socketId === socket.id;
+                const liveIcons = `${user.canVideo ? '<i class="fas fa-video text-cyan-300"></i>' : ""}${!user.canVideo && user.canAudio ? '<i class="fas fa-microphone text-emerald-300"></i>' : ""}`;
                 const controls =
                   collaborationIsHost && !user.isHost && !isSelf
-                    ? `<div class="flex items-center gap-2">
+                    ? `<div class="flex flex-wrap items-center justify-end gap-2">
                         <button onclick="setCollaborationPermission('${escapeAttr(socketId)}', true)" class="rounded-xl bg-emerald-500/15 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-200 hover:bg-emerald-500/25">Grant Edit</button>
                         <button onclick="setCollaborationPermission('${escapeAttr(socketId)}', false)" class="rounded-xl bg-rose-500/15 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-rose-200 hover:bg-rose-500/25">Restrict to View</button>
+                        ${user.canEdit ? `<button onclick="revokeCollaborationCapability('${escapeAttr(socketId)}', 'manipulation')" class="rounded-xl bg-amber-500/15 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-amber-200 hover:bg-amber-500/25">Remove Editor</button>` : ""}
+                        ${user.canAudio || user.canVideo ? `<button onclick="revokeCollaborationCapability('${escapeAttr(socketId)}', '${user.canVideo ? "video" : "audio"}')" class="rounded-xl bg-cyan-500/15 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-cyan-200 hover:bg-cyan-500/25">${user.canVideo ? "End Video" : "End Audio"}</button>` : ""}
                       </div>`
                     : `<span class="text-[10px] font-black uppercase tracking-[0.14em] ${user.canEdit ? "text-emerald-300" : "text-slate-500"}">${user.isHost ? "Host" : user.canEdit ? "Editor" : "Viewer"}</span>`;
                 return `<div class="builder-collab-user">
@@ -5173,7 +5732,7 @@
                     <span class="builder-collab-user-chip" style="background:${escapeAttr(user.color || "#22d3ee")}"></span>
                     <div class="min-w-0">
                       <div class="truncate text-sm font-semibold text-white">${escapeHtmlText(user.displayName || "Guest")}${isSelf ? ' <span class="text-cyan-300">(You)</span>' : ""}</div>
-                      <div class="text-[10px] uppercase tracking-[0.16em] ${user.isHost ? "text-cyan-300" : "text-slate-500"}">${user.isHost ? "Host" : "Guest session"}</div>
+                      <div class="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] ${user.isHost ? "text-cyan-300" : "text-slate-500"}">${liveIcons}<span>${user.awaitingApproval ? "Awaiting host" : user.isHost ? "Host" : "Guest session"}</span></div>
                     </div>
                   </div>
                   <div class="shrink-0">${controls}</div>
@@ -5204,6 +5763,7 @@
         const role = document.getElementById("builder-collaboration-role");
         const linkWrap = document.getElementById("builder-share-link-wrap");
         const linkInput = document.getElementById("builder-collaboration-link");
+        const liveToggle = document.getElementById("builder-collab-live-toggle");
         if (toggle) {
           toggle.classList.toggle("terminal-toggle-active", isCollaborationActive());
           toggle.title = isCollaborationActive()
@@ -5230,8 +5790,18 @@
         }
         if (linkWrap) linkWrap.classList.toggle("hidden", !collaborationShareLink);
         if (linkInput) linkInput.value = collaborationShareLink || "";
+        if (liveToggle) {
+          liveToggle.classList.toggle("hidden", !isCollaborationActive());
+          liveToggle.title = collaborationIsHost
+            ? "Host live controls"
+            : "Request audio, video, or manipulation access";
+        }
         renderCollaborationDropdown();
         renderCollaborationCursors();
+        renderCollaborationRequestLayer();
+        renderCollaborationLiveMenu();
+        renderCollaborationVideoStage();
+        renderCollaborationLobbyStatus();
       }
       function openCollaborationModal() {
         const modal = document.getElementById("builder-collaboration-modal");
@@ -5253,6 +5823,7 @@
       }
       function joinCollaborationRoom(forceHost = false) {
         if (!collaborationRoomId || !socket.connected) return;
+        collaborationAutoReconnectEnabled = true;
         const identity = getCollaborationIdentity();
         socket.emit("collaboration:join-room", {
           roomId: collaborationRoomId,
@@ -5270,6 +5841,9 @@
         collaborationIsHost = true;
         collaborationCanEdit = true;
         collaborationJoined = false;
+        collaborationLobbyVisible = false;
+        collaborationLobbyPending = false;
+        collaborationPendingRequestKind = "";
         joinCollaborationRoom(true);
         updateCollaborationUi();
       }
@@ -5359,6 +5933,9 @@
         collaborationShareLink = buildCollaborationShareLink(roomId);
         collaborationIsHost = false;
         collaborationCanEdit = false;
+        collaborationAutoReconnectEnabled = false;
+        collaborationLobbyPending = false;
+        collaborationPendingRequestKind = "";
         if (!loggedIn) {
           ensureGuestCollaborationIdentity();
         }
@@ -5367,7 +5944,7 @@
           try {
             launchBossMode();
           } catch {}
-          joinCollaborationRoom(false);
+          openCollaborationLobby();
           updateCollaborationUi();
         }, 120);
         return true;
@@ -5375,6 +5952,8 @@
       document.addEventListener("click", (event) => {
         const panel = document.getElementById("builder-collaboration-dropdown");
         const toggle = document.getElementById("builder-collaboration-toggle");
+        const liveMenu = document.getElementById("builder-collab-live-menu");
+        const liveToggle = document.getElementById("builder-collab-live-toggle");
         if (
           collaborationDropdownOpen &&
           panel &&
@@ -5384,12 +5963,25 @@
         ) {
           closeCollaborationDropdown();
         }
+        if (
+          collaborationLiveMenuOpen &&
+          liveMenu &&
+          liveToggle &&
+          !liveMenu.contains(event.target) &&
+          !liveToggle.contains(event.target)
+        ) {
+          closeCollaborationLiveMenu();
+        }
       });
       window.addEventListener("resize", () => {
         if (collaborationDropdownOpen) positionCollaborationDropdown();
         cancelAnimationFrame(collaborationCursorFrame);
         collaborationCursorFrame = requestAnimationFrame(renderCollaborationCursors);
+        renderCollaborationLiveMenu();
+        renderCollaborationVideoStage();
       });
+      window.addEventListener("pointermove", updateDraggedCollaborationVideo);
+      window.addEventListener("pointerup", stopCollaborationVideoDrag);
       socket.on("collaboration:joined", (payload = {}) => {
         if (String(payload.roomId || "") !== collaborationRoomId) return;
         collaborationJoined = true;
@@ -5411,6 +6003,7 @@
           collaborationIsHost = Boolean(self.isHost);
         }
         updateCollaborationUi();
+        syncCollaborationPeerMesh().catch(() => {});
       });
       socket.on("collaboration:permit-edit", (payload = {}) => {
         if (String(payload.roomId || "") !== collaborationRoomId) return;
@@ -5443,6 +6036,7 @@
         collaborationCursorMap.set(String(user.socketId || ""), {
           displayName: user.displayName || "Guest",
           color: user.color || "#22d3ee",
+          canEdit: Boolean(user.canEdit),
           x: Number(payload.x || 0),
           y: Number(payload.y || 0),
         });
@@ -5455,6 +6049,71 @@
           return;
         }
         applyRemoteCollaborationSnapshot(payload);
+      });
+      socket.on("collaboration:permission-request", (payload = {}) => {
+        if (String(payload.roomId || "") !== collaborationRoomId || !collaborationIsHost) return;
+        collaborationRequestQueue = [
+          payload,
+          ...collaborationRequestQueue.filter(
+            (entry) =>
+              !(
+                String(entry.targetSocketId || "") === String(payload.targetSocketId || "") &&
+                String(entry.requestKind || "") === String(payload.requestKind || "")
+              ),
+          ),
+        ].slice(0, 6);
+        renderCollaborationRequestLayer();
+      });
+      socket.on("request-to-join", (payload = {}) => {
+        if (String(payload.roomId || "") !== collaborationRoomId || !collaborationIsHost) return;
+        collaborationRequestQueue = [
+          payload,
+          ...collaborationRequestQueue.filter(
+            (entry) =>
+              !(
+                String(entry.targetSocketId || "") === String(payload.targetSocketId || "") &&
+                String(entry.requestKind || "") === String(payload.requestKind || "")
+              ),
+          ),
+        ].slice(0, 6);
+        renderCollaborationRequestLayer();
+      });
+      socket.on("permission-granted", (payload = {}) => {
+        if (String(payload.roomId || "") !== collaborationRoomId) return;
+        collaborationLobbyPending = false;
+        collaborationPendingRequestKind = "";
+        if (String(payload.requestKind || "").startsWith("join-")) {
+          closeCollaborationLobby();
+        }
+        if (payload.requestKind === "audio" || payload.requestKind === "join-audio") {
+          showBuilderSnackbar("Audio access approved by host.", "success");
+        } else if (payload.requestKind === "video" || payload.requestKind === "join-video") {
+          showBuilderSnackbar("Video access approved by host.", "success");
+        } else if (payload.requestKind === "manipulation") {
+          collaborationCanEdit = true;
+          showBuilderSnackbar("You now have edit access!", "success");
+        }
+        updateCollaborationUi();
+        syncCollaborationPeerMesh().catch(() => {});
+      });
+      socket.on("permission-denied", (payload = {}) => {
+        if (String(payload.roomId || "") !== collaborationRoomId) return;
+        collaborationLobbyPending = false;
+        collaborationPendingRequestKind = "";
+        renderCollaborationLobbyStatus("The host denied that request. You can try again.");
+        showBuilderSnackbar("That permission request was denied.", "info");
+      });
+      socket.on("collaboration:media-revoked", (payload = {}) => {
+        if (String(payload.roomId || "") !== collaborationRoomId) return;
+        stopCollaborationLocalMediaTracks();
+        showBuilderSnackbar("The host ended your live media access.", "info");
+        updateCollaborationUi();
+      });
+      socket.on("collaboration:webrtc-signal", (payload = {}) => {
+        if (String(payload.roomId || "") !== collaborationRoomId) return;
+        handleCollaborationWebrtcSignal(payload).catch(() => {
+          showBuilderSnackbar("Live media sync hit a temporary issue.", "error");
+        });
       });
       // UNIVERSAL PROGRESS LISTENER
       socket.on("conversion-progress", (data) => {
@@ -13540,6 +14199,9 @@
                             <span class="text-[8px] font-black text-cyan-500 uppercase tracking-widest">Studio Engine v3.0</span>
                             <span id="builder-status" class="text-[7px] text-gray-500 font-bold uppercase tracking-widest">Freeform Builder Ready</span>
                         </div>
+                        <button id="builder-collab-live-toggle" type="button" onclick="toggleCollaborationLiveMenu(event)" class="builder-collab-live-button hidden" title="Request live permissions">
+                            <i class="fas fa-video text-[11px]"></i>
+                        </button>
                         <div id="builder-view-only-badge" class="builder-collab-badge hidden">
                             <span class="dot"></span>
                             <span>View Only Mode</span>
@@ -13627,7 +14289,10 @@
                     <div id="terminal-instance" class="terminal-instance"></div>
                 </div>
             </div>
+            <div id="builder-collab-request-layer" class="builder-collab-request-layer"></div>
+            <div id="builder-collab-live-menu" class="builder-collab-mini-menu hidden"></div>
             <div id="builder-collaboration-dropdown" class="builder-collaboration-dropdown hidden"></div>
+            <div id="builder-collab-video-stage" class="builder-collab-video-stage"></div>
             <div id="builder-collaboration-modal" class="hidden absolute inset-0 z-[160] bg-slate-950/78 p-4 backdrop-blur-xl" onclick="if (event.target === this) closeCollaborationModal();">
                 <div class="mx-auto mt-10 w-full max-w-xl rounded-[2rem] border border-white/10 bg-[#08111f] shadow-[0_28px_90px_rgba(2,6,23,0.58)]">
                     <div class="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
@@ -13656,6 +14321,47 @@
                                 <button onclick="copyCollaborationLink()" class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white hover:bg-white/10">Copy</button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+            <div id="builder-collab-lobby-modal" class="hidden absolute inset-0 z-[161] bg-slate-950/78 p-4 backdrop-blur-xl" onclick="if (event.target === this && !collaborationLobbyPending) closeCollaborationLobby();">
+                <div class="mx-auto mt-10 w-full max-w-2xl rounded-[2rem] border border-white/10 bg-[#08111f] shadow-[0_28px_90px_rgba(2,6,23,0.58)]">
+                    <div class="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Join Workspace Session</p>
+                            <h3 class="mt-2 text-xl font-semibold text-white">Choose how you want to enter</h3>
+                            <p class="mt-1 text-sm text-slate-400">Ask the host for audio or full video presence before joining the live workspace.</p>
+                        </div>
+                        <button onclick="closeCollaborationLobby()" class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="space-y-5 px-5 py-5">
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <button type="button" onclick="setCollaborationLobbySelection('audio')" id="builder-collab-lobby-audio" class="builder-collab-lobby-card text-left">
+                                <div class="flex items-center gap-3">
+                                    <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-300"><i class="fas fa-microphone text-lg"></i></span>
+                                    <div>
+                                        <p class="text-sm font-black text-white">Audio Only</p>
+                                        <p class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">Listen &amp; Speak</p>
+                                    </div>
+                                </div>
+                            </button>
+                            <button type="button" onclick="setCollaborationLobbySelection('video')" id="builder-collab-lobby-video" class="builder-collab-lobby-card text-left">
+                                <div class="flex items-center gap-3">
+                                    <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-300"><i class="fas fa-video text-lg"></i></span>
+                                    <div>
+                                        <p class="text-sm font-black text-white">Video + Audio</p>
+                                        <p class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">Full Presence</p>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+                        <div id="builder-collab-lobby-status" class="rounded-[1.4rem] border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-slate-300">Select how you want to join, then ask the host for access.</div>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 border-t border-white/10 px-5 py-4">
+                        <div class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Guests enter as viewers until the host approves more access.</div>
+                        <button id="builder-collab-enter-room" onclick="submitCollaborationLobbyRequest()" class="rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-black text-slate-950 hover:bg-cyan-400">Enter Room</button>
                     </div>
                 </div>
             </div>
