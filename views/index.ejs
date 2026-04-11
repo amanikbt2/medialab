@@ -6147,7 +6147,14 @@
           }
         };
         updateCollaborationPeerSenders(pc);
-        collaborationPeerConnections.set(peerSocketId, { pc, lastSignature: "" });
+        collaborationPeerConnections.set(peerSocketId, {
+          pc,
+          lastSignature: "",
+          makingOffer: false,
+          ignoreOffer: false,
+          isSettingRemoteAnswerPending: false,
+          polite: String(socket.id || "") < String(peerSocketId || ""),
+        });
         return pc;
       }
       function getCollaborationMediaSignature() {
@@ -6156,9 +6163,9 @@
         return `${collaborationAudioEnabled ? "a1" : "a0"}|${collaborationVideoEnabled ? "v1" : "v0"}|${audioKinds}|${videoKinds}`;
       }
       async function maybeOfferToCollaborationPeer(peerSocketId = "", force = false) {
-        const entry = collaborationPeerConnections.get(peerSocketId) || {};
         const pc = createCollaborationPeerConnection(peerSocketId);
         if (!pc) return;
+        const entry = collaborationPeerConnections.get(peerSocketId) || {};
         updateCollaborationPeerSenders(pc);
         const self = getCollaborationSelfUser();
         const peer = collaborationUsers.find((user) => String(user.socketId || "") === String(peerSocketId || "")) || null;
@@ -6173,22 +6180,41 @@
               ? false
               : String(socket.id || "") > String(peerSocketId || "");
         if (!shouldInitiate) return;
-        if (pc.signalingState !== "stable") {
+        if (entry.makingOffer || pc.signalingState !== "stable") {
           scheduleCollaborationPeerOffer(peerSocketId);
           return;
         }
         const nextSignature = getCollaborationMediaSignature();
         if (!force && entry.lastSignature === nextSignature) return;
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        collaborationPeerConnections.set(peerSocketId, { pc, lastSignature: nextSignature });
-        clearCollaborationOfferRetry(peerSocketId);
-        socket.emit("collaboration:webrtc-signal", {
-          roomId: collaborationRoomId,
-          targetSocketId: peerSocketId,
-          signalType: "offer",
-          data: offer,
-        });
+        entry.makingOffer = true;
+        collaborationPeerConnections.set(peerSocketId, entry);
+        try {
+          const offer = await pc.createOffer();
+          if (pc.signalingState !== "stable") {
+            scheduleCollaborationPeerOffer(peerSocketId, 120);
+            return;
+          }
+          await pc.setLocalDescription(offer);
+          collaborationPeerConnections.set(peerSocketId, {
+            ...entry,
+            pc,
+            makingOffer: false,
+            lastSignature: nextSignature,
+          });
+          clearCollaborationOfferRetry(peerSocketId);
+          socket.emit("collaboration:webrtc-signal", {
+            roomId: collaborationRoomId,
+            targetSocketId: peerSocketId,
+            signalType: "offer",
+            data: offer,
+          });
+        } finally {
+          const latest = collaborationPeerConnections.get(peerSocketId);
+          if (latest) {
+            latest.makingOffer = false;
+            collaborationPeerConnections.set(peerSocketId, latest);
+          }
+        }
       }
       async function syncCollaborationPeerMesh(forceOffer = false) {
         const self = getCollaborationSelfUser();
@@ -6242,8 +6268,39 @@
         }
         const pc = createCollaborationPeerConnection(sourceSocketId);
         if (!pc) return;
+        const entry = collaborationPeerConnections.get(sourceSocketId) || {
+          pc,
+          lastSignature: "",
+          makingOffer: false,
+          ignoreOffer: false,
+          isSettingRemoteAnswerPending: false,
+          polite: String(socket.id || "") < String(sourceSocketId || ""),
+        };
         if (signalType === "offer" && payload.data) {
-          await pc.setRemoteDescription(new RTCSessionDescription(payload.data));
+          const readyForOffer =
+            !entry.makingOffer &&
+            (pc.signalingState === "stable" || entry.isSettingRemoteAnswerPending);
+          const offerCollision = !readyForOffer;
+          entry.ignoreOffer = !entry.polite && offerCollision;
+          collaborationPeerConnections.set(sourceSocketId, entry);
+          if (entry.ignoreOffer) {
+            return;
+          }
+          if (offerCollision) {
+            entry.isSettingRemoteAnswerPending = true;
+            collaborationPeerConnections.set(sourceSocketId, entry);
+            try {
+              await Promise.all([
+                pc.setLocalDescription({ type: "rollback" }),
+                pc.setRemoteDescription(new RTCSessionDescription(payload.data)),
+              ]);
+            } finally {
+              entry.isSettingRemoteAnswerPending = false;
+              collaborationPeerConnections.set(sourceSocketId, entry);
+            }
+          } else {
+            await pc.setRemoteDescription(new RTCSessionDescription(payload.data));
+          }
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           socket.emit("collaboration:webrtc-signal", {
@@ -6253,17 +6310,26 @@
             data: answer,
           });
           collaborationPeerConnections.set(sourceSocketId, {
+            ...entry,
             pc,
             lastSignature: getCollaborationMediaSignature(),
+            ignoreOffer: false,
+            isSettingRemoteAnswerPending: false,
           });
           clearCollaborationOfferRetry(sourceSocketId);
         } else if (signalType === "answer" && payload.data) {
+          entry.isSettingRemoteAnswerPending = true;
+          collaborationPeerConnections.set(sourceSocketId, entry);
           await pc.setRemoteDescription(new RTCSessionDescription(payload.data));
+          entry.isSettingRemoteAnswerPending = false;
+          entry.ignoreOffer = false;
+          collaborationPeerConnections.set(sourceSocketId, entry);
           clearCollaborationOfferRetry(sourceSocketId);
           if (collaborationAudioEnabled || collaborationVideoEnabled) {
             scheduleCollaborationPeerOffer(sourceSocketId, 120);
           }
         } else if (signalType === "candidate" && payload.data) {
+          if (entry.ignoreOffer) return;
           await pc.addIceCandidate(new RTCIceCandidate(payload.data));
         }
       }
