@@ -5349,8 +5349,9 @@
         if (collaborationAudioEnabled || collaborationVideoEnabled) {
           collaborationAudioEnabled = false;
           collaborationVideoEnabled = false;
-          stopCollaborationLocalMediaTracks();
+          stopCollaborationLocalTracksOnly();
           await pushCollaborationMediaState();
+          await syncCollaborationPeerMesh(true);
           updateCollaborationUi();
           return;
         }
@@ -5359,6 +5360,7 @@
           collaborationAudioEnabled = true;
           collaborationVideoEnabled = false;
           await pushCollaborationMediaState();
+          await syncCollaborationPeerMesh(true);
           updateCollaborationUi();
         } catch {}
       }
@@ -5367,8 +5369,9 @@
         if (collaborationVideoEnabled) {
           collaborationVideoEnabled = false;
           collaborationAudioEnabled = false;
-          stopCollaborationLocalMediaTracks();
+          stopCollaborationLocalTracksOnly();
           await pushCollaborationMediaState();
+          await syncCollaborationPeerMesh(true);
           updateCollaborationUi();
           return;
         }
@@ -5377,6 +5380,7 @@
           collaborationAudioEnabled = true;
           collaborationVideoEnabled = true;
           await pushCollaborationMediaState();
+          await syncCollaborationPeerMesh(true);
           updateCollaborationUi();
         } catch {}
       }
@@ -5485,7 +5489,7 @@
             audio: true,
             video: wantsVideo,
           });
-          stopCollaborationLocalMediaTracks();
+          stopCollaborationLocalTracksOnly();
           collaborationLocalStream = nextStream;
           renderCollaborationVideoStage();
           return nextStream;
@@ -5494,7 +5498,7 @@
           throw error;
         }
       }
-      function stopCollaborationLocalMediaTracks() {
+      function stopCollaborationLocalTracksOnly() {
         collaborationLocalStream?.getTracks?.().forEach((track) => {
           try {
             track.stop();
@@ -5502,6 +5506,9 @@
         });
         collaborationLocalStream = null;
         collaborationLocalVideoWindowPosition = null;
+      }
+      function stopCollaborationLocalMediaTracks() {
+        stopCollaborationLocalTracksOnly();
         collaborationRemoteStreams.forEach((entry) => {
           entry?.stream?.getTracks?.().forEach((track) => {
             try {
@@ -5517,6 +5524,26 @@
         });
         collaborationPeerConnections.clear();
         renderCollaborationVideoStage();
+      }
+      function updateCollaborationPeerSenders(pc) {
+        if (!pc) return;
+        const localTracks = collaborationLocalStream?.getTracks?.() || [];
+        const localTrackMap = new Map(localTracks.map((track) => [track.kind, track]));
+        pc.getSenders().forEach((sender) => {
+          const kind = sender.track?.kind || "";
+          if (!kind) return;
+          const nextTrack = localTrackMap.get(kind) || null;
+          try {
+            if (!nextTrack) pc.removeTrack(sender);
+            else if (sender.track !== nextTrack) sender.replaceTrack(nextTrack);
+          } catch {}
+          localTrackMap.delete(kind);
+        });
+        localTrackMap.forEach((track) => {
+          try {
+            pc.addTrack(track, collaborationLocalStream);
+          } catch {}
+        });
       }
       function createCollaborationPeerConnection(peerSocketId = "") {
         if (!peerSocketId) return null;
@@ -5545,23 +5572,28 @@
           });
           renderCollaborationVideoStage();
         };
-        collaborationLocalStream?.getTracks?.().forEach((track) => {
-          try {
-            pc.addTrack(track, collaborationLocalStream);
-          } catch {}
-        });
-        collaborationPeerConnections.set(peerSocketId, { pc, offered: false });
+        updateCollaborationPeerSenders(pc);
+        collaborationPeerConnections.set(peerSocketId, { pc, lastSignature: "" });
         return pc;
       }
-      async function maybeOfferToCollaborationPeer(peerSocketId = "") {
+      function getCollaborationMediaSignature() {
+        const audioKinds = collaborationLocalStream?.getAudioTracks?.().map((track) => track.id).join(",") || "";
+        const videoKinds = collaborationLocalStream?.getVideoTracks?.().map((track) => track.id).join(",") || "";
+        return `${collaborationAudioEnabled ? "a1" : "a0"}|${collaborationVideoEnabled ? "v1" : "v0"}|${audioKinds}|${videoKinds}`;
+      }
+      async function maybeOfferToCollaborationPeer(peerSocketId = "", force = false) {
         const entry = collaborationPeerConnections.get(peerSocketId) || {};
         const pc = createCollaborationPeerConnection(peerSocketId);
-        if (!pc || entry.offered) return;
+        if (!pc) return;
+        updateCollaborationPeerSenders(pc);
         const shouldInitiate = String(socket.id || "") > String(peerSocketId || "");
         if (!shouldInitiate) return;
+        if (pc.signalingState !== "stable") return;
+        const nextSignature = getCollaborationMediaSignature();
+        if (!force && entry.lastSignature === nextSignature) return;
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        collaborationPeerConnections.set(peerSocketId, { pc, offered: true });
+        collaborationPeerConnections.set(peerSocketId, { pc, lastSignature: nextSignature });
         socket.emit("collaboration:webrtc-signal", {
           roomId: collaborationRoomId,
           targetSocketId: peerSocketId,
@@ -5569,20 +5601,31 @@
           data: offer,
         });
       }
-      async function syncCollaborationPeerMesh() {
+      async function syncCollaborationPeerMesh(forceOffer = false) {
         const self = getCollaborationSelfUser();
-        if (!self || (!collaborationAudioEnabled && !collaborationVideoEnabled && !collaborationUserHasLiveMedia(self))) {
+        const peers = collaborationUsers.filter(
+          (user) => String(user.socketId || "") !== String(socket.id || ""),
+        );
+        const selfLive = Boolean(
+          self && (collaborationAudioEnabled || collaborationVideoEnabled || collaborationUserHasLiveMedia(self)),
+        );
+        const anyRemoteLive = peers.some((user) => collaborationUserHasLiveMedia(user));
+        if (!self) {
+          return;
+        }
+        if (!selfLive) {
+          stopCollaborationLocalTracksOnly();
+        } else {
+          const wantsVideo = collaborationVideoEnabled || Boolean(self.canVideo);
+          await ensureCollaborationLocalMedia(wantsVideo ? "video" : "audio");
+        }
+        if (!selfLive && !anyRemoteLive) {
           stopCollaborationLocalMediaTracks();
           return;
         }
-        const wantsVideo = collaborationVideoEnabled || Boolean(self.canVideo);
-        await ensureCollaborationLocalMedia(wantsVideo ? "video" : "audio");
-        const livePeers = collaborationUsers.filter(
-          (user) => String(user.socketId || "") !== String(socket.id || "") && collaborationUserHasLiveMedia(user),
-        );
-        const livePeerIds = new Set(livePeers.map((user) => String(user.socketId || "")));
+        const peerIds = new Set(peers.map((user) => String(user.socketId || "")));
         collaborationPeerConnections.forEach((entry, peerSocketId) => {
-          if (!livePeerIds.has(peerSocketId)) {
+          if (!peerIds.has(peerSocketId)) {
             try {
               entry?.pc?.close?.();
             } catch {}
@@ -5590,8 +5633,12 @@
             collaborationRemoteStreams.delete(peerSocketId);
           }
         });
-        for (const peer of livePeers) {
-          await maybeOfferToCollaborationPeer(String(peer.socketId || ""));
+        for (const peer of peers) {
+          const peerSocketId = String(peer.socketId || "");
+          createCollaborationPeerConnection(peerSocketId);
+          if (selfLive) {
+            await maybeOfferToCollaborationPeer(peerSocketId, forceOffer);
+          }
         }
         renderCollaborationVideoStage();
       }
@@ -5617,7 +5664,10 @@
             signalType: "answer",
             data: answer,
           });
-          collaborationPeerConnections.set(sourceSocketId, { pc, offered: true });
+          collaborationPeerConnections.set(sourceSocketId, {
+            pc,
+            lastSignature: getCollaborationMediaSignature(),
+          });
         } else if (signalType === "answer" && payload.data) {
           await pc.setRemoteDescription(new RTCSessionDescription(payload.data));
         } else if (signalType === "candidate" && payload.data) {
@@ -6020,8 +6070,9 @@
         if (String(payload.roomId || "") !== collaborationRoomId) return;
         collaborationAudioEnabled = false;
         collaborationVideoEnabled = false;
-        stopCollaborationLocalMediaTracks();
+        stopCollaborationLocalTracksOnly();
         showBuilderSnackbar("The host ended your live media access.", "info");
+        syncCollaborationPeerMesh(true).catch(() => {});
         updateCollaborationUi();
       });
       socket.on("collaboration:webrtc-signal", (payload = {}) => {
