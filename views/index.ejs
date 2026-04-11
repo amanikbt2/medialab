@@ -4702,7 +4702,8 @@
       let collaborationApplyingRemoteUpdate = false;
       let collaborationAutoReconnectEnabled = false;
       let collaborationLobbyVisible = false;
-      let collaborationLobbySelection = "audio";
+      let collaborationLobbyAudioEnabled = true;
+      let collaborationLobbyVideoEnabled = false;
       let collaborationLobbyPending = false;
       let collaborationPendingRequestKind = "";
       let collaborationRequestQueue = [];
@@ -5283,7 +5284,7 @@
       function openCollaborationLobby() {
         collaborationLobbyVisible = true;
         document.getElementById("builder-collab-lobby-modal")?.classList.remove("hidden");
-        setCollaborationLobbySelection(collaborationLobbySelection);
+        syncCollaborationLobbyCards();
         renderCollaborationLobbyStatus();
       }
       function closeCollaborationLobby() {
@@ -5291,14 +5292,31 @@
         collaborationLobbyVisible = false;
         document.getElementById("builder-collab-lobby-modal")?.classList.add("hidden");
       }
-      function setCollaborationLobbySelection(selection = "audio") {
-        collaborationLobbySelection = selection === "video" ? "video" : "audio";
+      function syncCollaborationLobbyCards() {
         document
           .getElementById("builder-collab-lobby-audio")
-          ?.classList.toggle("active", collaborationLobbySelection === "audio");
+          ?.classList.toggle("active", collaborationLobbyAudioEnabled);
         document
           .getElementById("builder-collab-lobby-video")
-          ?.classList.toggle("active", collaborationLobbySelection === "video");
+          ?.classList.toggle("active", collaborationLobbyVideoEnabled);
+      }
+      function toggleCollaborationLobbyOption(option = "audio") {
+        if (option === "video") {
+          collaborationLobbyVideoEnabled = !collaborationLobbyVideoEnabled;
+          if (collaborationLobbyVideoEnabled) {
+            collaborationLobbyAudioEnabled = true;
+          }
+        } else {
+          const nextAudioEnabled = !collaborationLobbyAudioEnabled;
+          collaborationLobbyAudioEnabled = nextAudioEnabled;
+          if (!nextAudioEnabled) {
+            collaborationLobbyVideoEnabled = false;
+          }
+        }
+        if (!collaborationLobbyAudioEnabled && !collaborationLobbyVideoEnabled) {
+          collaborationLobbyAudioEnabled = true;
+        }
+        syncCollaborationLobbyCards();
         renderCollaborationLobbyStatus();
       }
       function renderCollaborationLobbyStatus(message = "") {
@@ -5313,11 +5331,14 @@
         }
         button.disabled = false;
         button.classList.remove("opacity-60", "cursor-not-allowed");
+        const selectionLabel = collaborationLobbyVideoEnabled
+          ? "video + audio"
+          : collaborationLobbyAudioEnabled
+            ? "audio"
+            : "viewer";
         status.textContent =
           message ||
-          (collaborationLobbySelection === "video"
-            ? "You will request video + audio presence from the host."
-            : "You will request audio access from the host.");
+          `You will request ${selectionLabel} presence from the host before entering live mode.`;
       }
       function renderCollaborationRequestLayer() {
         const layer = document.getElementById("builder-collab-request-layer");
@@ -5648,8 +5669,9 @@
       }
       async function submitCollaborationLobbyRequest() {
         if (!collaborationRoomId) return;
+        const joinType = collaborationLobbyVideoEnabled ? "video" : "audio";
         collaborationLobbyPending = true;
-        collaborationPendingRequestKind = `join-${collaborationLobbySelection}`;
+        collaborationPendingRequestKind = `join-${joinType}`;
         renderCollaborationLobbyStatus();
         collaborationAutoReconnectEnabled = true;
         if (!collaborationJoined) {
@@ -5657,7 +5679,7 @@
         }
         socket.emit("request-to-join", {
           roomId: collaborationRoomId,
-          joinType: collaborationLobbySelection,
+          joinType,
         });
       }
       function toggleCollaborationLiveMenu(event) {
@@ -5945,6 +5967,9 @@
             launchBossMode();
           } catch {}
           openCollaborationLobby();
+          setTimeout(() => {
+            if (!collaborationJoined && !collaborationIsHost) openCollaborationLobby();
+          }, 280);
           updateCollaborationUi();
         }, 120);
         return true;
@@ -14324,13 +14349,13 @@
                     </div>
                 </div>
             </div>
-            <div id="builder-collab-lobby-modal" class="hidden absolute inset-0 z-[161] bg-slate-950/78 p-4 backdrop-blur-xl" onclick="if (event.target === this && !collaborationLobbyPending) closeCollaborationLobby();">
+            <div id="builder-collab-lobby-modal" class="hidden fixed inset-0 z-[4000] bg-slate-950/78 p-4 backdrop-blur-xl" onclick="if (event.target === this && !collaborationLobbyPending) closeCollaborationLobby();">
                 <div class="mx-auto mt-10 w-full max-w-2xl rounded-[2rem] border border-white/10 bg-[#08111f] shadow-[0_28px_90px_rgba(2,6,23,0.58)]">
                     <div class="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
                         <div>
                             <p class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Join Workspace Session</p>
                             <h3 class="mt-2 text-xl font-semibold text-white">Choose how you want to enter</h3>
-                            <p class="mt-1 text-sm text-slate-400">Ask the host for audio or full video presence before joining the live workspace.</p>
+                            <p class="mt-1 text-sm text-slate-400">Turn audio or video on here, then send the request to the host before you join live presence.</p>
                         </div>
                         <button onclick="closeCollaborationLobby()" class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10">
                             <i class="fas fa-times"></i>
@@ -14338,21 +14363,21 @@
                     </div>
                     <div class="space-y-5 px-5 py-5">
                         <div class="grid gap-4 md:grid-cols-2">
-                            <button type="button" onclick="setCollaborationLobbySelection('audio')" id="builder-collab-lobby-audio" class="builder-collab-lobby-card text-left">
+                            <button type="button" onclick="toggleCollaborationLobbyOption('audio')" id="builder-collab-lobby-audio" class="builder-collab-lobby-card text-left">
                                 <div class="flex items-center gap-3">
                                     <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-300"><i class="fas fa-microphone text-lg"></i></span>
                                     <div>
-                                        <p class="text-sm font-black text-white">Audio Only</p>
+                                        <p class="text-sm font-black text-white">Audio</p>
                                         <p class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">Listen &amp; Speak</p>
                                     </div>
                                 </div>
                             </button>
-                            <button type="button" onclick="setCollaborationLobbySelection('video')" id="builder-collab-lobby-video" class="builder-collab-lobby-card text-left">
+                            <button type="button" onclick="toggleCollaborationLobbyOption('video')" id="builder-collab-lobby-video" class="builder-collab-lobby-card text-left">
                                 <div class="flex items-center gap-3">
                                     <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-300"><i class="fas fa-video text-lg"></i></span>
                                     <div>
-                                        <p class="text-sm font-black text-white">Video + Audio</p>
-                                        <p class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">Full Presence</p>
+                                        <p class="text-sm font-black text-white">Video</p>
+                                        <p class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">Turns on full presence</p>
                                     </div>
                                 </div>
                             </button>
