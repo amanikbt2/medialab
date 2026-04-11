@@ -8406,7 +8406,7 @@ io.on("connection", (socket) => {
     if (!room || !user) return;
     const audioEnabled = Boolean(payload.audioEnabled);
     const videoEnabled = Boolean(payload.videoEnabled);
-    user.canAudio = audioEnabled || videoEnabled;
+    user.canAudio = audioEnabled;
     user.canVideo = videoEnabled;
     user.awaitingApproval = false;
     user.pendingRequestKind = "";

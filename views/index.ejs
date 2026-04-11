@@ -459,9 +459,14 @@
         transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
       }
       .builder-collab-media-prompt-option.is-on {
-        border-color: rgba(34, 211, 238, 0.34);
-        background: rgba(34, 211, 238, 0.09);
+        border-color: rgba(52, 211, 153, 0.38);
+        background: rgba(16, 185, 129, 0.12);
         transform: translateY(-1px);
+      }
+      .builder-collab-media-prompt-option.is-on .builder-collab-media-prompt-icon {
+        border-color: rgba(52, 211, 153, 0.32);
+        background: rgba(16, 185, 129, 0.14);
+        color: #86efac;
       }
       .builder-collab-media-prompt-icon {
         display: inline-flex;
@@ -4851,10 +4856,15 @@
       let collaborationAudioMeters = new Map();
       let collaborationAudioMeterFrame = 0;
       let collaborationAudioContext = null;
+      let collaborationMediaUpdateToken = 0;
+      let collaborationMediaUpdating = false;
+      let collaborationOfferRetryTimers = new Map();
       let collaborationVideoDragState = null;
       let collaborationLocalVideoWindowPosition = null;
       let collaborationMediaPromptDismissed = false;
       let collaborationMediaPromptShownForRoom = "";
+      let collaborationMediaPromptAudioSelected = false;
+      let collaborationMediaPromptVideoSelected = true;
       const collaborationIceConfiguration = {
         iceServers: [
           { urls: "stun:stun.relay.metered.ca:80" },
@@ -5466,6 +5476,7 @@
         });
       }
       function getRequestedCollaborationMediaMode() {
+        if (collaborationAudioEnabled && collaborationVideoEnabled) return "both";
         if (collaborationVideoEnabled) return "video";
         if (collaborationAudioEnabled) return "audio";
         return "none";
@@ -5473,6 +5484,8 @@
       function openCollaborationMediaPrompt() {
         const prompt = document.getElementById("builder-collab-media-prompt");
         if (!prompt) return;
+        collaborationMediaPromptAudioSelected = false;
+        collaborationMediaPromptVideoSelected = true;
         prompt.classList.remove("hidden");
         renderCollaborationMediaPrompt();
       }
@@ -5483,8 +5496,56 @@
       function renderCollaborationMediaPrompt() {
         const audioButton = document.getElementById("builder-collab-prompt-audio");
         const videoButton = document.getElementById("builder-collab-prompt-video");
-        audioButton?.classList.toggle("is-on", collaborationAudioEnabled);
-        videoButton?.classList.toggle("is-on", collaborationVideoEnabled);
+        audioButton?.classList.toggle("is-on", collaborationMediaPromptAudioSelected);
+        videoButton?.classList.toggle("is-on", collaborationMediaPromptVideoSelected);
+      }
+      function clearCollaborationOfferRetry(peerSocketId = "") {
+        const key = String(peerSocketId || "").trim();
+        const timer = collaborationOfferRetryTimers.get(key);
+        if (timer) {
+          clearTimeout(timer);
+          collaborationOfferRetryTimers.delete(key);
+        }
+      }
+      function scheduleCollaborationPeerOffer(peerSocketId = "", delay = 140) {
+        const key = String(peerSocketId || "").trim();
+        if (!key) return;
+        clearCollaborationOfferRetry(key);
+        const timer = setTimeout(() => {
+          collaborationOfferRetryTimers.delete(key);
+          maybeOfferToCollaborationPeer(key, true).catch(() => {});
+        }, delay);
+        collaborationOfferRetryTimers.set(key, timer);
+      }
+      async function applyCollaborationMediaState(audioEnabled = false, videoEnabled = false) {
+        if (!isCollaborationActive()) return false;
+        const requestToken = ++collaborationMediaUpdateToken;
+        collaborationMediaUpdating = true;
+        collaborationAudioEnabled = Boolean(audioEnabled);
+        collaborationVideoEnabled = Boolean(videoEnabled);
+        if (!collaborationAudioEnabled && !collaborationVideoEnabled) {
+          stopCollaborationLocalTracksOnly();
+        } else {
+          try {
+            await ensureCollaborationLocalMedia(getRequestedCollaborationMediaMode());
+          } catch {
+            if (requestToken !== collaborationMediaUpdateToken) return false;
+            collaborationAudioEnabled = false;
+            collaborationVideoEnabled = false;
+            collaborationMediaUpdating = false;
+            updateCollaborationUi();
+            renderCollaborationMediaPrompt();
+            return false;
+          }
+        }
+        if (requestToken !== collaborationMediaUpdateToken) return false;
+        await pushCollaborationMediaState();
+        await syncCollaborationPeerMesh(true);
+        if (requestToken !== collaborationMediaUpdateToken) return false;
+        collaborationMediaUpdating = false;
+        updateCollaborationUi();
+        renderCollaborationMediaPrompt();
+        return true;
       }
       function maybeShowCollaborationMediaPrompt() {
         if (
@@ -5509,47 +5570,34 @@
         }, 360);
       }
       async function handleCollaborationMediaPromptToggle(kind = "audio") {
-        if (kind === "video") await toggleCollaborationVideo();
-        else await toggleCollaborationAudio();
+        if (kind === "video") {
+          collaborationMediaPromptVideoSelected = !collaborationMediaPromptVideoSelected;
+        } else {
+          collaborationMediaPromptAudioSelected = !collaborationMediaPromptAudioSelected;
+        }
         renderCollaborationMediaPrompt();
+      }
+      async function applyCollaborationMediaPromptSelection() {
+        collaborationMediaPromptDismissed = true;
+        const applied = await applyCollaborationMediaState(
+          collaborationMediaPromptAudioSelected,
+          collaborationMediaPromptVideoSelected,
+        );
+        if (applied) closeCollaborationMediaPrompt();
       }
       async function toggleCollaborationAudio() {
         if (!isCollaborationActive()) return;
-        collaborationAudioEnabled = !collaborationAudioEnabled;
-        if (!collaborationAudioEnabled && !collaborationVideoEnabled) {
-          stopCollaborationLocalTracksOnly();
-        } else {
-          try {
-            await ensureCollaborationLocalMedia(getRequestedCollaborationMediaMode());
-          } catch {
-            collaborationAudioEnabled = false;
-            updateCollaborationUi();
-            return;
-          }
-        }
-        await pushCollaborationMediaState();
-        await syncCollaborationPeerMesh(true);
-        updateCollaborationUi();
-        renderCollaborationMediaPrompt();
+        await applyCollaborationMediaState(
+          !collaborationAudioEnabled,
+          collaborationVideoEnabled,
+        );
       }
       async function toggleCollaborationVideo() {
         if (!isCollaborationActive()) return;
-        collaborationVideoEnabled = !collaborationVideoEnabled;
-        if (!collaborationAudioEnabled && !collaborationVideoEnabled) {
-          stopCollaborationLocalTracksOnly();
-        } else {
-          try {
-            await ensureCollaborationLocalMedia(getRequestedCollaborationMediaMode());
-          } catch {
-            collaborationVideoEnabled = false;
-            updateCollaborationUi();
-            return;
-          }
-        }
-        await pushCollaborationMediaState();
-        await syncCollaborationPeerMesh(true);
-        updateCollaborationUi();
-        renderCollaborationMediaPrompt();
+        await applyCollaborationMediaState(
+          collaborationAudioEnabled,
+          !collaborationVideoEnabled,
+        );
       }
       function renderCollaborationVideoStage() {
         const stage = document.getElementById("builder-collab-video-stage");
@@ -5710,8 +5758,8 @@
         collaborationVideoDragState = null;
       }
       async function ensureCollaborationLocalMedia(mode = "audio") {
-        const wantsAudio = mode === "audio" || mode === "video";
-        const wantsVideo = mode === "video";
+        const wantsAudio = mode === "audio" || mode === "both";
+        const wantsVideo = mode === "video" || mode === "both";
         const existingHasAudio = Boolean(collaborationLocalStream?.getAudioTracks?.().length);
         const existingHasVideo = Boolean(collaborationLocalStream?.getVideoTracks?.().length);
         if (
@@ -5762,6 +5810,8 @@
         });
         collaborationPeerConnections.clear();
         collaborationAudioMeters.forEach((_, socketId) => cleanupCollaborationAudioMeter(socketId));
+        collaborationOfferRetryTimers.forEach((timer) => clearTimeout(timer));
+        collaborationOfferRetryTimers.clear();
         renderCollaborationVideoStage();
       }
       function resumeCollaborationAudioContext() {
@@ -5886,6 +5936,24 @@
           });
           renderCollaborationVideoStage();
         };
+        pc.onconnectionstatechange = () => {
+          const state = String(pc.connectionState || "");
+          if (["failed", "closed", "disconnected"].includes(state)) {
+            clearCollaborationOfferRetry(peerSocketId);
+            collaborationRemoteStreams.delete(peerSocketId);
+            cleanupCollaborationAudioMeter(peerSocketId);
+            if (state !== "closed") {
+              collaborationPeerConnections.delete(peerSocketId);
+            }
+            renderCollaborationVideoStage();
+          }
+        };
+        pc.oniceconnectionstatechange = () => {
+          const state = String(pc.iceConnectionState || "");
+          if (["failed", "disconnected"].includes(state)) {
+            scheduleCollaborationPeerOffer(peerSocketId, 220);
+          }
+        };
         updateCollaborationPeerSenders(pc);
         collaborationPeerConnections.set(peerSocketId, { pc, lastSignature: "" });
         return pc;
@@ -5902,12 +5970,16 @@
         updateCollaborationPeerSenders(pc);
         const shouldInitiate = String(socket.id || "") > String(peerSocketId || "");
         if (!shouldInitiate) return;
-        if (pc.signalingState !== "stable") return;
+        if (pc.signalingState !== "stable") {
+          scheduleCollaborationPeerOffer(peerSocketId);
+          return;
+        }
         const nextSignature = getCollaborationMediaSignature();
         if (!force && entry.lastSignature === nextSignature) return;
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         collaborationPeerConnections.set(peerSocketId, { pc, lastSignature: nextSignature });
+        clearCollaborationOfferRetry(peerSocketId);
         socket.emit("collaboration:webrtc-signal", {
           roomId: collaborationRoomId,
           targetSocketId: peerSocketId,
@@ -5981,8 +6053,13 @@
             pc,
             lastSignature: getCollaborationMediaSignature(),
           });
+          clearCollaborationOfferRetry(sourceSocketId);
         } else if (signalType === "answer" && payload.data) {
           await pc.setRemoteDescription(new RTCSessionDescription(payload.data));
+          clearCollaborationOfferRetry(sourceSocketId);
+          if (collaborationAudioEnabled || collaborationVideoEnabled) {
+            scheduleCollaborationPeerOffer(sourceSocketId, 120);
+          }
         } else if (signalType === "candidate" && payload.data) {
           await pc.addIceCandidate(new RTCIceCandidate(payload.data));
         }
@@ -6121,20 +6198,28 @@
         if (linkWrap) linkWrap.classList.toggle("hidden", !collaborationShareLink);
         if (linkInput) linkInput.value = collaborationShareLink || "";
         if (audioToggle) {
-          audioToggle.classList.toggle("opacity-40", !isCollaborationActive());
-          audioToggle.classList.toggle("pointer-events-none", !isCollaborationActive());
-          audioToggle.classList.toggle("terminal-toggle-active", collaborationAudioEnabled && !collaborationVideoEnabled);
-          audioToggle.classList.toggle("text-emerald-200", collaborationAudioEnabled || collaborationVideoEnabled);
-          audioToggle.classList.toggle("text-slate-300", !(collaborationAudioEnabled || collaborationVideoEnabled));
-          audioToggle.title = collaborationAudioEnabled || collaborationVideoEnabled ? "Turn audio off" : "Turn audio on";
+          audioToggle.classList.toggle("opacity-40", !isCollaborationActive() || collaborationMediaUpdating);
+          audioToggle.classList.toggle("pointer-events-none", !isCollaborationActive() || collaborationMediaUpdating);
+          audioToggle.classList.toggle("terminal-toggle-active", collaborationAudioEnabled);
+          audioToggle.classList.toggle("text-emerald-200", collaborationAudioEnabled);
+          audioToggle.classList.toggle("text-slate-300", !collaborationAudioEnabled);
+          audioToggle.title = collaborationMediaUpdating
+            ? "Updating audio..."
+            : collaborationAudioEnabled
+              ? "Turn audio off"
+              : "Turn audio on";
         }
         if (videoToggle) {
-          videoToggle.classList.toggle("opacity-40", !isCollaborationActive());
-          videoToggle.classList.toggle("pointer-events-none", !isCollaborationActive());
+          videoToggle.classList.toggle("opacity-40", !isCollaborationActive() || collaborationMediaUpdating);
+          videoToggle.classList.toggle("pointer-events-none", !isCollaborationActive() || collaborationMediaUpdating);
           videoToggle.classList.toggle("terminal-toggle-active", collaborationVideoEnabled);
           videoToggle.classList.toggle("text-cyan-100", collaborationVideoEnabled);
           videoToggle.classList.toggle("text-slate-300", !collaborationVideoEnabled);
-          videoToggle.title = collaborationVideoEnabled ? "Turn video off" : "Turn video on";
+          videoToggle.title = collaborationMediaUpdating
+            ? "Updating video..."
+            : collaborationVideoEnabled
+              ? "Turn video off"
+              : "Turn video on";
         }
         renderCollaborationDropdown();
         renderCollaborationCursors();
@@ -14843,7 +14928,7 @@
                     </div>
                     <div class="flex items-center justify-between gap-3 border-t border-white/10 px-5 py-4">
                         <button type="button" onclick="closeCollaborationMediaPrompt()" class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-slate-200 hover:bg-white/10">Not now</button>
-                        <button type="button" onclick="closeCollaborationMediaPrompt()" class="rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-black text-slate-950 hover:bg-cyan-400">Continue</button>
+                        <button type="button" onclick="applyCollaborationMediaPromptSelection()" class="rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-black text-slate-950 hover:bg-cyan-400">Continue</button>
                     </div>
                 </div>
             </div>
