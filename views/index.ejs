@@ -57,6 +57,53 @@
         background-color: #030712; /* Matches bg-gray-950 */
         color: #f3f4f6;
       }
+      html.collaboration-booting,
+      html.collaboration-booting body {
+        overflow: hidden;
+      }
+      .collaboration-preboot-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 2000000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background:
+          radial-gradient(circle at top left, rgba(34, 211, 238, 0.2), transparent 38%),
+          radial-gradient(circle at top right, rgba(16, 185, 129, 0.14), transparent 30%),
+          linear-gradient(160deg, rgba(2, 6, 23, 0.98), rgba(8, 15, 30, 0.99));
+        backdrop-filter: blur(18px);
+      }
+      html.collaboration-booting .collaboration-preboot-overlay {
+        display: flex;
+      }
+      .collaboration-preboot-card {
+        width: min(94vw, 500px);
+        border-radius: 2rem;
+        border: 1px solid rgba(34, 211, 238, 0.18);
+        background:
+          radial-gradient(circle at top left, rgba(34, 211, 238, 0.16), transparent 44%),
+          linear-gradient(180deg, rgba(8, 15, 30, 0.98), rgba(2, 6, 23, 0.98));
+        box-shadow: 0 34px 110px rgba(2, 6, 23, 0.6);
+        padding: 1.5rem;
+      }
+      .collaboration-preboot-progress {
+        position: relative;
+        overflow: hidden;
+        height: 0.72rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .collaboration-preboot-progress > span {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: var(--preboot-progress, 14%);
+        border-radius: inherit;
+        background: linear-gradient(90deg, #22d3ee, #67e8f9);
+        box-shadow: 0 0 24px rgba(34, 211, 238, 0.28);
+        transition: width 0.28s ease;
+      }
       /* --- UI Animations --- */
       .tool-card {
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2445,7 +2492,30 @@
       }
     </style>
   </head>
-  <body class="bg-gray-950 text-gray-100 min-h-screen">
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+  <div id="collaboration-preboot-overlay" class="collaboration-preboot-overlay">
+    <div class="collaboration-preboot-card">
+      <div class="flex items-start gap-4">
+        <div class="flex h-12 w-12 items-center justify-center rounded-[1.25rem] border border-cyan-400/20 bg-cyan-500/10 text-cyan-200">
+          <i class="fas fa-globe-americas text-lg"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Joining Collaboration</p>
+          <h2 id="collaboration-preboot-title" class="mt-2 text-xl font-semibold text-white">Preparing shared workspace...</h2>
+          <p id="collaboration-preboot-subtitle" class="mt-2 text-sm leading-6 text-slate-300">MediaLab is preparing your collaboration session.</p>
+        </div>
+      </div>
+      <div class="mt-5 rounded-[1.4rem] border border-white/10 bg-white/[0.03] p-4">
+        <div class="flex items-center gap-3">
+          <span class="builder-collab-spinner"></span>
+          <p id="collaboration-preboot-status" class="text-sm font-semibold text-white">Loading workspace shell...</p>
+        </div>
+        <div id="collaboration-preboot-bar" class="collaboration-preboot-progress mt-4" style="--preboot-progress:14%;">
+          <span></span>
+        </div>
+      </div>
+    </div>
+  </div>
     <!-- NAVBAR -->
     <nav class="bg-gray-900 border-b border-gray-800 sticky top-0 z-50">
       <div
@@ -5611,6 +5681,25 @@
           ""
         );
       }
+      function syncCollaborationPrebootOverlay(message = "", progress = 0) {
+        const title = document.getElementById("collaboration-preboot-title");
+        const subtitle = document.getElementById("collaboration-preboot-subtitle");
+        const status = document.getElementById("collaboration-preboot-status");
+        const bar = document.getElementById("collaboration-preboot-bar");
+        if (!title || !subtitle || !status || !bar) return;
+        const roomLabel = collaborationRoomId ? `Joining collaboration ID_${collaborationRoomId}` : "Joining collaboration";
+        const hostName = getCollaborationHostDisplayName();
+        title.textContent = roomLabel;
+        subtitle.textContent = hostName
+          ? `Hosted by ${hostName}`
+          : "MediaLab is preparing your shared room.";
+        if (message) status.textContent = message;
+        bar.style.setProperty("--preboot-progress", `${Math.max(10, Math.min(100, Number(progress || 0)))}%`);
+      }
+      function releaseCollaborationPrebootOverlay() {
+        document.documentElement.classList.remove("collaboration-booting");
+        document.getElementById("collaboration-preboot-overlay")?.classList.add("hidden");
+      }
       function showCollaborationJoinProgress(message = "Preparing collaboration workspace...", progress = 18) {
         const overlay = document.getElementById("builder-collab-join-overlay");
         const title = document.getElementById("builder-collab-join-title");
@@ -5625,6 +5714,7 @@
           : "Hosted session details are loading...";
         status.textContent = message;
         bar.style.setProperty("--join-progress", `${Math.max(8, Math.min(100, Number(progress || 0)))}%`);
+        syncCollaborationPrebootOverlay(message, progress);
         overlay.classList.remove("hidden");
       }
       function beginCollaborationJoinProgress() {
@@ -5655,6 +5745,7 @@
         if (!overlay) return;
         setTimeout(() => {
           overlay.classList.add("hidden");
+          releaseCollaborationPrebootOverlay();
         }, Math.max(0, Number(delay || 0)));
       }
       function renderCollaborationMediaPrompt() {
@@ -17031,6 +17122,11 @@
       });
       // ====================== INIT ======================
       window.onload = async () => {
+        const initialCollaborationRoom = getCollaborationRoomParam();
+        if (initialCollaborationRoom) {
+          collaborationRoomId = initialCollaborationRoom;
+          syncCollaborationPrebootOverlay("Loading workspace shell...", 16);
+        }
         renderCards();
         storePendingReferralFromUrl();
         await logUsageActivityOnce(
@@ -24487,6 +24583,16 @@ ${interactionBlock}
     <style>
 ${cssBlock}
     </style>
+    <script>
+      (() => {
+        try {
+          const roomId = new URLSearchParams(window.location.search).get("room");
+          if (roomId) {
+            document.documentElement.classList.add("collaboration-booting");
+          }
+        } catch {}
+      })();
+    </script>
   </head>
   <body>
 ${payload.body || "  "}
