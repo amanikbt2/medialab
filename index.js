@@ -2056,6 +2056,68 @@ function buildMarketplaceSourcePackage({
   };
 }
 
+function normalizeMarketplaceTemplateHtml(sourceHtml = "", fallbackTitle = "MediaLab Template") {
+  const raw = String(sourceHtml || "").trim();
+  if (!raw) return "";
+  if (/<html[\s>]|<body[\s>]|<!doctype/i.test(raw)) return raw;
+  const safeTitle =
+    sanitizeMarketplaceText(fallbackTitle || "MediaLab Template", 120) || "MediaLab Template";
+  const wrappedContent = /^<div[\s>]/i.test(raw) ? raw : `<div class="medialab-template-root">\n${raw}\n</div>`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${safeTitle}</title>
+</head>
+<body>
+${wrappedContent}
+</body>
+</html>`;
+}
+
+function buildPurchasedTemplateSnapshotFromMarketplaceItem(item = {}) {
+  const safeTitle =
+    sanitizeMarketplaceText(item?.title || "Marketplace Template", 160) || "Marketplace Template";
+  return {
+    marketplaceItemId: item?._id || null,
+    slug: `marketplace-template-${String(item?._id || "").trim()}`,
+    title: safeTitle,
+    description: sanitizeMarketplaceText(item?.description || item?.purpose || "", 2000),
+    category: sanitizeMarketplaceText(item?.category || "General", 120) || "General",
+    sourceHtml: normalizeMarketplaceTemplateHtml(item?.sourceHtml || "", safeTitle),
+    previewImage: getMarketplacePreviewImage(item),
+    sellerId: item?.authorId || null,
+    sellerName: sanitizeMarketplaceText(item?.authorName || "", 120),
+    purchasedAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
+
+async function grantMarketplaceTemplateToBuyer(listing, buyer) {
+  if (!listing?._id || !buyer?._id) return null;
+  buyer.purchasedTemplates = Array.isArray(buyer.purchasedTemplates) ? buyer.purchasedTemplates : [];
+  const snapshot = buildPurchasedTemplateSnapshotFromMarketplaceItem(listing);
+  const existingIndex = buyer.purchasedTemplates.findIndex(
+    (entry) => String(entry?.marketplaceItemId || "") === String(listing._id || ""),
+  );
+  if (existingIndex >= 0) {
+    buyer.purchasedTemplates.splice(existingIndex, 1, {
+      ...buyer.purchasedTemplates[existingIndex],
+      ...snapshot,
+      purchasedAt: buyer.purchasedTemplates[existingIndex]?.purchasedAt || snapshot.purchasedAt,
+      updatedAt: new Date(),
+    });
+  } else {
+    buyer.purchasedTemplates.unshift(snapshot);
+  }
+  if (buyer.purchasedTemplates.length > 40) {
+    buyer.purchasedTemplates = buyer.purchasedTemplates.slice(0, 40);
+  }
+  await buyer.save();
+  return snapshot;
+}
+
 async function ensureMarketplaceRepoForUser(user) {
   if (!user?.githubUsername || !user?.githubToken) return null;
   const octokit = buildGithubClient(user);
@@ -3569,22 +3631,56 @@ const WEBSITE_TEMPLATE_VIEWS = {
   arcade: "templates/arcade",
   studio: "templates/studio",
 };
-app.get("/api/builder/templates", async (_req, res) => {
+app.get("/api/builder/templates", async (req, res) => {
   try {
-    const items = await BuilderTemplate.find({ isActive: true })
+    const items = await BuilderTemplate.find({
+      isActive: true,
+      $or: [
+        { sourceMarketplaceItemId: null },
+        { sourceMarketplaceItemId: { $exists: false } },
+      ],
+    })
       .sort({ createdAt: 1 })
       .select("slug title description category authorName createdAt")
       .lean();
+    const officialItems = items.map((item) => ({
+      slug: item.slug || "",
+      title: item.title || "Official Template",
+      description: item.description || "Official MediaLab builder template.",
+      category: item.category || "General",
+      authorName: item.authorName || "MediaLab Creator",
+      createdAt: item.createdAt || null,
+      origin: "official",
+      kind: "template",
+      isPurchased: false,
+      marketplaceItemId: "",
+    }));
+    const purchasedTemplates = req.user?._id
+      ? (
+          await User.findById(req.user._id)
+            .select("purchasedTemplates")
+            .lean()
+        )?.purchasedTemplates || []
+      : [];
+    const purchasedItems = (Array.isArray(purchasedTemplates) ? purchasedTemplates : []).map((item) => ({
+      slug:
+        String(item?.slug || "").trim() ||
+        `marketplace-template-${String(item?.marketplaceItemId || "").trim()}`,
+      title: item?.title || "Purchased Template",
+      description: item?.description || "Purchased marketplace template.",
+      category: item?.category || "General",
+      authorName: item?.sellerName || "Marketplace Creator",
+      createdAt: item?.purchasedAt || item?.updatedAt || null,
+      origin: "purchased",
+      kind: "template",
+      isPurchased: true,
+      marketplaceItemId: String(item?.marketplaceItemId || ""),
+      sourceHtml: String(item?.sourceHtml || ""),
+      previewImage: String(item?.previewImage || ""),
+    }));
     return res.json({
       success: true,
-      items: items.map((item) => ({
-        slug: item.slug || "",
-        title: item.title || "Official Template",
-        description: item.description || "Official MediaLab builder template.",
-        category: item.category || "General",
-        authorName: item.authorName || "MediaLab Creator",
-        createdAt: item.createdAt || null,
-      })),
+      items: [...officialItems, ...purchasedItems],
     });
   } catch (error) {
     console.error("Builder templates fetch failed:", error);
@@ -4730,8 +4826,8 @@ app.get("/api/github/project-monitor", async (req, res) => {
 app.get("/api/marketplace", async (req, res) => {
   try {
     const items = await MarketplaceItem.aggregate([
-      { $match: { status: "approved", listingKind: "sale" } },
-      { $sample: { size: 12 } },
+      { $match: { status: "approved" } },
+      { $sample: { size: 24 } },
     ]);
     return res.json({
       success: true,
@@ -4830,7 +4926,7 @@ app.post("/api/marketplace", publishRateLimit, express.json({ limit: "15mb" }), 
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found." });
     }
-    const sourceType = ["upload", "draft", "live"].includes(String(req.body?.sourceType || "").trim())
+    const sourceType = ["upload", "draft", "live", "template-code"].includes(String(req.body?.sourceType || "").trim())
       ? String(req.body.sourceType).trim()
       : "draft";
     const listingKind =
@@ -4872,7 +4968,7 @@ app.post("/api/marketplace", publishRateLimit, express.json({ limit: "15mb" }), 
       .filter((file) => file.path);
     const packagedSourceHtml = resolveMarketplaceSourceHtmlFromFiles(sourceFiles, sourceEntryPath);
 
-    if (!projectId) {
+    if (!projectId && listingKind !== "template") {
       return res.status(400).json({
         success: false,
         message: "Select a project source first before submitting it to the marketplace.",
@@ -4911,7 +5007,9 @@ app.post("/api/marketplace", publishRateLimit, express.json({ limit: "15mb" }), 
     let sourceProject = null;
     let liveUrl = "";
     let resolvedSourceHtml = sourceHtml || packagedSourceHtml;
-    if (sourceType === "draft") {
+    if (listingKind === "template") {
+      resolvedSourceHtml = normalizeMarketplaceTemplateHtml(sourceHtml || packagedSourceHtml, title);
+    } else if (sourceType === "draft") {
       const builderDrafts = Array.isArray(user.builderDrafts) ? user.builderDrafts : [];
       const draft = builderDrafts.find((item) => String(item?.name || "").trim() === projectId);
       if (!draft && !resolvedSourceHtml) {
@@ -4966,7 +5064,7 @@ app.post("/api/marketplace", publishRateLimit, express.json({ limit: "15mb" }), 
 
     const sellerRatingMeta = computeSellerRatingMeta(user);
     const item = await MarketplaceItem.create({
-      projectId,
+      projectId: listingKind === "template" ? `template-${Date.now()}` : projectId,
       authorId: user._id,
       title,
       description,
@@ -4974,7 +5072,7 @@ app.post("/api/marketplace", publishRateLimit, express.json({ limit: "15mb" }), 
       category,
       screenshots,
       screenshotAssets,
-      allowTest,
+      allowTest: listingKind === "template" ? false : allowTest,
       purpose,
       sourceType,
       listingKind,
@@ -5011,7 +5109,7 @@ app.post("/api/marketplace", publishRateLimit, express.json({ limit: "15mb" }), 
     });
     return res.json({
       success: true,
-      message: "Project submitted for marketplace review.",
+      message: listingKind === "template" ? "Template submitted for marketplace review." : "Project submitted for marketplace review.",
       item: buildMarketplacePublicItem(item.toObject(), req.user?._id),
     });
   } catch (error) {
@@ -5076,7 +5174,7 @@ app.patch("/api/marketplace/:id", publishRateLimit, express.json({ limit: "15mb"
         message: "Marketplace listing not found.",
       });
     }
-    const sourceType = ["upload", "draft", "live"].includes(String(req.body?.sourceType || "").trim())
+    const sourceType = ["upload", "draft", "live", "template-code"].includes(String(req.body?.sourceType || "").trim())
       ? String(req.body.sourceType).trim()
       : item.sourceType || "draft";
     const listingKind =
@@ -5126,7 +5224,7 @@ app.patch("/api/marketplace/:id", publishRateLimit, express.json({ limit: "15mb"
       .filter((file) => file.path);
     const packagedSourceHtml = resolveMarketplaceSourceHtmlFromFiles(sourceFiles, sourceEntryPath);
 
-    if (!projectId) {
+    if (!projectId && listingKind !== "template") {
       return res.status(400).json({
         success: false,
         message: "Select a project source first before updating it.",
@@ -5165,7 +5263,9 @@ app.patch("/api/marketplace/:id", publishRateLimit, express.json({ limit: "15mb"
     let sourceProject = null;
     let liveUrl = "";
     let resolvedSourceHtml = sourceHtml || packagedSourceHtml;
-    if (sourceType === "draft") {
+    if (listingKind === "template") {
+      resolvedSourceHtml = normalizeMarketplaceTemplateHtml(sourceHtml || packagedSourceHtml, title);
+    } else if (sourceType === "draft") {
       const builderDrafts = Array.isArray(user.builderDrafts) ? user.builderDrafts : [];
       const draft = builderDrafts.find((entry) => String(entry?.name || "").trim() === projectId);
       if (!draft && !resolvedSourceHtml) {
@@ -5210,14 +5310,14 @@ app.patch("/api/marketplace/:id", publishRateLimit, express.json({ limit: "15mb"
       await cleanupMarketplaceTemplateArtifacts(item);
     }
 
-    item.projectId = projectId;
+    item.projectId = listingKind === "template" ? item.projectId || `template-${Date.now()}` : projectId;
     item.title = title;
     item.description = description;
     item.price = price;
     item.category = category;
     item.screenshots = screenshots;
     item.screenshotAssets = screenshotAssets;
-    item.allowTest = allowTest;
+    item.allowTest = listingKind === "template" ? false : allowTest;
     item.purpose = purpose;
     item.sourceType = sourceType;
     item.listingKind = listingKind;
@@ -5549,6 +5649,7 @@ app.post("/api/marketplace/:id/purchase", publishRateLimit, express.json(), asyn
     item.status = "approved";
 
     let transfer = null;
+    let grantedTemplate = null;
     let responseMessage = "Your purchase will be processed within 24 hours.";
     if (Number(item.price || 0) <= 0) {
       const buyer = await User.findById(req.user._id);
@@ -5559,10 +5660,18 @@ app.post("/api/marketplace/:id/purchase", publishRateLimit, express.json(), asyn
       targetPurchase.status = "approved";
       targetPurchase.reviewedAt = new Date();
       targetPurchase.approvedUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      targetPurchase.message = "Purchase approved. You now own the project.";
-      transfer = await transferMarketplaceProjectToBuyer(item, buyer);
+      if (String(item.listingKind || "sale") === "template") {
+        targetPurchase.message = "Purchase approved. You now own the template.";
+        grantedTemplate = await grantMarketplaceTemplateToBuyer(item, buyer);
+      } else {
+        targetPurchase.message = "Purchase approved. You now own the project.";
+        transfer = await transferMarketplaceProjectToBuyer(item, buyer);
+      }
       item.status = "approved";
-      responseMessage = "Purchase approved. You now own the project.";
+      responseMessage =
+        String(item.listingKind || "sale") === "template"
+          ? "Purchase approved. You now own the template."
+          : "Purchase approved. You now own the project.";
     }
 
     await item.save();
@@ -5601,6 +5710,7 @@ app.post("/api/marketplace/:id/purchase", publishRateLimit, express.json(), asyn
       message: responseMessage,
       item: buildMarketplacePublicItem(item.toObject(), req.user?._id),
       transfer,
+      template: grantedTemplate,
     });
   } catch (error) {
     console.error("Marketplace purchase failed:", error);
@@ -5787,14 +5897,6 @@ app.patch("/api/admin/marketplace/:id", adminRateLimit, requireAdminApi, express
     item.updatedAt = new Date();
     item.reviewedAt = new Date();
     await item.save();
-    let builderTemplate = null;
-    if (nextStatus === "approved" && String(item.listingKind || "sale") === "template") {
-      builderTemplate = await syncMarketplaceItemAsBuilderTemplate(item);
-    }
-    if (nextStatus === "disapproved" && String(item.listingKind || "sale") === "template") {
-      await cleanupMarketplaceStorageArtifacts(item);
-      await BuilderTemplate.deleteMany({ sourceMarketplaceItemId: item._id });
-    }
     await createUserNotification({
       userId: item.authorId,
       type: `marketplace-${nextStatus}`,
@@ -5811,8 +5913,8 @@ app.patch("/api/admin/marketplace/:id", adminRateLimit, requireAdminApi, express
           ? item.disapprovalReason || "Your approved sale was suspended. Click to review it in My Sales."
           : nextStatus === "disapproved"
           ? item.disapprovalReason || "Please review the feedback and submit again."
-          : String(item.listingKind || "sale") === "template" && builderTemplate?.slug
-            ? `${item.title} was approved as an official MediaLab template. Click to review it in My Sales.`
+          : String(item.listingKind || "sale") === "template"
+            ? `${item.title} was approved and is now live in Marketplace Templates.`
             : `${item.title} is now ${nextStatus}. Click to review it in My Sales.`,
       targetType: "marketplace-sale",
       targetId: String(item._id),
@@ -5821,7 +5923,7 @@ app.patch("/api/admin/marketplace/:id", adminRateLimit, requireAdminApi, express
         status: nextStatus,
         title: item.title,
         listingKind: item.listingKind || "sale",
-        templateSlug: builderTemplate?.slug || "",
+        templateSlug: "",
       },
     });
     return res.json({
@@ -5881,21 +5983,32 @@ app.patch(
       item.updatedAt = new Date();
 
       let transfer = null;
+      let grantedTemplate = null;
       if (nextStatus === "approved") {
         const buyer = await User.findById(purchase.buyerId);
         if (!buyer) {
           return res.status(404).json({ success: false, message: "Buyer account not found." });
         }
-        purchase.message = "Purchase approved. You now own the project.";
+        purchase.message =
+          String(item.listingKind || "sale") === "template"
+            ? "Purchase approved. You now own the template."
+            : "Purchase approved. You now own the project.";
         purchase.declineReason = "";
         purchase.approvedUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-        transfer = await transferMarketplaceProjectToBuyer(item, buyer);
+        if (String(item.listingKind || "sale") === "template") {
+          grantedTemplate = await grantMarketplaceTemplateToBuyer(item, buyer);
+        } else {
+          transfer = await transferMarketplaceProjectToBuyer(item, buyer);
+        }
         item.status = "approved";
         await createUserNotification({
           userId: buyer._id,
           type: "marketplace-purchase-approved",
           title: "Purchase approved",
-          message: `Your purchase for ${item.title} was approved. You now own the project.`,
+          message:
+            String(item.listingKind || "sale") === "template"
+              ? `Your purchase for ${item.title} was approved. You now own the template.`
+              : `Your purchase for ${item.title} was approved. You now own the project.`,
           targetType: "marketplace-purchased",
           targetId: String(item._id),
           metadata: { itemId: String(item._id), title: item.title, purchaseId: String(purchase._id) },
@@ -5950,10 +6063,13 @@ app.patch(
         success: true,
         message:
           nextStatus === "approved"
-            ? "Purchase approved and transferred to the buyer."
+            ? String(item.listingKind || "sale") === "template"
+              ? "Purchase approved and added to the buyer's templates."
+              : "Purchase approved and transferred to the buyer."
             : "Purchase request declined.",
         item: buildMarketplacePublicItem(item.toObject()),
         transfer,
+        template: grantedTemplate,
       });
     } catch (error) {
       console.error("Admin marketplace purchase update failed:", error);

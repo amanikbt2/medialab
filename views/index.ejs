@@ -5077,6 +5077,8 @@
       let marketplaceMySales = [];
       let marketplacePurchasedItems = [];
       let marketplaceActiveTab = "sale";
+      let marketplaceBrowseView = "projects";
+      let marketplaceMerchantDrawerOpen = false;
       let marketplaceSearchOpen = false;
       let marketplaceSearchField = "title";
       let marketplaceSearchTerm = "";
@@ -5437,7 +5439,7 @@
       function hasExplicitRouterState(urlLike = window.location.href) {
         try {
           const url = new URL(urlLike, window.location.origin);
-          return ["tool", "project", "modal"].some((key) =>
+          return ["tool", "project", "modal", "view"].some((key) =>
             String(url.searchParams.get(key) || "").trim(),
           );
         } catch {
@@ -5467,6 +5469,7 @@
           tool: url.searchParams.get("tool") || "",
           project: url.searchParams.get("project") || "",
           modal: url.searchParams.get("modal") || "",
+          view: url.searchParams.get("view") || "",
         };
         if (options.replace) {
           window.history.replaceState(state, document.title, nextUrl);
@@ -5480,9 +5483,13 @@
         const tool = String(url.searchParams.get("tool") || "").trim();
         const project = String(url.searchParams.get("project") || "").trim();
         const modal = String(url.searchParams.get("modal") || "").trim().toLowerCase();
+        const view = String(url.searchParams.get("view") || "").trim().toLowerCase();
         const targetTool = tool || (project ? "history" : "");
         routerSyncSuspended = true;
         try {
+          if (view === "projects" || view === "templates") {
+            marketplaceBrowseView = view;
+          }
           if (targetTool) {
             goToStudio(targetTool);
           }
@@ -8255,6 +8262,7 @@
       }
       function getMarketplaceStepIssues(step = marketplaceCreateStep) {
         const sourceType = String(marketplaceDraftListing.sourceType || "").trim();
+        const listingKind = String(marketplaceDraftListing.listingKind || "sale").trim().toLowerCase();
         const projectId = String(marketplaceDraftListing.projectId || "").trim();
         const sourceFiles = Array.isArray(marketplaceDraftListing.sourceFiles)
           ? marketplaceDraftListing.sourceFiles.filter(Boolean)
@@ -8279,6 +8287,11 @@
           : [];
         if (Number(step) === 1) {
           const issues = [];
+          if (listingKind === "template") {
+            if (sourceType !== "template-code") issues.push("Choose template code mode.");
+            if (!sourceHtml) issues.push("Paste your template code first.");
+            return issues;
+          }
           if (!sourceType) issues.push("Choose a project source type.");
           if (!projectId) issues.push("Select a project source first.");
           if (sourceType === "upload" && !sourceHtml && !sourceFiles.length) {
@@ -8382,10 +8395,11 @@
       }
       function renderMarketplaceCards(items = []) {
         if (!items.length) {
+          const noun = marketplaceBrowseView === "templates" ? "templates" : "projects";
           return `<div class="col-span-full rounded-[2.6rem] border border-dashed border-white/10 bg-slate-900/70 p-12 text-center">
             <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.6rem] border border-white/10 bg-white/5 text-cyan-300"><i class="fas fa-store text-2xl"></i></div>
-            <p class="mt-5 text-xl font-semibold text-white">No projects on sale yet</p>
-            <p class="mt-2 text-sm leading-6 text-slate-400">Approved marketplace listings will appear here in a randomized discovery grid.</p>
+            <p class="mt-5 text-xl font-semibold text-white">No ${noun} live yet</p>
+            <p class="mt-2 text-sm leading-6 text-slate-400">Approved marketplace ${noun} will appear here once creators publish them.</p>
           </div>`;
         }
         return items
@@ -8455,6 +8469,37 @@
             .includes(term);
         });
       }
+      function getMarketplaceBrowseItems(items = marketplaceItems) {
+        const normalizedItems = Array.isArray(items) ? items : [];
+        const filteredByView = normalizedItems.filter((item) =>
+          marketplaceBrowseView === "templates"
+            ? String(item?.listingKind || "sale").toLowerCase() === "template"
+            : String(item?.listingKind || "sale").toLowerCase() !== "template",
+        );
+        return getFilteredMarketplaceItems(filteredByView);
+      }
+      function getMarketplaceMerchantSalesGroups(items = marketplaceMySales) {
+        const normalizedItems = Array.isArray(items) ? items : [];
+        return {
+          projects: normalizedItems.filter(
+            (item) => String(item?.listingKind || "sale").toLowerCase() !== "template",
+          ),
+          templates: normalizedItems.filter(
+            (item) => String(item?.listingKind || "sale").toLowerCase() === "template",
+          ),
+        };
+      }
+      function getMarketplaceMerchantPurchasedGroups(items = marketplacePurchasedItems) {
+        const normalizedItems = Array.isArray(items) ? items : [];
+        return {
+          projects: normalizedItems.filter(
+            (item) => String(item?.listingKind || "sale").toLowerCase() !== "template",
+          ),
+          templates: normalizedItems.filter(
+            (item) => String(item?.listingKind || "sale").toLowerCase() === "template",
+          ),
+        };
+      }
       function getMarketplaceListingKindBadge(kind = "sale") {
         const normalized = String(kind || "sale").trim().toLowerCase();
         if (normalized === "template") {
@@ -8513,7 +8558,7 @@
                   }
                   ${
                     item.listingKind === "template"
-                      ? `<p class="mt-3 text-sm text-fuchsia-200"><span class="font-bold uppercase tracking-[0.12em]">Template review:</span> This submission is only visible to MediaLab admins until approved as an official template.</p>`
+                      ? `<p class="mt-3 text-sm text-fuchsia-200"><span class="font-bold uppercase tracking-[0.12em]">Template listing:</span> This reusable starter will appear in Marketplace Templates after approval and only buyers who purchase it will see it inside their builder inventory.</p>`
                       : ""
                   }
                 </div>
@@ -8590,6 +8635,77 @@
             </div>`).join("")}
         </div>`;
       }
+      function openPurchasedMarketplaceTemplate(itemId = "") {
+        const templateSlug = `marketplace-template-${String(itemId || "").trim()}`;
+        if (!String(itemId || "").trim()) return;
+        switchTool("web-builder");
+        setTimeout(() => {
+          loadBuilderSiteTemplate(templateSlug);
+          launchBossMode();
+        }, 120);
+      }
+      function renderMarketplaceMerchantSalesPanel() {
+        const groups = getMarketplaceMerchantSalesGroups(marketplaceMySales);
+        return `<div class="space-y-6">
+          <div class="rounded-[1.6rem] border border-white/10 bg-slate-950/70 p-4">
+            <p class="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-300">My Sales</p>
+            <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <div class="rounded-[1.4rem] border border-cyan-400/15 bg-cyan-500/[0.06] p-4">
+                <p class="text-slate-400">Projects</p>
+                <p class="mt-2 text-2xl font-semibold text-white">${groups.projects.length}</p>
+              </div>
+              <div class="rounded-[1.4rem] border border-fuchsia-400/15 bg-fuchsia-500/[0.06] p-4">
+                <p class="text-slate-400">Templates</p>
+                <p class="mt-2 text-2xl font-semibold text-white">${groups.templates.length}</p>
+              </div>
+            </div>
+          </div>
+          <div>
+            <p class="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-300">Projects</p>
+            <div class="mt-3">${renderMarketplaceMySales(groups.projects)}</div>
+          </div>
+          <div>
+            <p class="text-[11px] font-black uppercase tracking-[0.18em] text-fuchsia-300">Templates</p>
+            <div class="mt-3">${renderMarketplaceMySales(groups.templates)}</div>
+          </div>
+        </div>`;
+      }
+      function renderMarketplaceMerchantPurchasedPanel() {
+        const groups = getMarketplaceMerchantPurchasedGroups(marketplacePurchasedItems);
+        const templateCards = !groups.templates.length
+          ? `<div class="rounded-[1.6rem] border border-dashed border-white/10 bg-slate-950/70 p-8 text-center text-sm text-slate-400">No purchased templates yet.</div>`
+          : `<div class="space-y-4">${groups.templates
+              .map(
+                (item) => `<div class="rounded-[1.8rem] border border-white/10 bg-slate-900/80 p-5 shadow-[0_16px_40px_rgba(2,6,23,0.28)]">
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-3">
+                        <h3 class="truncate text-xl font-semibold text-white">${escapeHtmlText(item.title || "Purchased Template")}</h3>
+                        ${getMarketplaceStatusBadge(item.viewerPurchaseStatus || item.status)}
+                        ${getMarketplaceListingKindBadge("template")}
+                      </div>
+                      <p class="mt-3 text-sm leading-6 text-slate-400">${escapeHtmlText(item.description || item.purpose || "")}</p>
+                      <p class="mt-3 text-sm ${String(item.viewerPurchaseStatus || "").toLowerCase() === "approved" ? "text-emerald-300" : "text-amber-300"}">${escapeHtmlText(item.viewerPurchaseMessage || "Your template purchase will be processed within 24 hours.")}</p>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2">
+                      <button onclick="openMarketplaceDetail('${item._id}')" class="inline-flex items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-cyan-200 hover:bg-cyan-500/15 transition-all"><i class="fas fa-eye"></i>View</button>
+                      ${String(item.viewerPurchaseStatus || "").toLowerCase() === "approved" ? `<button onclick="openPurchasedMarketplaceTemplate('${item._id}')" class="inline-flex items-center gap-2 rounded-2xl border border-fuchsia-400/20 bg-fuchsia-500/10 px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-fuchsia-200 hover:bg-fuchsia-500/15 transition-all"><i class="fas fa-code"></i>Open in Builder</button>` : ``}
+                    </div>
+                  </div>
+                </div>`,
+              )
+              .join("")}</div>`;
+        return `<div class="space-y-6">
+          <div>
+            <p class="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-300">Purchased Projects</p>
+            <div class="mt-3">${renderMarketplacePurchased(groups.projects)}</div>
+          </div>
+          <div>
+            <p class="text-[11px] font-black uppercase tracking-[0.18em] text-fuchsia-300">Purchased Templates</p>
+            <div class="mt-3">${templateCards}</div>
+          </div>
+        </div>`;
+      }
       function renderMarketplaceCreatorStep() {
         const liveProjects = getMarketplaceLiveProjects();
         const draftProjects = getMarketplaceDraftProjects();
@@ -8638,15 +8754,24 @@
           <div class="mt-6">
             ${marketplaceCreateStep === 1 ? `
               <div class="space-y-4">
-                <label class="block">
-                  <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Choose project type</span>
-                  <select onchange="setMarketplaceSourceType(this.value)" data-marketplace-focus="source-type" class="mt-3 w-full rounded-2xl border border-white/10 bg-slate-950/85 px-4 py-3 text-white outline-none transition-all focus:border-cyan-400 focus:bg-slate-950">
-                    <option value="" class="bg-slate-950 text-white">Select source type</option>
-                    <option value="upload" ${marketplaceDraftListing.sourceType === "upload" ? "selected" : ""} class="bg-slate-950 text-white">Upload project folder</option>
-                    <option value="draft" ${marketplaceDraftListing.sourceType === "draft" ? "selected" : ""} class="bg-slate-950 text-white">MediaLab draft</option>
-                    <option value="live" ${marketplaceDraftListing.sourceType === "live" ? "selected" : ""} class="bg-slate-950 text-white">Live project</option>
-                  </select>
-                </label>
+                ${
+                  marketplaceDraftListing.listingKind === "template"
+                    ? `<div class="rounded-[1.8rem] border border-fuchsia-400/15 bg-fuchsia-500/[0.06] p-5">
+                        <p class="text-[10px] font-black uppercase tracking-[0.18em] text-fuchsia-300">Template Source</p>
+                        <p class="mt-3 text-sm leading-6 text-slate-300">Paste reusable HTML/CSS/JS for your starter. MediaLab will keep it scoped and wrap loose content in a root div automatically.</p>
+                        <textarea rows="13" data-marketplace-focus="template-source" oninput="handleMarketplaceLiveInput(event, 'sourceHtml')" class="mt-4 w-full rounded-[1.5rem] border border-white/10 bg-slate-950/85 px-4 py-4 font-mono text-[13px] leading-6 text-white outline-none resize-none transition-all focus:border-fuchsia-400" placeholder="<div class='landing-shell'>...your template code...</div>">${escapeHtmlText(marketplaceDraftListing.sourceHtml || "")}</textarea>
+                        <p class="mt-3 text-xs text-slate-400">Tip: wrap your starter in one main <code class="rounded bg-black/30 px-1.5 py-0.5 text-fuchsia-200">&lt;div&gt;</code> for cleaner template insertion.</p>
+                      </div>`
+                    : `<label class="block">
+                        <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Choose project type</span>
+                        <select onchange="setMarketplaceSourceType(this.value)" data-marketplace-focus="source-type" class="mt-3 w-full rounded-2xl border border-white/10 bg-slate-950/85 px-4 py-3 text-white outline-none transition-all focus:border-cyan-400 focus:bg-slate-950">
+                          <option value="" class="bg-slate-950 text-white">Select source type</option>
+                          <option value="upload" ${marketplaceDraftListing.sourceType === "upload" ? "selected" : ""} class="bg-slate-950 text-white">Upload project folder</option>
+                          <option value="draft" ${marketplaceDraftListing.sourceType === "draft" ? "selected" : ""} class="bg-slate-950 text-white">MediaLab draft</option>
+                          <option value="live" ${marketplaceDraftListing.sourceType === "live" ? "selected" : ""} class="bg-slate-950 text-white">Live project</option>
+                        </select>
+                      </label>`
+                }
                 ${
                   marketplaceDraftListing.sourceType === "draft"
                     ? `<label class="block">
@@ -8716,7 +8841,7 @@
                 }
                 <div class="rounded-[1.6rem] border border-cyan-400/15 bg-cyan-500/5 p-4 text-sm text-slate-300">
                   <p class="font-semibold text-white">Selected source</p>
-                  <p class="mt-2">${escapeHtmlText(marketplaceDraftListing.projectLabel || "No source selected yet.")}</p>
+                  <p class="mt-2">${escapeHtmlText(marketplaceDraftListing.projectLabel || (marketplaceDraftListing.listingKind === "template" ? "Template code snippet" : "No source selected yet."))}</p>
                   <p class="mt-1 text-xs text-slate-400">${marketplaceDraftListing.sourceHtml ? "Source captured and ready for listing." : "Complete step 1 to unlock the next step."}</p>
                 </div>
               </div>` : marketplaceCreateStep === 2 ? `
@@ -8789,7 +8914,7 @@
                   <input type="checkbox" ${marketplaceDraftListing.listingKind === "template" ? "checked" : ""} onchange="toggleMarketplaceTemplateMode(this.checked, this)" class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-fuchsia-400 accent-fuchsia-400" />
                   <span class="min-w-0">
                     <span class="block text-[11px] font-black uppercase tracking-[0.18em] text-fuchsia-200">Sell as template</span>
-                    <span class="mt-2 block text-sm leading-6 text-slate-300">Submit this project for official MediaLab template review instead of public marketplace sale.</span>
+                    <span class="mt-2 block text-sm leading-6 text-slate-300">List this as a reusable starter in Marketplace Templates instead of a standalone sale project.</span>
                   </span>
                 </label>
               </div>`}
@@ -8805,10 +8930,38 @@
         </div>`;
       }
       function renderMarketplacePane() {
-        if (marketplaceActiveTab === "mine") return renderMarketplaceMySales(marketplaceMySales);
-        if (marketplaceActiveTab === "purchased") return renderMarketplacePurchased(marketplacePurchasedItems);
-        if (marketplaceActiveTab === "create") return renderMarketplaceCreatorStep();
-        return `<div id="marketplace-pane" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">${renderMarketplaceCards(getFilteredMarketplaceItems(marketplaceItems))}</div>`;
+        return `<div id="marketplace-pane" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">${renderMarketplaceCards(getMarketplaceBrowseItems(marketplaceItems))}</div>`;
+      }
+      function renderMarketplaceMerchantDrawer() {
+        const open = Boolean(marketplaceMerchantDrawerOpen);
+        const section = ["mine", "purchased", "create"].includes(String(marketplaceActiveTab || ""))
+          ? marketplaceActiveTab
+          : "mine";
+        const content =
+          section === "create"
+            ? renderMarketplaceCreatorStep()
+            : section === "purchased"
+              ? renderMarketplaceMerchantPurchasedPanel()
+              : renderMarketplaceMerchantSalesPanel();
+        return `<div class="fixed inset-0 z-[130] ${open ? "" : "pointer-events-none opacity-0"} transition-all duration-200">
+          <button onclick="closeMarketplaceMerchantDrawer()" class="absolute inset-0 bg-slate-950/72 backdrop-blur-sm ${open ? "opacity-100" : "opacity-0"} transition-opacity duration-200"></button>
+          <aside class="absolute right-0 top-0 h-full w-full max-w-[720px] overflow-y-auto border-l border-cyan-400/15 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(15,23,42,0.96))] p-5 shadow-[-30px_0_90px_rgba(2,6,23,0.46)] ${open ? "translate-x-0" : "translate-x-full"} transition-transform duration-200">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300">Developer Profile</p>
+                <h3 class="mt-2 text-2xl font-semibold tracking-tight text-white">${escapeHtmlText(currentUser?.name || "Me")}</h3>
+                <p class="mt-2 text-sm leading-6 text-slate-400">Manage your creator inventory without cluttering the buyer marketplace.</p>
+              </div>
+              <button onclick="closeMarketplaceMerchantDrawer()" class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-200 hover:border-cyan-400/25 hover:text-cyan-200 transition-all"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="mt-6 grid grid-cols-3 gap-3">
+              <button onclick="setMarketplaceTab('mine')" class="rounded-[1.4rem] border px-4 py-4 text-left transition-all ${section === "mine" ? "border-cyan-400/35 bg-cyan-500/12 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.12)]" : "border-white/10 bg-white/[0.04] text-slate-200 hover:border-cyan-400/20"}"><span class="block text-[11px] font-black uppercase tracking-[0.16em]">My Sales</span><span class="mt-2 block text-xs text-slate-400">Projects and templates you listed</span></button>
+              <button onclick="setMarketplaceTab('purchased')" class="rounded-[1.4rem] border px-4 py-4 text-left transition-all ${section === "purchased" ? "border-cyan-400/35 bg-cyan-500/12 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.12)]" : "border-white/10 bg-white/[0.04] text-slate-200 hover:border-cyan-400/20"}"><span class="block text-[11px] font-black uppercase tracking-[0.16em]">Purchased</span><span class="mt-2 block text-xs text-slate-400">Projects and templates you own</span></button>
+              <button onclick="openAddSaleModal()" class="rounded-[1.4rem] border px-4 py-4 text-left transition-all ${section === "create" ? "border-emerald-400/35 bg-emerald-500/12 text-emerald-100 shadow-[0_0_24px_rgba(52,211,153,0.12)]" : "border-white/10 bg-white/[0.04] text-slate-200 hover:border-emerald-400/20"}"><span class="block text-[11px] font-black uppercase tracking-[0.16em]">Add New Sale</span><span class="mt-2 block text-xs text-slate-400">List a project or reusable template</span></button>
+            </div>
+            <div class="mt-6">${content}</div>
+          </aside>
+        </div>`;
       }
       function renderMarketplaceTool() {
         const selectStyles = `style="color:#020617;background-color:#ffffff;"`;
@@ -8817,35 +8970,45 @@
           <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 class="text-3xl font-semibold tracking-tighter text-white">Project Marketplace</h2>
+              <p class="mt-2 text-sm text-slate-400">Browse polished standalone sites and reusable builder starters from MediaLab creators.</p>
             </div>
             <div class="flex items-center gap-3">
+              <button onclick="openMarketplaceMerchantDrawer()" class="inline-flex h-12 items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 text-cyan-200 hover:bg-cyan-500/15 transition-all">
+                <i class="fas fa-user-circle"></i>
+                <span class="text-[11px] font-black uppercase tracking-[0.18em]">Me</span>
+              </button>
               <button onclick="toggleMarketplaceSearch()" class="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-slate-200 hover:border-cyan-400/25 hover:text-cyan-200 transition-all">
                 <i class="fas fa-search"></i>
               </button>
             </div>
           </div>
           <div class="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(15,23,42,0.92))] p-5 sm:p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)]">
-            <div class="flex flex-wrap gap-3">
-              <button onclick="setMarketplaceTab('sale')" class="rounded-2xl px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] ${marketplaceActiveTab === "sale" ? "bg-cyan-500 text-slate-950" : "border border-white/10 bg-white/5 text-slate-200"}">On Sale</button>
-              <button onclick="setMarketplaceTab('mine')" class="rounded-2xl px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] ${marketplaceActiveTab === "mine" ? "bg-cyan-500 text-slate-950" : "border border-white/10 bg-white/5 text-slate-200"}">My Sales</button>
-              <button onclick="setMarketplaceTab('purchased')" class="rounded-2xl px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] ${marketplaceActiveTab === "purchased" ? "bg-cyan-500 text-slate-950" : "border border-white/10 bg-white/5 text-slate-200"}">Purchased</button>
-              <button onclick="setMarketplaceTab('create')" class="rounded-2xl px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] ${marketplaceActiveTab === "create" ? "bg-cyan-500 text-slate-950" : "border border-white/10 bg-white/5 text-slate-200"}">Add New Sale +</button>
+            <div class="flex flex-wrap items-center gap-6 border-b border-white/8 pb-1">
+              <button onclick="setMarketplaceView('projects')" class="relative pb-3 text-[11px] font-black uppercase tracking-[0.18em] ${marketplaceBrowseView === "projects" ? "text-cyan-200" : "text-slate-400 hover:text-slate-200"} transition-all">
+                Projects
+                <span class="absolute inset-x-0 -bottom-px h-[3px] rounded-full ${marketplaceBrowseView === "projects" ? "bg-cyan-400 shadow-[0_0_16px_rgba(34,211,238,0.55)]" : "bg-transparent"}"></span>
+              </button>
+              <button onclick="setMarketplaceView('templates')" class="relative pb-3 text-[11px] font-black uppercase tracking-[0.18em] ${marketplaceBrowseView === "templates" ? "text-fuchsia-200" : "text-slate-400 hover:text-slate-200"} transition-all">
+                Templates
+                <span class="absolute inset-x-0 -bottom-px h-[3px] rounded-full ${marketplaceBrowseView === "templates" ? "bg-fuchsia-400 shadow-[0_0_16px_rgba(232,121,249,0.45)]" : "bg-transparent"}"></span>
+              </button>
             </div>
             ${
-              marketplaceActiveTab === "sale"
+              true
                 ? `<div id="marketplace-search-panel" class="${marketplaceSearchOpen ? "" : "hidden"} mt-4 flex flex-col gap-3 rounded-[1.5rem] border border-white/10 bg-slate-950/55 p-3 sm:flex-row">
                     <select onchange="setMarketplaceSearchField(this.value)" class="w-full sm:w-44 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none focus:border-cyan-400" ${selectStyles}>
-                      <option value="title" ${marketplaceSearchField === "title" ? "selected" : ""} ${darkOptionStyle}>Project title</option>
+                      <option value="title" ${marketplaceSearchField === "title" ? "selected" : ""} ${darkOptionStyle}>${marketplaceBrowseView === "templates" ? "Template title" : "Project title"}</option>
                       <option value="name" ${marketplaceSearchField === "name" ? "selected" : ""} ${darkOptionStyle}>Author name</option>
                       <option value="category" ${marketplaceSearchField === "category" ? "selected" : ""} ${darkOptionStyle}>Category</option>
                       <option value="free" ${marketplaceSearchField === "free" ? "selected" : ""} ${darkOptionStyle}>Free only</option>
                     </select>
-                    <input ${marketplaceSearchField === "free" ? "disabled" : ""} data-marketplace-focus="sale-search" value="${escapeHtmlText(marketplaceSearchTerm)}" oninput="handleMarketplaceSearchInput(event)" class="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-400 disabled:opacity-45" placeholder="${marketplaceSearchField === "name" ? "Search by creator name" : marketplaceSearchField === "category" ? "Search by category" : marketplaceSearchField === "free" ? "Showing free projects" : "Search by project title"}" />
+                    <input ${marketplaceSearchField === "free" ? "disabled" : ""} data-marketplace-focus="sale-search" value="${escapeHtmlText(marketplaceSearchTerm)}" oninput="handleMarketplaceSearchInput(event)" class="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-400 disabled:opacity-45" placeholder="${marketplaceSearchField === "name" ? "Search by creator name" : marketplaceSearchField === "category" ? "Search by category" : marketplaceSearchField === "free" ? "Showing free listings" : marketplaceBrowseView === "templates" ? "Search by template title" : "Search by project title"}" />
                   </div>`
                 : ""
             }
             <div class="mt-6">${renderMarketplacePane()}</div>
           </div>
+          ${renderMarketplaceMerchantDrawer()}
           ${marketplaceSubmitState.active ? `<div id="marketplace-submit-overlay" class="absolute inset-0 z-20 flex items-center justify-center rounded-[2.2rem] bg-slate-950/88 p-6 backdrop-blur-sm">
             <div class="w-full max-w-lg rounded-[2rem] border border-cyan-400/20 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] p-6 shadow-[0_28px_90px_rgba(2,6,23,0.48)]">
               <div class="flex items-center gap-4">
@@ -8932,6 +9095,11 @@
       }
       function setMarketplaceTab(tab = "sale") {
         marketplaceActiveTab = tab;
+        if (["mine", "purchased", "create"].includes(String(tab || ""))) {
+          marketplaceMerchantDrawerOpen = true;
+        } else {
+          marketplaceMerchantDrawerOpen = false;
+        }
         logUsageActivityOnce(
           `marketplace-tab:${tab}`,
           "marketplace-tab-open",
@@ -8941,7 +9109,50 @@
         );
         if (["sale", "mine"].includes(String(tab || ""))) startMarketplacePreviewRotation();
         else stopMarketplacePreviewRotation();
+        if (currentStudioToolId === "marketplace") {
+          syncUrl({ tool: "marketplace", view: marketplaceBrowseView }, { replace: true });
+        }
         mountMarketplaceTool();
+      }
+      function setMarketplaceView(view = "projects") {
+        marketplaceBrowseView = String(view || "projects").trim().toLowerCase() === "templates" ? "templates" : "projects";
+        marketplaceActiveTab = "sale";
+        marketplaceMerchantDrawerOpen = false;
+        if (currentStudioToolId === "marketplace") {
+          syncUrl({ tool: "marketplace", view: marketplaceBrowseView }, { replace: true });
+          mountMarketplaceTool();
+        }
+      }
+      function openMarketplaceMerchantDrawer(section = "mine") {
+        if (!loggedIn && ["mine", "purchased", "create"].includes(String(section || "").toLowerCase())) {
+          showLogin();
+          return;
+        }
+        marketplaceMerchantDrawerOpen = true;
+        marketplaceActiveTab = ["mine", "purchased", "create"].includes(String(section || "").toLowerCase())
+          ? String(section || "").toLowerCase()
+          : "mine";
+        if (currentStudioToolId === "marketplace") mountMarketplaceTool();
+      }
+      function closeMarketplaceMerchantDrawer() {
+        marketplaceMerchantDrawerOpen = false;
+        marketplaceActiveTab = "sale";
+        if (currentStudioToolId === "marketplace") mountMarketplaceTool();
+      }
+      function openAddSaleModal(listingKind = "sale") {
+        marketplaceMerchantDrawerOpen = true;
+        marketplaceActiveTab = "create";
+        marketplaceCreateStep = 1;
+        marketplaceEditingListingId = "";
+        marketplaceDraftListing = {
+          ...createEmptyMarketplaceDraftListing(),
+          listingKind: String(listingKind || "sale").toLowerCase() === "template" ? "template" : "sale",
+          sourceType: String(listingKind || "sale").toLowerCase() === "template" ? "template-code" : "",
+          projectId: String(listingKind || "sale").toLowerCase() === "template" ? "template-code" : "",
+          projectLabel: String(listingKind || "sale").toLowerCase() === "template" ? "Pasted template code" : "",
+          category: marketplaceBrowseView === "templates" ? "Landing Page" : "Game",
+        };
+        if (currentStudioToolId === "marketplace") mountMarketplaceTool();
       }
       function toggleMarketplaceSearch() {
         marketplaceSearchOpen = !marketplaceSearchOpen;
@@ -9004,23 +9215,39 @@
       async function toggleMarketplaceTemplateMode(enabled = false, input = null) {
         if (enabled) {
           const confirmed = await openAppDialog({
-            chip: "Official Template Review",
-            title: "Submit this project as an official template?",
+            chip: "Marketplace Template",
+            title: "List this as a reusable template?",
             message:
-              "If you sell this as a template, it will only appear to MediaLab admins and will not be sold publicly. If approved, it will be used as an official Web Builder template.",
+              "Template listings appear in Marketplace Templates and should be pasted as reusable builder code. MediaLab will wrap the snippet in a clean root container when needed.",
             tone: "warning",
-            confirmLabel: "Use as Template",
-            cancelLabel: "Keep Public Sale",
+            confirmLabel: "Sell as Template",
+            cancelLabel: "Keep as Project",
           });
           marketplaceDraftListing = {
             ...marketplaceDraftListing,
             listingKind: confirmed ? "template" : "sale",
+            sourceType: confirmed ? "template-code" : marketplaceDraftListing.sourceType,
+            projectId: confirmed ? "template-code" : marketplaceDraftListing.projectId,
+            projectLabel: confirmed ? "Pasted template code" : marketplaceDraftListing.projectLabel,
+            allowTest: confirmed ? false : marketplaceDraftListing.allowTest,
           };
           if (input) input.checked = confirmed;
         } else {
           marketplaceDraftListing = {
             ...marketplaceDraftListing,
             listingKind: "sale",
+            sourceType:
+              String(marketplaceDraftListing.sourceType || "").trim() === "template-code"
+                ? ""
+                : marketplaceDraftListing.sourceType,
+            projectId:
+              String(marketplaceDraftListing.projectId || "").trim() === "template-code"
+                ? ""
+                : marketplaceDraftListing.projectId,
+            projectLabel:
+              String(marketplaceDraftListing.projectId || "").trim() === "template-code"
+                ? ""
+                : marketplaceDraftListing.projectLabel,
           };
           if (input) input.checked = false;
         }
@@ -9067,6 +9294,9 @@
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.message || "Could not load templates.");
           builderCommunityTemplates = Array.isArray(data.items) ? data.items : [];
+          if (currentUser) {
+            currentUser.purchasedTemplates = builderCommunityTemplates.filter((item) => item.isPurchased);
+          }
           renderBuilderCommunityTemplates();
         } catch (error) {
           console.warn("Builder template fetch skipped:", error.message);
@@ -9469,6 +9699,7 @@
           marketplaceMySales.find((item) => item._id === id) ||
           marketplacePurchasedItems.find((item) => item._id === id) ||
           null;
+        const listingKind = String(sourceItem?.listingKind || "sale").toLowerCase();
         const access = canInteractWithMarketplaceItem(sourceItem);
         if (!access.approved) {
           showBuilderSnackbar("This project is still pending approval. Rating unlocks after approval.", "error");
@@ -9768,7 +9999,7 @@
                 ${
                   item.viewerPurchaseStatus
                     ? `<div class="mt-5 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm ${String(item.viewerPurchaseStatus || "").toLowerCase() === "approved" ? "text-emerald-300" : String(item.viewerPurchaseStatus || "").toLowerCase() === "failed" ? "text-rose-300" : "text-amber-300"}">${escapeHtmlText(item.viewerPurchaseMessage || "Purchase recorded.")}</div>`
-                    : `<button onclick="purchaseMarketplaceItem('${item._id}')" class="mt-5 w-full rounded-2xl ${access.canPurchase ? "bg-emerald-400 text-slate-950 hover:bg-emerald-300" : "bg-slate-700 text-slate-400 cursor-not-allowed"} px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em]">Purchase Project</button>`
+                    : `<button onclick="purchaseMarketplaceItem('${item._id}')" class="mt-5 w-full rounded-2xl ${access.canPurchase ? "bg-emerald-400 text-slate-950 hover:bg-emerald-300" : "bg-slate-700 text-slate-400 cursor-not-allowed"} px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em]">Purchase ${String(item.listingKind || "sale").toLowerCase() === "template" ? "Template" : "Project"}</button>`
                 }
               </div>
               <div class="rounded-[1.8rem] border border-white/10 bg-slate-900/85 p-5">
@@ -10033,7 +10264,10 @@
         const confirmed = await openAppDialog({
           chip: "Marketplace Purchase",
           title: "Start purchase request?",
-          message: "MediaLab will create a pending purchase for admin review before the project is transferred to your builder dashboard.",
+          message:
+            listingKind === "template"
+              ? "MediaLab will create a pending purchase for admin review before this template is added to your Web Builder inventory."
+              : "MediaLab will create a pending purchase for admin review before the project is transferred to your builder dashboard.",
           confirmLabel: "Continue",
           cancelLabel: "Cancel",
         });
@@ -10087,6 +10321,9 @@
               currentUser.builderDrafts = draftsData.drafts || [];
               renderBuilderDrafts();
             }
+          }
+          if (data.template && loggedIn && currentUser) {
+            fetchBuilderCommunityTemplates().catch(() => {});
           }
         } catch (error) {
           failUniversalProgress("Purchase failed.");
@@ -15103,7 +15340,7 @@
       async function switchTool(id) {
         const switchToken = ++studioToolSwitchToken;
         currentStudioToolId = id;
-        syncUrl({ tool: id || null });
+        syncUrl({ tool: id || null, view: id === "marketplace" ? marketplaceBrowseView : null });
         try {
           sessionStorage.setItem("medialab:lastTool", String(id || "console"));
         } catch {}
@@ -21455,6 +21692,9 @@ console.log("Triggered ${eventName}", { source, event });
         }
       }
       async function loadBuilderSiteTemplate(slug) {
+        const selectedTemplate = (Array.isArray(builderCommunityTemplates) ? builderCommunityTemplates : []).find(
+          (item) => String(item?.slug || "").trim() === String(slug || "").trim(),
+        );
         const labels = {
           candycrush: "Candy Crush Game",
           portfolio: "Portfolio Site",
@@ -21464,21 +21704,24 @@ console.log("Triggered ${eventName}", { source, event });
         const editor = document.getElementById("builder-code-editor");
         if (!editor) return;
         try {
-          const res = await fetch(`/templates/${slug}`, {
-            credentials: "same-origin",
-          });
-          if (!res.ok) {
-            throw new Error(`Template request failed: ${res.status}`);
+          beginUniversalProgress(`Loading ${selectedTemplate?.title || labels[slug] || "website"} template...`, 14, 88);
+          let html = String(selectedTemplate?.sourceHtml || "");
+          if (!html) {
+            const res = await fetch(`/templates/${slug}`, {
+              credentials: "same-origin",
+            });
+            if (!res.ok) {
+              throw new Error(`Template request failed: ${res.status}`);
+            }
+            html = await res.text();
           }
-          beginUniversalProgress(`Loading ${labels[slug] || "website"} template...`, 14, 88);
-          let html = await res.text();
           const ownerName = String(currentUser?.name || "Your Game World").trim() || "Your Game World";
           html = html.replace(/__MEDIALAB_OWNER_NAME__/g, ownerName);
           builderImportedProject = null;
           builderRawImportDocument = html;
           builderLoadedTemplateSlug = String(slug || "").trim().toLowerCase();
           builderTemplateRuntimeDocument = html;
-          setBuilderProjectFromEntries(labels[slug] || "Website Template", [{ path: "index.html", content: html }], "index.html");
+          setBuilderProjectFromEntries(selectedTemplate?.title || labels[slug] || "Website Template", [{ path: "index.html", content: html }], "index.html");
           builderCodeMode = true;
           updateBuilderUI();
           editor.value = html;
@@ -21487,9 +21730,9 @@ console.log("Triggered ${eventName}", { source, event });
           builderCodeMode = false;
           updateBuilderUI();
           preserveBuilderFullscreenAfterUpload();
-          completeUniversalProgress(`${labels[slug] || "Website"} ready.`);
+          completeUniversalProgress(`${selectedTemplate?.title || labels[slug] || "Website"} ready.`);
           showBuilderSnackbar(
-            `${labels[slug] || "Website"} loaded into the canvas.`,
+            `${selectedTemplate?.title || labels[slug] || "Website"} loaded into the canvas.`,
             "success",
           );
         } catch (error) {

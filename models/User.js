@@ -49,6 +49,23 @@ const LiveProjectSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const PurchasedTemplateSchema = new mongoose.Schema(
+  {
+    marketplaceItemId: { type: mongoose.Schema.Types.ObjectId, ref: "MarketplaceItem", required: true },
+    slug: { type: String, default: "", trim: true },
+    title: { type: String, default: "", trim: true },
+    description: { type: String, default: "", trim: true },
+    category: { type: String, default: "General", trim: true },
+    sourceHtml: { type: String, default: "" },
+    previewImage: { type: String, default: "", trim: true },
+    sellerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    sellerName: { type: String, default: "", trim: true },
+    purchasedAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { _id: false },
+);
+
 const UserSchema = new mongoose.Schema({
   googleId: { type: String, unique: true, sparse: true },
   email: { type: String, required: true, unique: true },
@@ -95,6 +112,7 @@ const UserSchema = new mongoose.Schema({
   projects: [ProjectSchema],
   builderDrafts: [BuilderDraftSchema],
   liveProjects: [LiveProjectSchema],
+  purchasedTemplates: [PurchasedTemplateSchema],
 
   // --- PRO FEATURES & LIMITS ---
   isPro: { type: Boolean, default: false },

@@ -948,11 +948,13 @@ router.get("/me", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
 
   if (req.isAuthenticated() && req.user) {
-    await ensureUserReferralCode(req.user);
-    const notificationSnapshot = await buildNotificationSnapshot(req.user._id);
+    const freshUser = await User.findById(req.user._id);
+    const resolvedUser = freshUser || req.user;
+    await ensureUserReferralCode(resolvedUser);
+    const notificationSnapshot = await buildNotificationSnapshot(resolvedUser._id);
     res.json({
       success: true,
-      user: toSafeUser(req.user),
+      user: toSafeUser(resolvedUser),
       notifications: notificationSnapshot.notifications,
       unreadCount: notificationSnapshot.unreadCount,
     });
