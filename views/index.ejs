@@ -6341,6 +6341,51 @@
           } catch {}
         });
       }
+      function mergeCollaborationRemoteTrack(peerSocketId = "", incomingStream = null, incomingTrack = null) {
+        const key = String(peerSocketId || "").trim();
+        if (!key) return null;
+        const peer = collaborationUsers.find((user) => String(user.socketId || "") === key) || null;
+        const fallback = getCollaborationWindowSeedPosition(key);
+        const existingEntry = collaborationRemoteStreams.get(key) || null;
+        const mergedStream =
+          existingEntry?.stream instanceof MediaStream
+            ? existingEntry.stream
+            : new MediaStream();
+        const appendTrack = (track) => {
+          if (!track?.kind) return;
+          const currentTrack = mergedStream.getTracks().find((item) => item.kind === track.kind);
+          if (currentTrack && currentTrack.id === track.id) return;
+          if (currentTrack) {
+            try {
+              mergedStream.removeTrack(currentTrack);
+            } catch {}
+          }
+          try {
+            mergedStream.addTrack(track);
+          } catch {}
+          track.onended = () => {
+            try {
+              mergedStream.removeTrack(track);
+            } catch {}
+            const latestEntry = collaborationRemoteStreams.get(key);
+            if (latestEntry?.stream === mergedStream) {
+              renderCollaborationVideoStage();
+            }
+          };
+        };
+        if (incomingTrack) appendTrack(incomingTrack);
+        incomingStream?.getTracks?.().forEach(appendTrack);
+        const nextEntry = {
+          stream: mergedStream,
+          displayName: peer?.displayName || existingEntry?.displayName || "Collaborator",
+          left: existingEntry?.left || fallback.left,
+          top: existingEntry?.top || fallback.top,
+          audioLeft: existingEntry?.audioLeft,
+          audioTop: existingEntry?.audioTop,
+        };
+        collaborationRemoteStreams.set(key, nextEntry);
+        return nextEntry;
+      }
       function createCollaborationPeerConnection(peerSocketId = "") {
         if (!peerSocketId) return null;
         const cached = collaborationPeerConnections.get(peerSocketId);
@@ -6364,15 +6409,7 @@
         };
         pc.ontrack = (event) => {
           const [stream] = event.streams || [];
-          if (!stream) return;
-          const peer = collaborationUsers.find((user) => String(user.socketId || "") === String(peerSocketId));
-          const fallback = getCollaborationWindowSeedPosition(peerSocketId);
-          collaborationRemoteStreams.set(peerSocketId, {
-            stream,
-            displayName: peer?.displayName || "Collaborator",
-            left: collaborationRemoteStreams.get(peerSocketId)?.left || fallback.left,
-            top: collaborationRemoteStreams.get(peerSocketId)?.top || fallback.top,
-          });
+          mergeCollaborationRemoteTrack(peerSocketId, stream || null, event.track || null);
           renderCollaborationVideoStage();
         };
         pc.onconnectionstatechange = () => {
