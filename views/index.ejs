@@ -5427,6 +5427,16 @@
         });
         return url;
       }
+      function hasExplicitRouterState(urlLike = window.location.href) {
+        try {
+          const url = new URL(urlLike, window.location.origin);
+          return ["tool", "project", "modal"].some((key) =>
+            String(url.searchParams.get(key) || "").trim(),
+          );
+        } catch {
+          return false;
+        }
+      }
       function syncUrl(nextParams = {}, options = {}) {
         if (routerSyncSuspended && !options.force) return;
         const url = buildRouterUrl(nextParams);
@@ -5484,7 +5494,7 @@
           updateStudioToolSwitches?.();
         }
       }
-      function initRouter() {
+      async function initRouter() {
         if (routerInitialized) return;
         routerInitialized = true;
         routerLastUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -5493,7 +5503,7 @@
             console.warn("Router popstate sync failed:", error?.message || error);
           });
         });
-        applyRouterState({ initial: true }).catch((error) => {
+        await applyRouterState({ initial: true }).catch((error) => {
           console.warn("Router init failed:", error?.message || error);
         });
       }
@@ -17287,13 +17297,19 @@
         }
         await initializeDataExplorerSession();
         const collaborationActivated = await activateCollaborationFromUrl();
+        const hasDeepLinkState = hasExplicitRouterState();
+        await initRouter();
         try {
           const lastTool = String(sessionStorage.getItem("medialab:lastTool") || "").trim();
-          if (!collaborationActivated && lastTool && lastTool !== currentStudioToolId) {
+          if (
+            !collaborationActivated &&
+            !hasDeepLinkState &&
+            lastTool &&
+            lastTool !== currentStudioToolId
+          ) {
             await switchTool(lastTool);
           }
         } catch {}
-        initRouter();
         console.log(
           "%c✅ MediaLab - Full Final Script with Independent Vertical Tools Scroll",
           "color:#22d3ee; font-weight:bold",
