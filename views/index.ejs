@@ -4951,6 +4951,9 @@
       let currentStudioToolId = "image-pdf";
       let currentLiveProjectDetail = null;
       let currentLiveProjectMonitor = null;
+      let routerSyncSuspended = false;
+      let routerLastUrl = "";
+      let routerInitialized = false;
       const COLLAB_SHARE_BASE_URL = "https://medialab-6b20.onrender.com";
       const collaborationGuestPalette = [
         "#22d3ee",
@@ -5412,6 +5415,87 @@
         if (defaultTool) return defaultTool;
         if (!loggedIn) return "web-builder";
         return window.innerWidth < 768 ? "console" : "web-builder";
+      }
+      function buildRouterUrl(nextParams = {}) {
+        const url = new URL(window.location.href);
+        Object.entries(nextParams || {}).forEach(([key, value]) => {
+          if (value === null || value === undefined || value === "") {
+            url.searchParams.delete(key);
+          } else {
+            url.searchParams.set(key, String(value));
+          }
+        });
+        return url;
+      }
+      function syncUrl(nextParams = {}, options = {}) {
+        if (routerSyncSuspended && !options.force) return;
+        const url = buildRouterUrl(nextParams);
+        const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+        const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        if (nextUrl === currentUrl || nextUrl === routerLastUrl) {
+          routerLastUrl = nextUrl;
+          return;
+        }
+        const state = {
+          tool: url.searchParams.get("tool") || "",
+          project: url.searchParams.get("project") || "",
+          modal: url.searchParams.get("modal") || "",
+        };
+        if (options.replace) {
+          window.history.replaceState(state, document.title, nextUrl);
+        } else {
+          window.history.pushState(state, document.title, nextUrl);
+        }
+        routerLastUrl = nextUrl;
+      }
+      async function applyRouterState(options = {}) {
+        const url = new URL(window.location.href);
+        const tool = String(url.searchParams.get("tool") || "").trim();
+        const project = String(url.searchParams.get("project") || "").trim();
+        const modal = String(url.searchParams.get("modal") || "").trim().toLowerCase();
+        const targetTool = tool || (project ? "history" : "");
+        routerSyncSuspended = true;
+        try {
+          if (targetTool) {
+            goToStudio(targetTool);
+          }
+          if (project) {
+            await openLiveProjectDetail(project);
+            if (!currentLiveProjectDetail) {
+              showBuilderSnackbar("Project not found. Staying in the current tool.", "error");
+              syncUrl({ project: null }, { replace: true, force: true });
+            }
+          } else if (currentLiveProjectDetail) {
+            closeLiveProjectDetail();
+          }
+          if (modal === "account") {
+            openAccountModal();
+          } else if (modal === "withdraw") {
+            openWithdrawModal();
+          } else {
+            closeWithdrawModal();
+            closeAccountModal();
+          }
+        } finally {
+          routerSyncSuspended = false;
+          routerLastUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        }
+        if (options.fromPopstate) {
+          updateStudioToolSwitches?.();
+        }
+      }
+      function initRouter() {
+        if (routerInitialized) return;
+        routerInitialized = true;
+        routerLastUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        window.addEventListener("popstate", () => {
+          applyRouterState({ fromPopstate: true }).catch((error) => {
+            console.warn("Router popstate sync failed:", error?.message || error);
+          });
+        });
+        applyRouterState({ initial: true }).catch((error) => {
+          console.warn("Router init failed:", error?.message || error);
+        });
       }
       function goToStudio(defaultTool = null) {
         const entryTool = getPreferredStudioEntryTool(defaultTool);
@@ -9934,6 +10018,7 @@
         currentLiveProjectDetail = null;
         currentLiveProjectMonitor = null;
         pendingAdsTxtFile = null;
+        syncUrl({ project: null }, { replace: true });
       }
       function startLiveProjectHealthPolling() {
         if (currentLiveProjectHealthPoller) {
@@ -11085,6 +11170,7 @@
       async function openLiveProjectDetail(filename) {
         const normalizedFilename = decodeURIComponent(String(filename || "").trim());
         if (!normalizedFilename) return;
+        syncUrl({ project: normalizedFilename });
         logUsageActivityOnce(
           `project-dashboard:${normalizedFilename}`,
           "project-dashboard-open",
@@ -12458,6 +12544,7 @@
         updateAccountModalUi();
         document.getElementById("account-modal")?.classList.remove("hidden");
         document.getElementById("account-modal")?.classList.add("flex");
+        syncUrl({ modal: "account" });
         fetchWithdrawalRequests().then(() => {
           updateWithdrawalStatusSummary();
         });
@@ -13079,6 +13166,9 @@
       function closeAccountModal() {
         document.getElementById("account-modal")?.classList.add("hidden");
         document.getElementById("account-modal")?.classList.remove("flex");
+        if (new URL(window.location.href).searchParams.get("modal") === "account") {
+          syncUrl({ modal: null }, { replace: true });
+        }
       }
       function resetWithdrawalFlow() {
         selectedWithdrawalMethod = "";
@@ -13120,10 +13210,14 @@
         updateAccountModalUi();
         document.getElementById("withdraw-modal")?.classList.remove("hidden");
         document.getElementById("withdraw-modal")?.classList.add("flex");
+        syncUrl({ modal: "withdraw" });
       }
       function closeWithdrawModal() {
         document.getElementById("withdraw-modal")?.classList.add("hidden");
         document.getElementById("withdraw-modal")?.classList.remove("flex");
+        if (new URL(window.location.href).searchParams.get("modal") === "withdraw") {
+          syncUrl({ modal: null }, { replace: true });
+        }
       }
       function updateWithdrawalMethodLayout() {
         const methodGrid = document.getElementById("withdraw-method-grid");
@@ -14756,6 +14850,7 @@
       async function switchTool(id) {
         const switchToken = ++studioToolSwitchToken;
         currentStudioToolId = id;
+        syncUrl({ tool: id || null });
         try {
           sessionStorage.setItem("medialab:lastTool", String(id || "console"));
         } catch {}
@@ -17198,6 +17293,7 @@
             await switchTool(lastTool);
           }
         } catch {}
+        initRouter();
         console.log(
           "%c✅ MediaLab - Full Final Script with Independent Vertical Tools Scroll",
           "color:#22d3ee; font-weight:bold",
