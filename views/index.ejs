@@ -4956,12 +4956,15 @@
       let routerInitialized = false;
       const COLLAB_SHARE_BASE_URL = "https://medialab-6b20.onrender.com";
       const collaborationGuestPalette = [
+        "#facc15",
+        "#22c55e",
+        "#3b82f6",
+        "#ef4444",
+        "#111827",
+        "#f97316",
+        "#8b5cf6",
+        "#ec4899",
         "#22d3ee",
-        "#60a5fa",
-        "#34d399",
-        "#f59e0b",
-        "#f472b6",
-        "#a78bfa",
       ];
       let collaborationRoomId = "";
       let collaborationHostToken = "";
@@ -5000,6 +5003,7 @@
       let collaborationMediaPromptVideoSelected = true;
       let collaborationInactiveOverlay = null;
       let collaborationJoinProgressTimer = null;
+      let connectivityPresenceState = typeof navigator !== "undefined" ? navigator.onLine : true;
       const collaborationIceConfiguration = {
         iceServers: [
           { urls: "stun:stun.relay.metered.ca:80" },
@@ -5520,6 +5524,37 @@
           console.warn("Router init failed:", error?.message || error);
         });
       }
+      function showConnectivityToast(isOnline = true) {
+        const icon = isOnline
+          ? '<i class="fas fa-wifi text-[15px]"></i>'
+          : '<i class="fas fa-wifi-slash text-[15px]"></i>';
+        const message = isOnline ? "You're now back online" : "You're now offline";
+        showBuilderSnackbar(
+          `<span class="inline-flex items-center gap-3">${icon}<span>${message}</span></span>`,
+          isOnline ? "success" : "error",
+          true,
+          {
+            duration: 3000,
+            extraClasses: isOnline
+              ? ["shadow-[0_0_28px_rgba(34,197,94,0.35)]"]
+              : ["shadow-[0_0_28px_rgba(244,63,94,0.28)]"],
+          },
+        );
+      }
+      function initConnectivityPresenceToasts() {
+        const handleOnline = () => {
+          if (connectivityPresenceState === true) return;
+          connectivityPresenceState = true;
+          showConnectivityToast(true);
+        };
+        const handleOffline = () => {
+          if (connectivityPresenceState === false) return;
+          connectivityPresenceState = false;
+          showConnectivityToast(false);
+        };
+        window.addEventListener("online", handleOnline);
+        window.addEventListener("offline", handleOffline);
+      }
       function goToStudio(defaultTool = null) {
         const routedTool = !defaultTool ? getExplicitRouterTool() : "";
         const entryTool = getPreferredStudioEntryTool(defaultTool || routedTool || null);
@@ -5600,6 +5635,18 @@
       function hasCollaborationRoomParam() {
         return Boolean(getCollaborationRoomParam());
       }
+      function getCollaborationPaletteColor(seed = "") {
+        const text = String(seed || "").trim() || `${Date.now()}-${Math.random()}`;
+        let hash = 0;
+        for (let index = 0; index < text.length; index += 1) {
+          hash = (hash * 33 + text.charCodeAt(index)) >>> 0;
+        }
+        return (
+          collaborationGuestPalette[
+            Math.abs(hash) % Math.max(1, collaborationGuestPalette.length)
+          ] || "#22d3ee"
+        );
+      }
       function ensureGuestCollaborationIdentity() {
         if (collaborationGuestIdentity) return collaborationGuestIdentity;
         try {
@@ -5612,10 +5659,9 @@
           }
         } catch {}
         const displayName = `Guest-${Math.floor(1000 + Math.random() * 9000)}`;
-        const color =
-          collaborationGuestPalette[
-            Math.floor(Math.random() * collaborationGuestPalette.length)
-          ] || "#22d3ee";
+        const color = getCollaborationPaletteColor(
+          `${displayName}-${Math.random().toString(16).slice(2)}`,
+        );
         collaborationGuestIdentity = {
           userId: "",
           displayName,
@@ -5637,7 +5683,9 @@
             displayName:
               String(currentUser.name || currentUser.email || "MediaLab User").trim() ||
               "MediaLab User",
-            color: "#22d3ee",
+            color: getCollaborationPaletteColor(
+              String(currentUser._id || currentUser.email || currentUser.name || "medialab-user"),
+            ),
             isGuest: false,
           };
         }
@@ -17494,6 +17542,7 @@
         const collaborationActivated = await activateCollaborationFromUrl();
         const hasDeepLinkState = hasExplicitRouterState();
         await initRouter();
+        initConnectivityPresenceToasts();
         try {
           const lastTool = String(sessionStorage.getItem("medialab:lastTool") || "").trim();
           if (
@@ -25711,7 +25760,7 @@ ${interactionBlock}
         URL.revokeObjectURL(codeUrl);
       }
       let builderSnackbarTimer = null;
-      function showBuilderSnackbar(message = "Done", tone = "info", allowHtml = false) {
+      function showBuilderSnackbar(message = "Done", tone = "info", allowHtml = false, options = {}) {
         const bar = document.getElementById("builder-snackbar");
         if (!bar) return;
         if (allowHtml) bar.innerHTML = message;
@@ -25729,7 +25778,12 @@ ${interactionBlock}
           "border-red-500/40",
           "text-red-100",
           "text-white",
+          "shadow-[0_0_28px_rgba(34,197,94,0.35)]",
+          "shadow-[0_0_28px_rgba(244,63,94,0.28)]",
         );
+        (options.extraClasses || []).forEach((className) => {
+          if (className) bar.classList.remove(className);
+        });
         if (tone === "success") {
           bar.classList.add(
             "bg-emerald-600/95",
@@ -25749,11 +25803,14 @@ ${interactionBlock}
             "text-cyan-100",
           );
         }
+        (options.extraClasses || []).forEach((className) => {
+          if (className) bar.classList.add(className);
+        });
         bar.classList.remove("hidden");
         clearTimeout(builderSnackbarTimer);
         builderSnackbarTimer = setTimeout(() => {
           bar.classList.add("hidden");
-        }, 2200);
+        }, Math.max(1200, Number(options.duration || 2200)));
       }
       async function copyBuilderCode() {
         const code = buildCodeModeDocument();
