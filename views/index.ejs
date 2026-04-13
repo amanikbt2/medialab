@@ -61,6 +61,17 @@
       html.collaboration-booting body {
         overflow: hidden;
       }
+      /* Full-screen progress overlay: lock page scroll whenever it is visible */
+      html:has(#universal-progress:not(.hidden)),
+      html:has(#universal-progress:not(.hidden)) body {
+        overflow: hidden;
+      }
+      #universal-progress {
+        pointer-events: auto;
+      }
+      #universal-progress.hidden {
+        pointer-events: none;
+      }
       .collaboration-preboot-overlay {
         position: fixed;
         inset: 0;
@@ -2516,6 +2527,42 @@
       </div>
     </div>
   </div>
+  <div
+    id="universal-progress"
+    class="hidden fixed inset-0 z-[85000] flex items-center justify-center p-5 sm:p-8 bg-slate-950/90 backdrop-blur-xl"
+    aria-live="polite"
+  >
+    <div
+      class="w-full max-w-lg rounded-[2.25rem] border border-cyan-500/20 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.14),transparent_38%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(3,7,18,0.99))] p-8 sm:p-10 shadow-[0_32px_120px_rgba(2,6,23,0.72)]"
+    >
+      <div class="flex items-start gap-4 sm:gap-5">
+        <div
+          class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/10 text-cyan-200 shadow-[0_12px_40px_rgba(34,211,238,0.15)]"
+        >
+          <i class="fas fa-bolt text-xl"></i>
+        </div>
+        <div class="min-w-0 flex-1 pt-0.5">
+          <p class="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-300">MediaLab</p>
+          <p
+            id="universal-status-text"
+            class="mt-2 text-lg sm:text-xl font-semibold leading-snug text-white tracking-tight"
+          >
+            Engine Active...
+          </p>
+        </div>
+        <span
+          id="universal-percent"
+          class="text-sm font-black tabular-nums text-cyan-400 shrink-0 pt-1 sm:pt-2"
+          >0%</span>
+      </div>
+      <div class="mt-8 h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+        <div
+          id="universal-bar"
+          class="h-full rounded-full bg-cyan-400 w-0 transition-all duration-500 ease-out shadow-[0_0_18px_rgba(34,211,238,0.65)]"
+        ></div>
+      </div>
+    </div>
+  </div>
     <!-- NAVBAR -->
     <nav class="bg-gray-900 border-b border-gray-800 sticky top-0 z-50">
       <div
@@ -3147,43 +3194,6 @@
             class="flex-1 p-4 sm:p-8 overflow-y-auto sidebar-scroll relative"
             id="content-area"
           >
-            <div
-              id="universal-progress"
-              class="hidden max-w-4xl mx-auto mb-6 animate-fadeIn sticky top-0 z-30"
-            >
-              <div class="relative pt-4">
-                <div
-                  class="h-[2px] w-full bg-gray-800 rounded-full overflow-hidden"
-                >
-                  <div
-                    id="universal-bar"
-                    class="h-full bg-cyan-400 w-0 transition-all duration-500 ease-out shadow-[0_0_12px_rgba(34,211,238,0.8)]"
-                  ></div>
-                </div>
-                <div class="flex items-center justify-between mt-3 px-1">
-                  <div class="flex items-center gap-2">
-                    <span class="relative flex h-2 w-2">
-                      <span
-                        class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"
-                      ></span>
-                      <span
-                        class="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"
-                      ></span>
-                    </span>
-                    <span
-                      id="universal-status-text"
-                      class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]"
-                      >Engine Active...</span
-                    >
-                  </div>
-                  <span
-                    id="universal-percent"
-                    class="text-[10px] font-black text-cyan-400 tabular-nums"
-                    >0%</span
-                  >
-                </div>
-              </div>
-            </div>
             <div
               id="tool-display"
               class="max-w-5xl mx-auto h-full min-h-[500px]"
@@ -7544,27 +7554,7 @@
           btn.disabled = false;
         }
       }
-      // ====================== UNIVERSAL PROGRESS LOGIC ======================
-      socket.on("process-step", (data) => {
-        const progressDiv = document.getElementById("universal-progress");
-        const statusText = document.getElementById("universal-status-text");
-        const bar = document.getElementById("universal-bar");
-        const percentLabel = document.getElementById("universal-percent");
-        progressDiv.classList.remove("hidden");
-        if (statusText) statusText.innerText = data.message;
-        if (data.percent) {
-          bar.style.width = data.percent + "%";
-          percentLabel.innerText = data.percent + "%";
-        }
-        if (data.percent >= 100 || data.message.includes("Complete")) {
-          bar.classList.replace("bg-cyan-500", "bg-green-500");
-          setTimeout(() => {
-            progressDiv.classList.add("hidden");
-            bar.style.width = "0%";
-            bar.classList.replace("bg-green-500", "bg-cyan-500");
-          }, 4000);
-        }
-      });
+      // ====================== UNIVERSAL PROGRESS LOGIC (socket handler registered after window.onload) ======================
       // ====================== HISTORY LOGIC (SIDEBAR & TOOL) ======================
       function legacyUpdateSidebarHistory(projects) {
         const list = document.getElementById("project-history-list");
@@ -7643,7 +7633,7 @@
           .replace(/\\/g, "\\\\")
           .replace(/'/g, "\\'")
           .replace(/\r/g, "")
-          .replace(/\n/g, "\\n");
+          .replace(/\n/g, "\n");
       }
       function getAdsenseReviewLabel(status = "") {
         const normalized = String(status || "").trim().toUpperCase();
@@ -8346,7 +8336,7 @@
           sourceType: String(type || "").trim(),
         };
         marketplaceEditingListingId = "";
-        if (currentStudioToolId === "marketplace") mountMarketplaceTool();
+        if (currentStudioToolId === "marketplace") mountMarketplaceTool("drawer");
       }
       async function editMarketplaceSale(id = "") {
         const itemId = String(id || "").trim();
@@ -8386,7 +8376,7 @@
             screenshotAssets: Array.isArray(item.screenshotAssets) ? item.screenshotAssets.slice(0, 4) : [],
           };
           completeUniversalProgress("Marketplace sale ready to edit.");
-          mountMarketplaceTool();
+          mountMarketplaceTool("drawer");
           showBuilderSnackbar("Editing marketplace sale.", "success");
         } catch (error) {
           failUniversalProgress("Could not load marketplace sale.");
@@ -8944,7 +8934,7 @@
               ? renderMarketplaceMerchantPurchasedPanel()
               : renderMarketplaceMerchantSalesPanel();
         return `<div class="fixed inset-0 z-[130] ${open ? "" : "pointer-events-none opacity-0"} transition-all duration-200">
-          <button onclick="closeMarketplaceMerchantDrawer()" class="absolute inset-0 bg-slate-950/72 backdrop-blur-sm ${open ? "opacity-100" : "opacity-0"} transition-opacity duration-200"></button>
+          <button type="button" onclick="closeMarketplaceMerchantDrawer()" class="absolute inset-0 bg-slate-950/72 backdrop-blur-sm ${open ? "opacity-100" : "opacity-0"} transition-opacity duration-200"></button>
           <aside class="absolute right-0 top-0 h-full w-full max-w-[720px] overflow-y-auto border-l border-cyan-400/15 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(15,23,42,0.96))] p-5 shadow-[-30px_0_90px_rgba(2,6,23,0.46)] ${open ? "translate-x-0" : "translate-x-full"} transition-transform duration-200">
             <div class="flex items-start justify-between gap-4">
               <div>
@@ -8952,43 +8942,27 @@
                 <h3 class="mt-2 text-2xl font-semibold tracking-tight text-white">${escapeHtmlText(currentUser?.name || "Me")}</h3>
                 <p class="mt-2 text-sm leading-6 text-slate-400">Manage your creator inventory without cluttering the buyer marketplace.</p>
               </div>
-              <button onclick="closeMarketplaceMerchantDrawer()" class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-200 hover:border-cyan-400/25 hover:text-cyan-200 transition-all"><i class="fas fa-times"></i></button>
+              <button type="button" onclick="closeMarketplaceMerchantDrawer()" class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-200 hover:border-cyan-400/25 hover:text-cyan-200 transition-all"><i class="fas fa-times"></i></button>
             </div>
             <div class="mt-6 grid grid-cols-3 gap-3">
-              <button onclick="setMarketplaceTab('mine')" class="rounded-[1.4rem] border px-4 py-4 text-left transition-all ${section === "mine" ? "border-cyan-400/35 bg-cyan-500/12 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.12)]" : "border-white/10 bg-white/[0.04] text-slate-200 hover:border-cyan-400/20"}"><span class="block text-[11px] font-black uppercase tracking-[0.16em]">My Sales</span><span class="mt-2 block text-xs text-slate-400">Projects and templates you listed</span></button>
-              <button onclick="setMarketplaceTab('purchased')" class="rounded-[1.4rem] border px-4 py-4 text-left transition-all ${section === "purchased" ? "border-cyan-400/35 bg-cyan-500/12 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.12)]" : "border-white/10 bg-white/[0.04] text-slate-200 hover:border-cyan-400/20"}"><span class="block text-[11px] font-black uppercase tracking-[0.16em]">Purchased</span><span class="mt-2 block text-xs text-slate-400">Projects and templates you own</span></button>
-              <button onclick="openAddSaleModal()" class="rounded-[1.4rem] border px-4 py-4 text-left transition-all ${section === "create" ? "border-emerald-400/35 bg-emerald-500/12 text-emerald-100 shadow-[0_0_24px_rgba(52,211,153,0.12)]" : "border-white/10 bg-white/[0.04] text-slate-200 hover:border-emerald-400/20"}"><span class="block text-[11px] font-black uppercase tracking-[0.16em]">Add New Sale</span><span class="mt-2 block text-xs text-slate-400">List a project or reusable template</span></button>
+              <button type="button" onclick="setMarketplaceTab('mine')" class="rounded-[1.4rem] border px-4 py-4 text-left transition-all ${section === "mine" ? "border-cyan-400/35 bg-cyan-500/12 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.12)]" : "border-white/10 bg-white/[0.04] text-slate-200 hover:border-cyan-400/20"}"><span class="block text-[11px] font-black uppercase tracking-[0.16em]">My Sales</span><span class="mt-2 block text-xs text-slate-400">Projects and templates you listed</span></button>
+              <button type="button" onclick="setMarketplaceTab('purchased')" class="rounded-[1.4rem] border px-4 py-4 text-left transition-all ${section === "purchased" ? "border-cyan-400/35 bg-cyan-500/12 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.12)]" : "border-white/10 bg-white/[0.04] text-slate-200 hover:border-cyan-400/20"}"><span class="block text-[11px] font-black uppercase tracking-[0.16em]">Purchased</span><span class="mt-2 block text-xs text-slate-400">Projects and templates you own</span></button>
+              <button type="button" onclick="openAddSaleModal()" class="rounded-[1.4rem] border px-4 py-4 text-left transition-all ${section === "create" ? "border-emerald-400/35 bg-emerald-500/12 text-emerald-100 shadow-[0_0_24px_rgba(52,211,153,0.12)]" : "border-white/10 bg-white/[0.04] text-slate-200 hover:border-emerald-400/20"}"><span class="block text-[11px] font-black uppercase tracking-[0.16em]">Add New Sale</span><span class="mt-2 block text-xs text-slate-400">List a project or reusable template</span></button>
             </div>
             <div class="mt-6">${content}</div>
           </aside>
         </div>`;
       }
-      function renderMarketplaceTool() {
+      function renderMarketplaceBrowseChromeHtml() {
         const selectStyles = `style="color:#020617;background-color:#ffffff;"`;
         const darkOptionStyle = `style="color:#020617;background-color:#ffffff;"`;
-        return `<div class="animate-fadeIn relative space-y-8">
-          <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 class="text-3xl font-semibold tracking-tighter text-white">Project Marketplace</h2>
-              <p class="mt-2 text-sm text-slate-400">Browse polished standalone sites and reusable builder starters from MediaLab creators.</p>
-            </div>
-            <div class="flex items-center gap-3">
-              <button onclick="openMarketplaceMerchantDrawer()" class="inline-flex h-12 items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 text-cyan-200 hover:bg-cyan-500/15 transition-all">
-                <i class="fas fa-user-circle"></i>
-                <span class="text-[11px] font-black uppercase tracking-[0.18em]">Me</span>
-              </button>
-              <button onclick="toggleMarketplaceSearch()" class="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-slate-200 hover:border-cyan-400/25 hover:text-cyan-200 transition-all">
-                <i class="fas fa-search"></i>
-              </button>
-            </div>
-          </div>
-          <div class="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(15,23,42,0.92))] p-5 sm:p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)]">
+        return `
             <div class="flex flex-wrap items-center gap-6 border-b border-white/8 pb-1">
-              <button onclick="setMarketplaceView('projects')" class="relative pb-3 text-[11px] font-black uppercase tracking-[0.18em] ${marketplaceBrowseView === "projects" ? "text-cyan-200" : "text-slate-400 hover:text-slate-200"} transition-all">
+              <button type="button" onclick="setMarketplaceView('projects')" class="relative pb-3 text-[11px] font-black uppercase tracking-[0.18em] ${marketplaceBrowseView === "projects" ? "text-cyan-200" : "text-slate-400 hover:text-slate-200"} transition-all">
                 Projects
                 <span class="absolute inset-x-0 -bottom-px h-[3px] rounded-full ${marketplaceBrowseView === "projects" ? "bg-cyan-400 shadow-[0_0_16px_rgba(34,211,238,0.55)]" : "bg-transparent"}"></span>
               </button>
-              <button onclick="setMarketplaceView('templates')" class="relative pb-3 text-[11px] font-black uppercase tracking-[0.18em] ${marketplaceBrowseView === "templates" ? "text-fuchsia-200" : "text-slate-400 hover:text-slate-200"} transition-all">
+              <button type="button" onclick="setMarketplaceView('templates')" class="relative pb-3 text-[11px] font-black uppercase tracking-[0.18em] ${marketplaceBrowseView === "templates" ? "text-fuchsia-200" : "text-slate-400 hover:text-slate-200"} transition-all">
                 Templates
                 <span class="absolute inset-x-0 -bottom-px h-[3px] rounded-full ${marketplaceBrowseView === "templates" ? "bg-fuchsia-400 shadow-[0_0_16px_rgba(232,121,249,0.45)]" : "bg-transparent"}"></span>
               </button>
@@ -9005,11 +8979,24 @@
                     <input ${marketplaceSearchField === "free" ? "disabled" : ""} data-marketplace-focus="sale-search" value="${escapeHtmlText(marketplaceSearchTerm)}" oninput="handleMarketplaceSearchInput(event)" class="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-400 disabled:opacity-45" placeholder="${marketplaceSearchField === "name" ? "Search by creator name" : marketplaceSearchField === "category" ? "Search by category" : marketplaceSearchField === "free" ? "Showing free listings" : marketplaceBrowseView === "templates" ? "Search by template title" : "Search by project title"}" />
                   </div>`
                 : ""
-            }
-            <div class="mt-6">${renderMarketplacePane()}</div>
-          </div>
-          ${renderMarketplaceMerchantDrawer()}
-          ${marketplaceSubmitState.active ? `<div id="marketplace-submit-overlay" class="absolute inset-0 z-20 flex items-center justify-center rounded-[2.2rem] bg-slate-950/88 p-6 backdrop-blur-sm">
+            }`;
+      }
+      function renderMarketplaceBrowseShellInner() {
+        return `<div id="marketplace-browse-chrome">${renderMarketplaceBrowseChromeHtml()}</div>
+            <div class="mt-6">${renderMarketplacePane()}</div>`;
+      }
+      function patchMarketplaceBrowseChromeAndPane() {
+        const chrome = document.getElementById("marketplace-browse-chrome");
+        if (!chrome) return false;
+        const focusState = captureMarketplaceFocus();
+        chrome.innerHTML = renderMarketplaceBrowseChromeHtml();
+        restoreMarketplaceFocus(focusState);
+        refreshMarketplacePaneOnly();
+        return true;
+      }
+      function renderMarketplaceSubmitOverlayMarkup() {
+        return marketplaceSubmitState.active
+          ? `<div id="marketplace-submit-overlay" class="absolute inset-0 z-20 flex items-center justify-center rounded-[2.2rem] bg-slate-950/88 p-6 backdrop-blur-sm">
             <div class="w-full max-w-lg rounded-[2rem] border border-cyan-400/20 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] p-6 shadow-[0_28px_90px_rgba(2,6,23,0.48)]">
               <div class="flex items-center gap-4">
                 <div class="flex h-14 w-14 items-center justify-center rounded-[1.4rem] border border-cyan-400/20 bg-cyan-500/10 text-cyan-300">
@@ -9031,12 +9018,64 @@
                 <p class="mt-4 text-sm leading-6 text-slate-400">MediaLab is uploading your project package, screenshots, and metadata. Keep this tab open until the review submission completes.</p>
               </div>
             </div>
-          </div>` : ""}
+          </div>`
+          : "";
+      }
+      function renderMarketplaceTool() {
+        return `<div id="marketplace-tool-root" class="relative space-y-8">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 class="text-3xl font-semibold tracking-tighter text-white">Project Marketplace</h2>
+              <p class="mt-2 text-sm text-slate-400">Browse polished standalone sites and reusable builder starters from MediaLab creators.</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <button type="button" onclick="openMarketplaceMerchantDrawer()" class="inline-flex h-12 items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 text-cyan-200 hover:bg-cyan-500/15 transition-all">
+                <i class="fas fa-user-circle"></i>
+                <span class="text-[11px] font-black uppercase tracking-[0.18em]">Me</span>
+              </button>
+              <button type="button" onclick="toggleMarketplaceSearch()" class="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-slate-200 hover:border-cyan-400/25 hover:text-cyan-200 transition-all">
+                <i class="fas fa-search"></i>
+              </button>
+            </div>
+          </div>
+          <div id="marketplace-browse-shell" class="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(15,23,42,0.92))] p-5 sm:p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)]">${renderMarketplaceBrowseShellInner()}</div>
+          <div id="marketplace-drawer-slot">${renderMarketplaceMerchantDrawer()}</div>
+          <div id="marketplace-submit-overlay-slot">${renderMarketplaceSubmitOverlayMarkup()}</div>
         </div>`;
       }
-      function mountMarketplaceTool() {
+      function patchMarketplaceToolSlots(scope = "all") {
+        const root = document.getElementById("marketplace-tool-root");
+        if (!root) return false;
+        const patchBrowse = scope === "all" || scope === "browse";
+        const patchDrawer = scope === "all" || scope === "drawer";
+        if (patchBrowse) {
+          const shell = document.getElementById("marketplace-browse-shell");
+          if (shell) {
+            const focusState = captureMarketplaceFocus();
+            shell.innerHTML = renderMarketplaceBrowseShellInner();
+            restoreMarketplaceFocus(focusState);
+          }
+        }
+        if (patchDrawer) {
+          const drawerSlot = document.getElementById("marketplace-drawer-slot");
+          const submitSlot = document.getElementById("marketplace-submit-overlay-slot");
+          if (drawerSlot) drawerSlot.innerHTML = renderMarketplaceMerchantDrawer();
+          if (submitSlot) submitSlot.innerHTML = renderMarketplaceSubmitOverlayMarkup();
+          if (marketplaceActiveTab === "create") syncMarketplaceCreateActions();
+        }
+        return true;
+      }
+      function mountMarketplaceTool(scope = "all") {
         const area = document.getElementById("tool-display");
         if (!area) return;
+        if (document.getElementById("marketplace-tool-root")) {
+          if (scope === "browse") {
+            patchMarketplaceBrowseChromeAndPane();
+            return;
+          }
+          patchMarketplaceToolSlots(scope);
+          return;
+        }
         const focusState = captureMarketplaceFocus();
         const previousHeight = area.offsetHeight;
         const previousScroll = area.scrollTop;
@@ -9053,7 +9092,7 @@
       function refreshMarketplacePaneOnly() {
         const pane = document.getElementById("marketplace-pane");
         if (!pane) {
-          if (currentStudioToolId === "marketplace") mountMarketplaceTool();
+          if (currentStudioToolId === "marketplace") mountMarketplaceTool("all");
           return;
         }
         pane.outerHTML = renderMarketplacePane();
@@ -9111,8 +9150,8 @@
         else stopMarketplacePreviewRotation();
         if (currentStudioToolId === "marketplace") {
           syncUrl({ tool: "marketplace", view: marketplaceBrowseView }, { replace: true });
+          mountMarketplaceTool("drawer");
         }
-        mountMarketplaceTool();
       }
       function setMarketplaceView(view = "projects") {
         marketplaceBrowseView = String(view || "projects").trim().toLowerCase() === "templates" ? "templates" : "projects";
@@ -9120,7 +9159,8 @@
         marketplaceMerchantDrawerOpen = false;
         if (currentStudioToolId === "marketplace") {
           syncUrl({ tool: "marketplace", view: marketplaceBrowseView }, { replace: true });
-          mountMarketplaceTool();
+          mountMarketplaceTool("drawer");
+          mountMarketplaceTool("browse");
         }
       }
       function openMarketplaceMerchantDrawer(section = "mine") {
@@ -9132,12 +9172,12 @@
         marketplaceActiveTab = ["mine", "purchased", "create"].includes(String(section || "").toLowerCase())
           ? String(section || "").toLowerCase()
           : "mine";
-        if (currentStudioToolId === "marketplace") mountMarketplaceTool();
+        if (currentStudioToolId === "marketplace") mountMarketplaceTool("drawer");
       }
       function closeMarketplaceMerchantDrawer() {
         marketplaceMerchantDrawerOpen = false;
         marketplaceActiveTab = "sale";
-        if (currentStudioToolId === "marketplace") mountMarketplaceTool();
+        if (currentStudioToolId === "marketplace") mountMarketplaceTool("drawer");
       }
       function openAddSaleModal(listingKind = "sale") {
         marketplaceMerchantDrawerOpen = true;
@@ -9152,7 +9192,7 @@
           projectLabel: String(listingKind || "sale").toLowerCase() === "template" ? "Pasted template code" : "",
           category: marketplaceBrowseView === "templates" ? "Landing Page" : "Game",
         };
-        if (currentStudioToolId === "marketplace") mountMarketplaceTool();
+        if (currentStudioToolId === "marketplace") mountMarketplaceTool("drawer");
       }
       function toggleMarketplaceSearch() {
         marketplaceSearchOpen = !marketplaceSearchOpen;
@@ -9165,7 +9205,7 @@
       }
       function setMarketplaceCreateStep(step = 1) {
         marketplaceCreateStep = Math.max(1, Math.min(3, Number(step) || 1));
-        if (currentStudioToolId === "marketplace") mountMarketplaceTool();
+        if (currentStudioToolId === "marketplace") mountMarketplaceTool("drawer");
       }
       function syncMarketplaceCreateActions() {
         const backButton = document.getElementById("marketplace-step-back-btn");
@@ -9310,7 +9350,7 @@
         if (marketplaceSearchField === "free") {
           marketplaceSearchTerm = "";
         }
-        mountMarketplaceTool();
+        if (currentStudioToolId === "marketplace") mountMarketplaceTool("browse");
       }
       function captureMarketplaceFocus() {
         const active = document.activeElement;
@@ -9366,7 +9406,7 @@
           dropzone.classList.toggle("cursor-pointer", !marketplaceUploadState.active);
           return;
         }
-        mountMarketplaceTool();
+        mountMarketplaceTool("drawer");
       }
       function setMarketplaceSubmitState(patch = {}) {
         marketplaceSubmitState = {
@@ -9374,7 +9414,7 @@
           ...patch,
         };
         if (currentStudioToolId !== "marketplace" || marketplaceActiveTab !== "create") {
-          if (currentStudioToolId === "marketplace") mountMarketplaceTool();
+          if (currentStudioToolId === "marketplace") mountMarketplaceTool("drawer");
           return;
         }
         const overlay = document.getElementById("marketplace-submit-overlay");
@@ -9391,7 +9431,7 @@
           bar.style.width = `${safePercent}%`;
           return;
         }
-        mountMarketplaceTool();
+        mountMarketplaceTool("drawer");
       }
       function stopMarketplaceSubmitProgressPulse() {
         if (!marketplaceSubmitProgressTimer) return;
@@ -9429,7 +9469,7 @@
           sourceFiles: draft ? [{ path: "index.html", name: "index.html" }] : [],
           title: marketplaceDraftListing.title || String(draft?.name || "").trim(),
         };
-        mountMarketplaceTool();
+        mountMarketplaceTool("drawer");
       }
       function selectMarketplaceLiveProject(fileName = "") {
         const project = getMarketplaceLiveProjects().find(
@@ -9445,7 +9485,7 @@
           sourceFiles: [],
           title: marketplaceDraftListing.title || String(project?.name || "").trim(),
         };
-        mountMarketplaceTool();
+        mountMarketplaceTool("drawer");
       }
       async function readMarketplaceUploadFile(file, path) {
         const mimeType = String(file?.type || "").trim();
@@ -9530,13 +9570,13 @@
           title: marketplaceDraftListing.title || folderName,
         };
         marketplaceUploadState = createEmptyMarketplaceUploadState();
-        mountMarketplaceTool();
+        if (currentStudioToolId === "marketplace") mountMarketplaceTool("drawer");
         showBuilderSnackbar("Project folder prepared for marketplace listing.", "success");
       }
       function handleMarketplaceUploadFolderInput(input) {
         processMarketplaceUploadFiles(Array.from(input?.files || [])).catch(() => {
           marketplaceUploadState = createEmptyMarketplaceUploadState();
-          if (currentStudioToolId === "marketplace") mountMarketplaceTool();
+          if (currentStudioToolId === "marketplace") mountMarketplaceTool("drawer");
           showBuilderSnackbar("Could not read that project folder.", "error");
         });
       }
@@ -9544,7 +9584,7 @@
         event.preventDefault();
         processMarketplaceUploadFiles(Array.from(event.dataTransfer?.files || [])).catch(() => {
           marketplaceUploadState = createEmptyMarketplaceUploadState();
-          if (currentStudioToolId === "marketplace") mountMarketplaceTool();
+          if (currentStudioToolId === "marketplace") mountMarketplaceTool("drawer");
           showBuilderSnackbar("Could not read that project folder.", "error");
         });
       }
@@ -9607,7 +9647,7 @@
         };
             completeUniversalProgress("Marketplace screenshots uploaded.");
             if (currentStudioToolId === "marketplace" && marketplaceActiveTab === "create") {
-              mountMarketplaceTool();
+              mountMarketplaceTool("drawer");
             }
           } catch (error) {
             failUniversalProgress("Screenshot upload failed.");
@@ -9623,7 +9663,7 @@
           screenshots: (marketplaceDraftListing.screenshots || []).filter((_, itemIndex) => itemIndex !== index),
           screenshotAssets: (marketplaceDraftListing.screenshotAssets || []).filter((_, itemIndex) => itemIndex !== index),
         };
-        mountMarketplaceTool();
+        mountMarketplaceTool("drawer");
       }
       async function terminateMarketplaceLiveProject() {
         const filename = String(marketplaceDraftListing.projectId || "").trim();
@@ -9679,7 +9719,7 @@
             sourceFiles: [{ path: "index.html", name: "index.html" }],
           };
           completeUniversalProgress("Live project terminated and packaged.");
-          mountMarketplaceTool();
+          mountMarketplaceTool("drawer");
         } catch (error) {
           failUniversalProgress("Termination failed.");
           showBuilderSnackbar(
@@ -9729,7 +9769,7 @@
             renderMarketplaceDetail(currentMarketplaceItem);
           }
           await refreshMarketplaceData();
-          if (currentStudioToolId === "marketplace") mountMarketplaceTool();
+          if (currentStudioToolId === "marketplace") refreshMarketplacePaneOnly();
           showBuilderSnackbar("Thanks for rating this project.", "success");
         } catch (error) {
           showBuilderSnackbar(error.message || "Could not save that rating.", "error");
@@ -9837,7 +9877,7 @@
           await refreshMarketplaceData();
           stopMarketplaceSubmitProgressPulse();
           marketplaceSubmitState = createEmptyMarketplaceSubmitState();
-          mountMarketplaceTool();
+          mountMarketplaceTool("all");
           showBuilderSnackbar(
             isEditingSale
               ? "Marketplace sale updated and sent for review."
@@ -9848,7 +9888,7 @@
           stopMarketplaceSubmitProgressPulse();
           failUniversalProgress("Marketplace submit failed.");
           marketplaceSubmitState = createEmptyMarketplaceSubmitState();
-          mountMarketplaceTool();
+          mountMarketplaceTool("all");
           showBuilderSnackbar(error.message || "Could not submit this marketplace listing.", "error");
         }
       }
@@ -9908,7 +9948,7 @@
             closeMarketplaceDetail();
           }
           closeMarketplaceRemoveModal();
-          if (currentStudioToolId === "marketplace") mountMarketplaceTool();
+          if (currentStudioToolId === "marketplace") mountMarketplaceTool("all");
           refreshMarketplaceData().catch(() => {});
           showBuilderSnackbar("Marketplace sale deleted.", "success");
         } catch (error) {
@@ -10184,7 +10224,7 @@
           currentMarketplaceItem = data.item;
           renderMarketplaceDetail(currentMarketplaceItem);
           await refreshMarketplaceData();
-          if (currentStudioToolId === "marketplace") mountMarketplaceTool();
+          if (currentStudioToolId === "marketplace") refreshMarketplacePaneOnly();
           showBuilderSnackbar("Comment posted.", "success");
         } catch (error) {
           showBuilderSnackbar(error.message || "Could not post that comment.", "error");
@@ -10226,7 +10266,7 @@
           renderMarketplaceDetail(currentMarketplaceItem);
           renderMarketplaceCommentsModal(currentMarketplaceItem);
           await refreshMarketplaceData();
-          if (currentStudioToolId === "marketplace") mountMarketplaceTool();
+          if (currentStudioToolId === "marketplace") refreshMarketplacePaneOnly();
           showBuilderSnackbar("Reply posted.", "success");
         } catch (error) {
           showBuilderSnackbar(error.message || "Could not post that reply.", "error");
@@ -10306,7 +10346,7 @@
           }
           completeUniversalProgress("Purchase request sent.");
           await refreshMarketplaceData();
-          if (currentStudioToolId === "marketplace") mountMarketplaceTool();
+          if (currentStudioToolId === "marketplace") mountMarketplaceTool("all");
           showBuilderSnackbar(
             data.message ||
               "Your purchase will be processed within 24 hours.",
@@ -11860,6 +11900,9 @@
         currentUser = null;
         currentPremiumRequest = null;
         currentReferralStatus = null;
+        try {
+          localStorage.removeItem("medialab_has_session");
+        } catch {}
         notificationsList = [];
         unreadNotificationCount = 0;
         stopAdsenseStatusSyncLoop();
@@ -11915,6 +11958,7 @@
           fetchBar.style.opacity = notificationsLoading ? "1" : "0.35";
         }
         if (!list) return;
+        const previousScrollTop = list.scrollTop;
         if (!loggedIn || !currentUser) {
           list.innerHTML = `<div class="rounded-[1.3rem] border border-dashed border-white/10 p-5 text-center text-sm text-slate-400">Sign in to view your notifications.</div>`;
           return;
@@ -11960,6 +12004,7 @@
               <p class="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">${escapeHtmlText(formatDate(item.createdAt || item.date || new Date()))}</p>
             </button>`)
           .join("");
+        list.scrollTop = previousScrollTop;
       }
       function normalizeNotificationItem(item = {}) {
         return {
@@ -12037,9 +12082,15 @@
       }
       function applyNotificationSnapshot(items = [], unreadCount = null) {
         notificationsList = trimNotificationFeed(Array.isArray(items) ? items : []);
-        unreadNotificationCount = Number(
-          unreadCount ?? notificationsList.filter((item) => !item.isRead).length,
-        );
+        const derivedUnreadCount = notificationsList.filter((item) => !item.isRead).length;
+        unreadNotificationCount = Number(unreadCount ?? derivedUnreadCount);
+        if (!Number.isFinite(unreadNotificationCount) || unreadNotificationCount < 0) {
+          unreadNotificationCount = derivedUnreadCount;
+        }
+        // Keep UI reliable: badge should reflect unread items, not a stale/incorrect count.
+        if (unreadNotificationCount !== derivedUnreadCount) {
+          unreadNotificationCount = derivedUnreadCount;
+        }
         persistNotificationCache();
         renderNotificationsUi();
         return notificationsList;
@@ -12172,16 +12223,27 @@
         dropdown.style.display = shouldOpen ? "flex" : "none";
         if (shouldOpen) {
           queueNotificationAutoHide();
+          // Show cached notifications instantly, then refresh from server.
+          restoreNotificationCache(currentUser);
+          // Standard-app behavior: opening the drawer marks everything as read.
+          // Do an optimistic UI update immediately (no flicker) so badge clears instantly.
+          if (notificationsList.some((item) => !item.isRead)) {
+            applyNotificationSnapshot(
+              notificationsList.map((item) =>
+                item.isRead
+                  ? item
+                  : { ...item, isRead: true, readAt: item.readAt || new Date().toISOString() },
+              ),
+              0,
+            );
+          }
+
+          // Confirm with server ASAP (don't wait for the fetch to finish).
+          const markPromise = markAllNotificationsRead({ silent: true, force: true }).catch(() => {});
           await fetchNotificationsWithRetry(2, 500);
-          await markAllNotificationsRead({ silent: true, force: true });
-          notificationsList = notificationsList.map((item) =>
-            item.isRead
-              ? item
-              : { ...item, isRead: true, readAt: item.readAt || new Date().toISOString() },
-          );
-          unreadNotificationCount = 0;
-          persistNotificationCache();
-          renderNotificationsUi();
+          await markPromise;
+          // Final sync to ensure refresh stays correct.
+          fetchNotifications({ allowSessionRecovery: true }).catch(() => {});
         } else {
           clearTimeout(notificationDropdownTimer);
         }
@@ -14315,6 +14377,9 @@
             markSessionHealthy();
             loggedIn = true;
             currentUser = data.user;
+            try {
+              localStorage.setItem("medialab_has_session", "true");
+            } catch {}
             await fetchPremiumRequestStatus();
             updateUserProfileUi();
             applyNotificationSnapshot(data.notifications, data.unreadCount);
@@ -14348,6 +14413,9 @@
             currentPremiumRequest = null;
             authBootstrapReady = true;
             updateUserProfileUi();
+            try {
+              localStorage.removeItem("medialab_has_session");
+            } catch {}
             if (showProgress) {
               setUniversalProgress({
                 visible: false,
@@ -14361,6 +14429,9 @@
           console.error("Auth check failed:", e);
           authBootstrapReady = true;
           updateUserProfileUi();
+          try {
+            localStorage.removeItem("medialab_has_session");
+          } catch {}
           if (showProgress) {
             setUniversalProgress({
               visible: false,
@@ -15099,7 +15170,7 @@
         btn.innerHTML = `<i class="fas fa-spinner animate-spin mr-2"></i> Initializing Export...`;
         if (toolWrapper) toolWrapper.classList.add("hidden");
         if (wordCountBadge) wordCountBadge.classList.add("hidden");
-        // 3. Initialize Universal Progress
+        // 3. Initialize Universal Progress (full-page overlay)
         progressDiv.classList.remove("hidden");
         statusText.innerText = "📝 Analyzing Document Structure...";
         bar.style.width = "15%";
@@ -15121,7 +15192,8 @@
             statusText.innerText = "✅ Export Successful!";
             bar.style.width = "100%";
             percentLabel.innerText = "100%";
-            bar.classList.replace("bg-cyan-500", "bg-green-500");
+            bar.classList.remove("bg-cyan-400", "bg-cyan-500");
+            bar.classList.add("bg-green-500");
             bar.classList.add("shadow-[0_0_20px_rgba(34,197,94,0.6)]");
             // SUCCESS STATE: INJECT THE RESULT CARD
             const fileName = `Document_${Date.now()}.${formatType}`;
@@ -15162,8 +15234,8 @@
             setTimeout(() => {
               progressDiv.classList.add("hidden");
               bar.style.width = "0%";
-              bar.classList.replace("bg-green-500", "bg-cyan-500");
-              bar.classList.remove("shadow-[0_0_20px_rgba(34,197,94,0.6)]");
+              bar.classList.remove("bg-green-500", "shadow-[0_0_20px_rgba(34,197,94,0.6)]");
+              bar.classList.add("bg-cyan-400");
             }, 4000);
           }, 1500);
         } catch (error) {
@@ -17730,15 +17802,23 @@
           },
           60000,
         );
-        await checkAuth({ showProgress: true });
         const urlParams = new URLSearchParams(window.location.search);
+        const hasSessionMarker = (() => {
+          try {
+            return localStorage.getItem("medialab_has_session") === "true";
+          } catch {
+            return false;
+          }
+        })();
+        const bootShowProgress = hasSessionMarker || urlParams.get("loggedIn") === "true";
+        await checkAuth({ showProgress: bootShowProgress });
         if (urlParams.get("loggedIn") === "true") {
           await checkAuth({ showProgress: true });
           window.history.replaceState({}, document.title, "/");
         }
         const githubState = urlParams.get("github");
         if (githubState) {
-          await checkAuth({ showProgress: true });
+          await checkAuth({ showProgress: hasSessionMarker || urlParams.get("loggedIn") === "true" });
           if (githubState === "connected") {
             alert(
               "GitHub connected. Initialize Cloud Storage in the sidebar to activate the medialab repository and GitHub Pages.",
@@ -17756,7 +17836,7 @@
         }
         const adsenseState = urlParams.get("adsense");
         if (adsenseState) {
-          await checkAuth({ showProgress: true });
+          await checkAuth({ showProgress: hasSessionMarker || urlParams.get("loggedIn") === "true" });
           if (adsenseState === "connected") {
             showStudioStatusSnackbar(
               "Google AdSense access connected. You can continue linking your site now.",
@@ -17802,23 +17882,25 @@
         const statusText = document.getElementById("universal-status-text");
         const bar = document.getElementById("universal-bar");
         const percentLabel = document.getElementById("universal-percent");
-        if (!progressDiv || !statusText || !bar) return;
+        if (!progressDiv || !statusText || !bar || !percentLabel) return;
         progressDiv.classList.remove("hidden");
         statusText.innerText = data.message;
         if (data.percent) {
           bar.style.width = data.percent + "%";
           percentLabel.innerText = data.percent + "%";
         }
-        // CRITICAL: Handle the 100% finish line
-        if (data.percent >= 100) {
-          bar.classList.replace("bg-cyan-500", "bg-green-500");
+        const done =
+          Number(data.percent) >= 100 ||
+          (typeof data.message === "string" && data.message.includes("Complete"));
+        if (done) {
+          bar.classList.remove("bg-cyan-400", "bg-cyan-500");
+          bar.classList.add("bg-green-500");
           bar.classList.add("shadow-[0_0_20px_rgba(34,197,94,0.6)]");
-          // Give the user a moment to see 100% before hiding the bar
           setTimeout(() => {
             progressDiv.classList.add("hidden");
-            // Reset for next time
             bar.style.width = "0%";
-            bar.classList.replace("bg-green-500", "bg-cyan-500");
+            bar.classList.remove("bg-green-500", "shadow-[0_0_20px_rgba(34,197,94,0.6)]");
+            bar.classList.add("bg-cyan-400");
           }, 3000);
         }
       });
@@ -25415,6 +25497,10 @@ ${interactionBlock}
         setTimeout(() => {
           setUniversalProgress({ visible: false, message: "Ready", percent: 0, tone: "cyan" });
         }, 2400);
+      }
+      function hideUniversalProgress() {
+        clearUniversalProgressPulse();
+        setUniversalProgress({ visible: false, message: "Ready", percent: 0, tone: "cyan" });
       }
       function closeBuilderPublishModal() {
         document.getElementById("builder-publish-modal")?.classList.add("hidden");
