@@ -4930,7 +4930,10 @@ app.post("/api/marketplace", publishRateLimit, express.json({ limit: "15mb" }), 
       ? String(req.body.sourceType).trim()
       : "draft";
     const listingKind =
-      String(req.body?.listingKind || "").trim().toLowerCase() === "template" ? "template" : "sale";
+      String(req.body?.listingKind || "").trim().toLowerCase() === "template" ||
+      sourceType === "template-code"
+        ? "template"
+        : "sale";
     const projectId = buildMarketplaceProjectId(
       sourceType,
       req.body?.projectId || "",
@@ -4986,22 +4989,25 @@ app.post("/api/marketplace", publishRateLimit, express.json({ limit: "15mb" }), 
         message: "Add a professional description before submitting this sale.",
       });
     }
-    if (purpose.length < 5) {
+    if (listingKind !== "template" && purpose.length < 5) {
       return res.status(400).json({
         success: false,
         message: "Add a clearer project purpose before submitting this sale.",
       });
     }
-    if (!category) {
+    if (listingKind !== "template" && !category) {
       return res.status(400).json({
         success: false,
         message: "Choose a project category before submitting this sale.",
       });
     }
-    if (screenshots.length < 4) {
+    if (listingKind === "template" ? screenshots.length < 1 : screenshots.length < 4) {
       return res.status(400).json({
         success: false,
-        message: "Upload 4 preview images so buyers get a proper marketplace preview.",
+        message:
+          listingKind === "template"
+            ? "Capture at least one template preview image before submitting."
+            : "Upload 4 preview images so buyers get a proper marketplace preview.",
       });
     }
     let sourceProject = null;
@@ -5178,7 +5184,8 @@ app.patch("/api/marketplace/:id", publishRateLimit, express.json({ limit: "15mb"
       ? String(req.body.sourceType).trim()
       : item.sourceType || "draft";
     const listingKind =
-      String(req.body?.listingKind || item.listingKind || "").trim().toLowerCase() === "template"
+      String(req.body?.listingKind || item.listingKind || "").trim().toLowerCase() === "template" ||
+      sourceType === "template-code"
         ? "template"
         : "sale";
     const projectId = buildMarketplaceProjectId(
@@ -5242,22 +5249,25 @@ app.patch("/api/marketplace/:id", publishRateLimit, express.json({ limit: "15mb"
         message: "Add a professional description before updating this sale.",
       });
     }
-    if (purpose.length < 5) {
+    if (listingKind !== "template" && purpose.length < 5) {
       return res.status(400).json({
         success: false,
         message: "Add a clearer project purpose before updating this sale.",
       });
     }
-    if (!category) {
+    if (listingKind !== "template" && !category) {
       return res.status(400).json({
         success: false,
         message: "Choose a project category before updating this sale.",
       });
     }
-    if (screenshots.length < 4) {
+    if (listingKind === "template" ? screenshots.length < 1 : screenshots.length < 4) {
       return res.status(400).json({
         success: false,
-        message: "Upload 4 preview images so buyers get a proper marketplace preview.",
+        message:
+          listingKind === "template"
+            ? "Capture at least one template preview image before updating."
+            : "Upload 4 preview images so buyers get a proper marketplace preview.",
       });
     }
     let sourceProject = null;

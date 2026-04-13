@@ -5161,6 +5161,11 @@
       let marketplacePreviewAutoCloseTimer = null;
       let pendingMarketplaceRemovalId = "";
       let currentAppDialogResolver = null;
+      let marketplaceCreateDelegatesBound = false;
+      let marketplaceTemplatePreviewRefreshTimer = null;
+      let marketplaceTemplatePreviewExpanded = false;
+      let marketplaceTemplateCaptureLibPromise = null;
+      let marketplaceTemplateScreenshotAutoCapturing = false;
       const LOGIN_REQUIRED_TOOL_IDS = ["console", "image-pdf"];
       const PREMIUM_TOOL_IDS = ["voice-clone", "text-to-speech", "image-edit"];
       function normalizeHostedBaseUrl(url = "") {
@@ -8210,9 +8215,64 @@
       function getMarketplaceLiveProjects() {
         return Array.isArray(currentUser?.liveProjects) ? currentUser.liveProjects : [];
       }
+      function validateMarketplaceTemplateCode(code = "") {
+        const raw = String(code || "").trim();
+        if (!raw) {
+          return {
+            valid: false,
+            reason: "Paste your template code first.",
+            rootHtml: "",
+          };
+        }
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(raw, "text/html");
+          const body = doc?.body;
+          if (!body) {
+            return {
+              valid: false,
+              reason: "Invalid template. Could not parse HTML.",
+              rootHtml: "",
+            };
+          }
+          const significantNodes = Array.from(body.childNodes || []).filter((node) => {
+            if (node.nodeType === Node.TEXT_NODE) {
+              return String(node.textContent || "").trim().length > 0;
+            }
+            return true;
+          });
+          if (significantNodes.length !== 1) {
+            return {
+              valid: false,
+              reason: "Invalid template. Use exactly one root element and make it a <div>.",
+              rootHtml: "",
+            };
+          }
+          const root = significantNodes[0];
+          if (root.nodeType !== Node.ELEMENT_NODE || String(root.tagName || "").toLowerCase() !== "div") {
+            return {
+              valid: false,
+              reason: "Invalid template. Root element must be a <div>.",
+              rootHtml: "",
+            };
+          }
+          return {
+            valid: true,
+            reason: "",
+            rootHtml: root.outerHTML || raw,
+          };
+        } catch (_error) {
+          return {
+            valid: false,
+            reason: "Invalid template HTML. Fix syntax and try again.",
+            rootHtml: "",
+          };
+        }
+      }
       function getMarketplaceValidationIssues() {
         const issues = [];
         const sourceType = String(marketplaceDraftListing.sourceType || "").trim();
+        const listingKind = String(marketplaceDraftListing.listingKind || "sale").trim().toLowerCase();
         const projectId = String(marketplaceDraftListing.projectId || "").trim();
         const sourceFiles = Array.isArray(marketplaceDraftListing.sourceFiles)
           ? marketplaceDraftListing.sourceFiles.filter(Boolean)
@@ -8235,6 +8295,17 @@
         const screenshots = Array.isArray(marketplaceDraftListing.screenshots)
           ? marketplaceDraftListing.screenshots.filter(Boolean)
           : [];
+        if (listingKind === "template") {
+          const templateValidation = validateMarketplaceTemplateCode(sourceHtml);
+          if (sourceType !== "template-code") {
+            issues.push("Choose template code mode.");
+          }
+          if (!sourceHtml) {
+            issues.push("Paste your template code first.");
+          } else if (!templateValidation.valid) {
+            issues.push(templateValidation.reason || "Invalid template. Root element must be a <div>.");
+          }
+        } else {
         if (!sourceType) {
           issues.push("Choose a project source type.");
         }
@@ -8250,13 +8321,14 @@
         if (sourceType === "live" && !projectId) {
           issues.push("Choose one of your live projects.");
         }
+        }
         if (title.length < 3) {
           issues.push("Enter a marketplace title with at least 3 characters.");
         }
-        if (!category) {
+        if (listingKind !== "template" && !category) {
           issues.push("Enter a project category.");
         }
-        if (effectivePurpose.length < 5) {
+        if (listingKind !== "template" && effectivePurpose.length < 5) {
           issues.push("Purpose is too short.");
         }
         if (description.length < 8) {
@@ -8265,8 +8337,8 @@
         if (Number(marketplaceDraftListing.price) < 0 || Number.isNaN(Number(marketplaceDraftListing.price))) {
           issues.push("Price must be 0 or more.");
         }
-        if (screenshots.length < 4) {
-          issues.push("Upload 4 preview images.");
+        if (listingKind === "template" ? screenshots.length < 1 : screenshots.length < 4) {
+          issues.push(listingKind === "template" ? "Capture or upload at least 1 preview image." : "Upload 4 preview images.");
         }
         return issues;
       }
@@ -8298,8 +8370,6 @@
         if (Number(step) === 1) {
           const issues = [];
           if (listingKind === "template") {
-            if (sourceType !== "template-code") issues.push("Choose template code mode.");
-            if (!sourceHtml) issues.push("Paste your template code first.");
             return issues;
           }
           if (!sourceType) issues.push("Choose a project source type.");
@@ -8317,6 +8387,14 @@
         }
         if (Number(step) === 2) {
           const issues = [];
+          if (listingKind === "template") {
+            const templateValidation = validateMarketplaceTemplateCode(sourceHtml);
+            if (!sourceHtml) issues.push("Paste your template code first.");
+            if (sourceHtml && !templateValidation.valid) {
+              issues.push(templateValidation.reason || "Invalid template. Root element must be a <div>.");
+            }
+            return issues;
+          }
           if (title.length < 2) issues.push("Enter a marketplace title.");
           if (!category) issues.push("Enter a project category.");
           if (!effectivePurpose) issues.push("Add a short purpose.");
@@ -8327,7 +8405,19 @@
           return issues;
         }
         if (Number(step) === 3) {
+          const issues = [];
+          if (listingKind === "template") {
+            if (title.length < 2) issues.push("Enter a marketplace title.");
+            if (description.length < 3) issues.push("Add a short professional description.");
+            if (Number(marketplaceDraftListing.price) < 0 || Number.isNaN(Number(marketplaceDraftListing.price))) {
+              issues.push("Price must be 0 or more.");
+            }
+            return issues;
+          }
           return screenshots.length < 4 ? ["Upload 4 preview images."] : [];
+        }
+        if (Number(step) === 4) {
+          return listingKind === "template" && screenshots.length < 1 ? ["Capture or upload at least 1 preview image."] : [];
         }
         return [];
       }
@@ -8335,12 +8425,18 @@
         const issues = getMarketplaceValidationIssues();
         return messages.some((message) => issues.includes(message));
       }
+      function isMarketplaceTemplateMode() {
+        return String(marketplaceDraftListing.listingKind || "sale").trim().toLowerCase() === "template";
+      }
+      function getMarketplaceCreateMaxStep() {
+        return isMarketplaceTemplateMode() ? 4 : 3;
+      }
       function canAdvanceMarketplaceStep(step = marketplaceCreateStep) {
         return getMarketplaceStepIssues(step).length === 0;
       }
       function setMarketplaceListingKind(kind = "sale") {
         const normalized = String(kind || "sale").trim().toLowerCase() === "template" ? "template" : "sale";
-        if (normalized === String(marketplaceDraftListing.listingKind || "sale").trim().toLowerCase()) return;
+        marketplaceTemplatePreviewExpanded = false;
         if (normalized === "template") {
           marketplaceDraftListing = {
             ...marketplaceDraftListing,
@@ -8368,9 +8464,128 @@
                 : marketplaceDraftListing.projectLabel,
           };
         }
-        if (currentStudioToolId === "marketplace" && marketplaceActiveTab === "create") {
-          mountMarketplaceTool("drawer");
+        if (!patchMarketplaceToolSlots("all")) {
+          mountMarketplaceTool("all");
         }
+      }
+      function toggleMarketplaceTemplatePreviewExpanded(expanded = false) {
+        marketplaceTemplatePreviewExpanded = Boolean(expanded);
+        if (currentStudioToolId === "marketplace") {
+          mountMarketplaceTool("all");
+        }
+      }
+      async function ensureMarketplaceTemplateCaptureLibrary() {
+        if (window.html2canvas) return window.html2canvas;
+        if (marketplaceTemplateCaptureLibPromise) return marketplaceTemplateCaptureLibPromise;
+        marketplaceTemplateCaptureLibPromise = new Promise((resolve, reject) => {
+          const existing = document.querySelector('script[data-marketplace-template-capture="html2canvas"]');
+          if (existing) {
+            existing.addEventListener("load", () => resolve(window.html2canvas));
+            existing.addEventListener("error", () => reject(new Error("Could not load screenshot helper.")));
+            return;
+          }
+          const script = document.createElement("script");
+          script.src = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
+          script.async = true;
+          script.setAttribute("data-marketplace-template-capture", "html2canvas");
+          script.onload = () => resolve(window.html2canvas);
+          script.onerror = () => reject(new Error("Could not load screenshot helper."));
+          document.head.appendChild(script);
+        });
+        return marketplaceTemplateCaptureLibPromise;
+      }
+      async function captureMarketplaceTemplateScreenshot() {
+        try {
+          if (!isMarketplaceTemplateMode()) return;
+          const validation = validateMarketplaceTemplateCode(marketplaceDraftListing.sourceHtml || "");
+          if (!validation.valid || !validation.rootHtml) {
+            showBuilderSnackbar(validation.reason || "Paste a valid template first.", "error");
+            return;
+          }
+          beginUniversalProgress("Capturing template screenshot...", 18, 82);
+          const html2canvas = await ensureMarketplaceTemplateCaptureLibrary();
+          if (typeof html2canvas !== "function") throw new Error("Screenshot helper is unavailable.");
+          const wrapper = document.createElement("div");
+          wrapper.style.position = "fixed";
+          wrapper.style.left = "-100000px";
+          wrapper.style.top = "0";
+          wrapper.style.width = "1200px";
+          wrapper.style.minHeight = "700px";
+          wrapper.style.padding = "24px";
+          wrapper.style.background = "#0f172a";
+          wrapper.style.zIndex = "-1";
+          wrapper.innerHTML = validation.rootHtml;
+          document.body.appendChild(wrapper);
+          const canvas = await html2canvas(wrapper, {
+            backgroundColor: "#0f172a",
+            useCORS: true,
+            scale: 1.4,
+            logging: false,
+          });
+          wrapper.remove();
+          const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png", 0.92));
+          if (!blob) throw new Error("Could not create screenshot file.");
+          const file = new File([blob], `template-preview-${Date.now()}.png`, { type: "image/png" });
+          const formData = new FormData();
+          formData.append("screenshot", file);
+          const res = await fetch("/api/marketplace/upload-screenshot", {
+            method: "POST",
+            credentials: "include",
+            body: formData,
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success || !data.url) {
+            throw new Error(data.message || "Could not upload captured screenshot.");
+          }
+          const newAsset = {
+            url: String(data.url || "").trim(),
+            thumbnailUrl: String(data.thumbnailUrl || data.url || "").trim(),
+            fileId: String(data.fileId || "").trim(),
+            name: String(data.name || file.name || "").trim(),
+          };
+          marketplaceDraftListing = {
+            ...marketplaceDraftListing,
+            screenshots: [newAsset.url, ...(marketplaceDraftListing.screenshots || []).filter((url) => String(url || "").trim() !== newAsset.url)].slice(0, 4),
+            screenshotAssets: [newAsset, ...(marketplaceDraftListing.screenshotAssets || []).filter((item) => String(item?.url || "").trim() !== newAsset.url)].slice(0, 4),
+          };
+          completeUniversalProgress("Template screenshot captured.");
+          if (currentStudioToolId === "marketplace") mountMarketplaceTool("all");
+        } catch (error) {
+          failUniversalProgress("Could not capture screenshot.");
+          showBuilderSnackbar(error.message || "Could not capture template screenshot.", "error");
+        }
+      }
+      function maybeAutoCaptureMarketplaceTemplateScreenshot() {
+        if (!isMarketplaceTemplateMode()) return;
+        if (Number(marketplaceCreateStep) !== 4) return;
+        if (marketplaceTemplateScreenshotAutoCapturing) return;
+        if ((marketplaceDraftListing.screenshots || []).length > 0) return;
+        const validation = validateMarketplaceTemplateCode(marketplaceDraftListing.sourceHtml || "");
+        if (!validation.valid) return;
+        marketplaceTemplateScreenshotAutoCapturing = true;
+        captureMarketplaceTemplateScreenshot().finally(() => {
+          marketplaceTemplateScreenshotAutoCapturing = false;
+        });
+      }
+      function bindMarketplaceCreateDelegates() {
+        if (marketplaceCreateDelegatesBound) return;
+        marketplaceCreateDelegatesBound = true;
+        document.addEventListener("change", (event) => {
+          const target = event?.target;
+          if (!target || typeof target.closest !== "function") return;
+          const listingTypeSelect = target.closest('[data-marketplace-role="listing-kind"]');
+          if (listingTypeSelect) {
+            setMarketplaceListingKind(listingTypeSelect.value);
+          }
+        });
+        document.addEventListener("input", (event) => {
+          const target = event?.target;
+          if (!target || typeof target.closest !== "function") return;
+          const listingTypeSelect = target.closest('[data-marketplace-role="listing-kind"]');
+          if (listingTypeSelect) {
+            setMarketplaceListingKind(listingTypeSelect.value);
+          }
+        });
       }
       function setMarketplaceSourceType(type = "") {
         marketplaceDraftListing = {
@@ -8390,7 +8605,7 @@
           sourceType: String(type || "").trim(),
         };
         marketplaceEditingListingId = "";
-        if (currentStudioToolId === "marketplace") mountMarketplaceTool("drawer");
+        if (currentStudioToolId === "marketplace") mountMarketplaceTool("all");
       }
       async function editMarketplaceSale(id = "") {
         const itemId = String(id || "").trim();
@@ -8773,6 +8988,16 @@
         const stepOneReady = canAdvanceMarketplaceStep(1);
         const stepTwoReady = canAdvanceMarketplaceStep(2);
         const stepThreeReady = canAdvanceMarketplaceStep(3);
+        const isTemplateMode = isMarketplaceTemplateMode();
+        const maxStep = getMarketplaceCreateMaxStep();
+        const stepFourReady = isTemplateMode ? canAdvanceMarketplaceStep(4) : false;
+        const templateValidation = validateMarketplaceTemplateCode(marketplaceDraftListing.sourceHtml || "");
+        const templatePreviewDoc = templateValidation.valid
+          ? `<!doctype html><html><head><meta charset="utf-8" /><style>html,body{margin:0;padding:0;background:#0f172a;color:#e2e8f0;font-family:Inter,Arial,sans-serif;}body{padding:12px;}*{box-sizing:border-box;max-width:100%;}</style></head><body>${templateValidation.rootHtml}</body></html>`
+          : "";
+        const templatePreviewMiniDoc = templateValidation.valid
+          ? `<!doctype html><html><head><meta charset="utf-8" /><style>html,body{margin:0;padding:0;background:#0f172a;color:#e2e8f0;font-family:Inter,Arial,sans-serif;overflow:hidden;}body{padding:0;}*{box-sizing:border-box;max-width:none;}.tiny-preview-scale{transform:scale(0.34);transform-origin:top left;width:294%;min-height:294%;}</style></head><body><div class="tiny-preview-scale">${templateValidation.rootHtml}</div></body></html>`
+          : "";
         if (!loggedIn) {
           return `<div class="rounded-[2rem] border border-dashed border-white/10 bg-slate-900/70 p-10 text-center">
             <p class="text-xl font-semibold text-white">Sign in to sell your projects</p>
@@ -8782,18 +9007,21 @@
         }
         return `<div class="rounded-[2rem] border border-white/10 bg-slate-900/80 p-5 sm:p-6 shadow-[0_20px_60px_rgba(2,6,23,0.3)]">
           <div class="flex items-center gap-2 text-center">
-            ${[1, 2, 3]
+            ${(isTemplateMode ? [1, 2, 3, 4] : [1, 2, 3])
               .map((step) => {
-                const enabled =
-                  step === 1 || (step === 2 ? stepOneReady : stepOneReady && stepTwoReady);
+                const enabled = step === 1 || (step > 1 && canAdvanceMarketplaceStep(step - 1));
                 const completed =
                   step < marketplaceCreateStep ||
                   (step === 1 && stepOneReady) ||
                   (step === 2 && stepTwoReady) ||
-                  stepThreeReady;
+                  (step === 3 && stepThreeReady) ||
+                  (step === 4 && stepFourReady);
+                const stepLabel = isTemplateMode
+                  ? (step === 1 ? "Template" : step === 2 ? "Paste" : step === 3 ? "Details" : "Preview")
+                  : (step === 1 ? "Source" : step === 2 ? "Details" : "Previews");
                 return `<div class="flex min-w-0 flex-1 items-center gap-2">
-                  <button onclick="${enabled ? `setMarketplaceCreateStep(${step})` : "void(0)"}" class="min-w-[92px] rounded-2xl border ${marketplaceCreateStep === step ? "border-cyan-400/25 bg-cyan-500/10 text-cyan-200" : completed ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-200" : "border-white/10 bg-white/5 text-slate-300"} ${enabled ? "" : "opacity-45 cursor-not-allowed"} px-3 py-3 text-[10px] font-black uppercase tracking-[0.18em]">${step}. ${step === 1 ? "Source" : step === 2 ? "Details" : "Previews"}</button>
-                  ${step < 3 ? `<div class="h-[3px] flex-1 rounded-full ${(step < marketplaceCreateStep || (step === 1 && stepOneReady && marketplaceCreateStep > 1)) ? "bg-emerald-400/90" : "bg-white/10"}"></div>` : ""}
+                  <button onclick="${enabled ? `setMarketplaceCreateStep(${step})` : "void(0)"}" class="min-w-[92px] rounded-2xl border ${marketplaceCreateStep === step ? "border-cyan-400/25 bg-cyan-500/10 text-cyan-200" : completed ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-200" : "border-white/10 bg-white/5 text-slate-300"} ${enabled ? "" : "opacity-45 cursor-not-allowed"} px-3 py-3 text-[10px] font-black uppercase tracking-[0.18em]">${step}. ${stepLabel}</button>
+                  ${step < maxStep ? `<div class="h-[3px] flex-1 rounded-full ${(step < marketplaceCreateStep || (step === 1 && stepOneReady && marketplaceCreateStep > 1)) ? "bg-emerald-400/90" : "bg-white/10"}"></div>` : ""}
                 </div>`;
               })
               .join("")}
@@ -8803,7 +9031,7 @@
               <div class="space-y-4">
                 <label class="block">
                   <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Listing type</span>
-                  <select onchange="setMarketplaceListingKind(this.value)" class="mt-3 w-full rounded-2xl border border-white/10 bg-slate-950/85 px-4 py-3 text-white outline-none transition-all focus:border-cyan-400 focus:bg-slate-950">
+                  <select data-marketplace-role="listing-kind" onchange="setMarketplaceListingKind(this.value)" oninput="setMarketplaceListingKind(this.value)" class="mt-3 w-full rounded-2xl border border-white/10 bg-slate-950/85 px-4 py-3 text-white outline-none transition-all focus:border-cyan-400 focus:bg-slate-950">
                     <option value="sale" ${marketplaceDraftListing.listingKind === "template" ? "" : "selected"} class="bg-slate-950 text-white">Project</option>
                     <option value="template" ${marketplaceDraftListing.listingKind === "template" ? "selected" : ""} class="bg-slate-950 text-white">Template</option>
                   </select>
@@ -8811,10 +9039,8 @@
                 ${
                   marketplaceDraftListing.listingKind === "template"
                     ? `<div class="rounded-[1.8rem] border border-fuchsia-400/15 bg-fuchsia-500/[0.06] p-5">
-                        <p class="text-[10px] font-black uppercase tracking-[0.18em] text-fuchsia-300">Template Source</p>
-                        <p class="mt-3 text-sm leading-6 text-slate-300">Paste reusable HTML/CSS/JS for your starter. MediaLab will keep it scoped and wrap loose content in a root div automatically.</p>
-                        <textarea rows="13" data-marketplace-focus="template-source" oninput="handleMarketplaceLiveInput(event, 'sourceHtml')" class="mt-4 w-full rounded-[1.5rem] border border-white/10 bg-slate-950/85 px-4 py-4 font-mono text-[13px] leading-6 text-white outline-none resize-none transition-all focus:border-fuchsia-400" placeholder="<div class='landing-shell'>...your template code...</div>">${escapeHtmlText(marketplaceDraftListing.sourceHtml || "")}</textarea>
-                        <p class="mt-3 text-xs text-slate-400">Tip: wrap your starter in one main <code class="rounded bg-black/30 px-1.5 py-0.5 text-fuchsia-200">&lt;div&gt;</code> for cleaner template insertion.</p>
+                        <p class="text-[10px] font-black uppercase tracking-[0.18em] text-fuchsia-300">Template Mode Enabled</p>
+                        <p class="mt-3 text-sm leading-6 text-slate-300">Project source upload is skipped. Continue to the next step to paste your template code and preview it.</p>
                       </div>`
                     : `<label class="block">
                         <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Choose project type</span>
@@ -8900,19 +9126,82 @@
                 </div>
               </div>` : marketplaceCreateStep === 2 ? `
               <div class="space-y-4">
+                ${
+                  marketplaceDraftListing.listingKind === "template"
+                    ? `<div class="rounded-[1.8rem] border border-fuchsia-400/15 bg-fuchsia-500/[0.06] p-5">
+                        <p class="text-[10px] font-black uppercase tracking-[0.18em] text-fuchsia-300">Template Source</p>
+                        <p class="mt-3 text-sm leading-6 text-slate-300">Paste reusable HTML/CSS/JS for your starter. Strict mode requires exactly one root <code class="rounded bg-black/30 px-1.5 py-0.5 text-fuchsia-200">&lt;div&gt;</code>.</p>
+                        <div class="mt-4 rounded-[1.3rem] border border-cyan-400/20 bg-slate-950/70 p-3">
+                          <div class="flex items-center justify-between gap-3">
+                            <p class="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">Smart Template Preview</p>
+                            <div class="flex items-center gap-2">
+                              <span class="rounded-full border ${templateValidation.valid ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-200" : "border-rose-400/25 bg-rose-500/10 text-rose-200"} px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]">${templateValidation.valid ? "Valid" : "Invalid"}</span>
+                              ${
+                                !marketplaceTemplatePreviewExpanded
+                                  ? `<button type="button" onclick="toggleMarketplaceTemplatePreviewExpanded(true)" class="rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-200 hover:bg-cyan-500/20">&#9654; Preview</button>`
+                                  : `<button type="button" onclick="toggleMarketplaceTemplatePreviewExpanded(false)" class="rounded-full border border-fuchsia-400/25 bg-fuchsia-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-fuchsia-200 hover:bg-fuchsia-500/20">&lt;&gt; Minimize</button>`
+                              }
+                            </div>
+                          </div>
+                          <div class="mt-2 overflow-hidden rounded-2xl border ${templateValidation.valid ? "border-emerald-400/20" : "border-white/10"} bg-slate-900/80 ${marketplaceTemplatePreviewExpanded ? "w-full" : "mx-auto h-32 w-32"}">
+                            ${
+                              templateValidation.valid
+                                ? `<iframe sandbox="allow-same-origin allow-scripts" class="${marketplaceTemplatePreviewExpanded ? "h-[60vh] w-full" : "h-32 w-32"} bg-slate-900" srcdoc="${escapeHtmlText(marketplaceTemplatePreviewExpanded ? templatePreviewDoc : templatePreviewMiniDoc)}"></iframe>`
+                                : `<div class="flex ${marketplaceTemplatePreviewExpanded ? "h-[60vh] w-full" : "h-32 w-32"} items-center justify-center px-3 text-center text-[11px] text-slate-400">Tiny preview</div>`
+                            }
+                          </div>
+                        </div>
+                        ${
+                          marketplaceTemplatePreviewExpanded
+                            ? ""
+                            : `${
+                                marketplaceDraftListing.sourceHtml.trim() && !templateValidation.valid
+                                  ? `<div class="mt-4 h-1 w-full rounded-t-[1.1rem] bg-rose-500"></div>`
+                                  : ""
+                              }
+                              <textarea rows="13" data-marketplace-focus="template-source" oninput="handleMarketplaceLiveInput(event, 'sourceHtml')" onchange="handleMarketplaceLiveInput(event, 'sourceHtml')" class="mt-${marketplaceDraftListing.sourceHtml.trim() && !templateValidation.valid ? "0" : "4"} w-full rounded-[1.5rem] border ${marketplaceDraftListing.sourceHtml.trim() && !templateValidation.valid ? "border-rose-400/40 focus:border-rose-400" : "border-white/10 focus:border-fuchsia-400"} bg-slate-950/85 px-4 py-4 font-mono text-[13px] leading-6 text-white outline-none resize-none transition-all" placeholder="<div class='landing-shell'>...your template code...</div>">${escapeHtmlText(marketplaceDraftListing.sourceHtml || "")}</textarea>
+                              ${
+                                marketplaceDraftListing.sourceHtml.trim() && !templateValidation.valid
+                                  ? `<div class="mt-2 rounded-[1.1rem] border border-rose-400/20 bg-rose-500/10 p-3 text-sm text-rose-200"><p class="font-semibold">Invalid template</p><p class="mt-1">${escapeHtmlText(templateValidation.reason || "Root element must be a <div>.")}</p></div>`
+                                  : marketplaceDraftListing.sourceHtml.trim() && templateValidation.valid
+                                    ? `<div class="mt-2 rounded-[1.1rem] border border-emerald-400/20 bg-emerald-500/10 p-3 text-sm text-emerald-200"><p class="font-semibold">Valid template</p></div>`
+                                    : ""
+                              }`
+                        }
+                      </div>`
+                    : ""
+                }
+                ${
+                  !isTemplateMode
+                    ? `<label class="block">
+                        <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Marketplace title</span>
+                        <input value="${escapeHtmlText(marketplaceDraftListing.title)}" data-marketplace-focus="title" oninput="handleMarketplaceLiveInput(event, 'title')" class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-cyan-400" placeholder="Candy Crush Starter Pack" />
+                      </label>
+                      <label class="block">
+                        <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Category</span>
+                        <select data-marketplace-focus="category" onchange="handleMarketplaceLiveInput(event, 'category')" class="mt-3 w-full rounded-2xl border border-white/10 bg-slate-950/85 px-4 py-3 text-white outline-none transition-all focus:border-cyan-400 focus:bg-slate-950">
+                          ${marketplaceCategoryOptions.map((option) => `<option value="${escapeHtmlText(option)}" ${String(marketplaceDraftListing.category || "Game") === option ? "selected" : ""} class="bg-slate-950 text-white">${escapeHtmlText(option)}</option>`).join("")}
+                        </select>
+                      </label>
+                      <label class="block">
+                        <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Purpose</span>
+                        <textarea rows="3" data-marketplace-focus="purpose" oninput="handleMarketplaceLiveInput(event, 'purpose')" class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none resize-none focus:border-cyan-400" placeholder="What problem does this project solve?">${escapeHtmlText(marketplaceDraftListing.purpose)}</textarea>
+                      </label>
+                      <label class="block">
+                        <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Professional description</span>
+                        <textarea rows="5" data-marketplace-focus="description" oninput="handleMarketplaceLiveInput(event, 'description')" class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none resize-none focus:border-cyan-400" placeholder="Write a compelling professional description.">${escapeHtmlText(marketplaceDraftListing.description)}</textarea>
+                      </label>
+                      <label class="block">
+                        <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Set price</span>
+                        <input type="number" min="0" step="0.01" value="${Number(marketplaceDraftListing.price || 0)}" data-marketplace-focus="price" oninput="handleMarketplaceLiveInput(event, 'price')" class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-cyan-400" placeholder="0 for free" />
+                      </label>`
+                    : ""
+                }
+              </div>` : (isTemplateMode && marketplaceCreateStep === 3) ? `
+              <div class="space-y-4">
                 <label class="block">
                   <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Marketplace title</span>
                   <input value="${escapeHtmlText(marketplaceDraftListing.title)}" data-marketplace-focus="title" oninput="handleMarketplaceLiveInput(event, 'title')" class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-cyan-400" placeholder="Candy Crush Starter Pack" />
-                </label>
-                <label class="block">
-                  <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Category</span>
-                  <select data-marketplace-focus="category" onchange="handleMarketplaceLiveInput(event, 'category')" class="mt-3 w-full rounded-2xl border border-white/10 bg-slate-950/85 px-4 py-3 text-white outline-none transition-all focus:border-cyan-400 focus:bg-slate-950">
-                    ${marketplaceCategoryOptions.map((option) => `<option value="${escapeHtmlText(option)}" ${String(marketplaceDraftListing.category || "Game") === option ? "selected" : ""} class="bg-slate-950 text-white">${escapeHtmlText(option)}</option>`).join("")}
-                  </select>
-                </label>
-                <label class="block">
-                  <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Purpose</span>
-                  <textarea rows="3" data-marketplace-focus="purpose" oninput="handleMarketplaceLiveInput(event, 'purpose')" class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none resize-none focus:border-cyan-400" placeholder="What problem does this project solve?">${escapeHtmlText(marketplaceDraftListing.purpose)}</textarea>
                 </label>
                 <label class="block">
                   <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Professional description</span>
@@ -8924,19 +9213,26 @@
                 </label>
               </div>` : `
               <div class="space-y-4">
-                <label class="block">
-                  <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Preview images (4 required)</span>
-                  <input type="file" accept="image/*" multiple onchange="handleMarketplaceScreenshotInput(this)" class="mt-3 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300" />
-                </label>
-                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-                  ${Array.from({ length: 4 }, (_, index) => {
+                ${
+                  !isTemplateMode
+                    ? `<label class="block">
+                        <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Preview images (4 required)</span>
+                        <input type="file" accept="image/*" multiple onchange="handleMarketplaceScreenshotInput(this)" class="mt-3 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300" />
+                      </label>`
+                    : `<div class="rounded-[1.6rem] border border-fuchsia-400/15 bg-fuchsia-500/[0.06] p-4 text-sm text-slate-300">
+                        <p class="font-semibold text-white">Template preview screenshot</p>
+                        <p class="mt-2 text-xs text-slate-300">Screenshot is generated from your template preview flow. Upload is disabled in template mode.</p>
+                      </div>`
+                }
+                <div class="grid grid-cols-1 ${isTemplateMode ? "" : "sm:grid-cols-2 xl:grid-cols-4"} gap-3">
+                  ${Array.from({ length: isTemplateMode ? 1 : 4 }, (_, index) => {
                     const shot = (marketplaceDraftListing.screenshots || [])[index];
                     if (!shot) {
                       return `<div class="relative overflow-hidden rounded-[1.55rem] border border-dashed border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(15,23,42,0.88))] p-4">
                         <div class="flex h-36 flex-col items-center justify-center rounded-[1.2rem] border border-white/6 bg-slate-950/55 text-center">
                           <div class="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-400"><i class="fas fa-image"></i></div>
                           <p class="mt-3 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">${index === 0 ? "Thumbnail slot" : `Preview ${index + 1}`}</p>
-                          <p class="mt-2 px-4 text-xs leading-5 text-slate-500">Add a clean project screenshot for a stronger marketplace card.</p>
+                          <p class="mt-2 px-4 text-xs leading-5 text-slate-500">${isTemplateMode ? "Capture from template preview or upload manually." : "Add a clean project screenshot for a stronger marketplace card."}</p>
                         </div>
                       </div>`;
                     }
@@ -8946,7 +9242,7 @@
                         <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent p-3">
                           <div class="inline-flex items-center rounded-full border ${index === 0 ? "border-cyan-400/25 bg-cyan-500/10 text-cyan-200" : "border-white/10 bg-slate-950/60 text-white"} px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]">${index === 0 ? "Marketplace thumbnail" : `Preview ${index + 1}`}</div>
                         </div>
-                        <button onclick="removeMarketplaceScreenshot(${index})" class="absolute right-2 top-2 h-8 w-8 rounded-xl border border-white/10 bg-slate-950/80 text-white transition-all hover:bg-rose-500"><i class="fas fa-times"></i></button>
+                        ${isTemplateMode ? "" : `<button onclick="removeMarketplaceScreenshot(${index})" class="absolute right-2 top-2 h-8 w-8 rounded-xl border border-white/10 bg-slate-950/80 text-white transition-all hover:bg-rose-500"><i class="fas fa-times"></i></button>`}
                       </div>
                     </div>`;
                   }).join("")}
@@ -8955,7 +9251,7 @@
                   <p class="font-semibold text-white">Review summary</p>
                   <p class="mt-2">Project: ${escapeHtmlText(marketplaceDraftListing.title || "Untitled Sale")}</p>
                   <p class="mt-1">Price: ${renderMarketplacePriceValue(marketplaceDraftListing.price, "font-semibold")}</p>
-                  <p class="mt-1">Screenshots: ${(marketplaceDraftListing.screenshots || []).length}/4</p>
+                  <p class="mt-1">Screenshots: ${(marketplaceDraftListing.screenshots || []).length}/${isTemplateMode ? "1" : "4"}</p>
                 </div>
                 <label class="flex items-start gap-3 rounded-[1.6rem] border border-emerald-400/15 bg-emerald-500/[0.06] p-4">
                   <input type="checkbox" ${marketplaceDraftListing.allowTest ? "checked" : ""} onchange="toggleMarketplaceAllowTest(this.checked, this)" class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-emerald-400 accent-emerald-400" />
@@ -8969,9 +9265,9 @@
           <div class="mt-6 flex items-center justify-between gap-3">
             <button id="marketplace-step-back-btn" onclick="setMarketplaceCreateStep(${Math.max(1, marketplaceCreateStep - 1)})" ${marketplaceCreateStep === 1 ? "disabled" : ""} class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-slate-200 ${marketplaceCreateStep === 1 ? "opacity-40 cursor-not-allowed" : "hover:bg-white/10"}">Back</button>
             ${
-              marketplaceCreateStep < 3
+              marketplaceCreateStep < maxStep
                 ? `<button id="marketplace-step-next-btn" ${canAdvanceMarketplaceStep(marketplaceCreateStep) ? "" : "disabled"} onclick="${canAdvanceMarketplaceStep(marketplaceCreateStep) ? `setMarketplaceCreateStep(${marketplaceCreateStep + 1})` : "void(0)"}" class="rounded-2xl ${canAdvanceMarketplaceStep(marketplaceCreateStep) ? "bg-cyan-500 text-slate-950 hover:bg-cyan-400" : "bg-slate-700 text-slate-400 cursor-not-allowed"} px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em]">Continue</button>`
-                : `<button id="marketplace-step-next-btn" ${stepThreeReady ? "" : "disabled"} onclick="${stepThreeReady ? "submitMarketplaceListing()" : "void(0)"}" class="rounded-2xl ${stepThreeReady ? "bg-emerald-400 text-slate-950 hover:bg-emerald-300" : "bg-slate-700 text-slate-400 cursor-not-allowed"} px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em]">Submit for Review</button>`
+                : `<button id="marketplace-step-next-btn" ${canAdvanceMarketplaceStep(maxStep) ? "" : "disabled"} onclick="${canAdvanceMarketplaceStep(maxStep) ? "submitMarketplaceListing()" : "void(0)"}" class="rounded-2xl ${canAdvanceMarketplaceStep(maxStep) ? "bg-emerald-400 text-slate-950 hover:bg-emerald-300" : "bg-slate-700 text-slate-400 cursor-not-allowed"} px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em]">Submit for Review</button>`
             }
           </div>
         </div>`;
@@ -9118,6 +9414,7 @@
         return true;
       }
       function mountMarketplaceTool(scope = "all") {
+        bindMarketplaceCreateDelegates();
         const area = document.getElementById("tool-display");
         if (!area) return;
         if (document.getElementById("marketplace-tool-root")) {
@@ -9289,12 +9586,17 @@
         refreshMarketplacePaneOnly();
       }
       function setMarketplaceCreateStep(step = 1) {
-        marketplaceCreateStep = Math.max(1, Math.min(3, Number(step) || 1));
-        if (currentStudioToolId === "marketplace") mountMarketplaceTool("drawer");
+        marketplaceCreateStep = Math.max(1, Math.min(getMarketplaceCreateMaxStep(), Number(step) || 1));
+        if (marketplaceCreateStep !== 2) {
+          marketplaceTemplatePreviewExpanded = false;
+        }
+        if (currentStudioToolId === "marketplace") mountMarketplaceTool("all");
+        maybeAutoCaptureMarketplaceTemplateScreenshot();
       }
       function syncMarketplaceCreateActions() {
         const backButton = document.getElementById("marketplace-step-back-btn");
         const nextButton = document.getElementById("marketplace-step-next-btn");
+        const maxStep = getMarketplaceCreateMaxStep();
         if (backButton) {
           const backStep = Math.max(1, marketplaceCreateStep - 1);
           backButton.disabled = marketplaceCreateStep === 1;
@@ -9304,7 +9606,7 @@
         if (nextButton) {
           const stepReady = canAdvanceMarketplaceStep(marketplaceCreateStep);
           nextButton.disabled = !stepReady;
-          if (marketplaceCreateStep < 3) {
+          if (marketplaceCreateStep < maxStep) {
             nextButton.textContent = "Continue";
             nextButton.setAttribute(
               "onclick",
@@ -9330,6 +9632,14 @@
           ...marketplaceDraftListing,
           [field]: nextValue,
         };
+        if (
+          field === "sourceHtml" &&
+          String(marketplaceDraftListing.listingKind || "").trim().toLowerCase() === "template"
+        ) {
+          marketplaceDraftListing.sourceType = "template-code";
+          marketplaceDraftListing.projectId = "template-code";
+          marketplaceDraftListing.projectLabel = "Pasted template code";
+        }
         if (field === "description") {
           const currentPurpose = String(marketplaceDraftListing.purpose || "").trim();
           if (!currentPurpose) {
@@ -9392,9 +9702,22 @@
       }
       function handleMarketplaceLiveInput(event, field) {
         updateMarketplaceDraftField(field, event?.target?.value ?? "");
-        if (currentStudioToolId === "marketplace" && marketplaceActiveTab === "create") {
-          syncMarketplaceCreateActions();
+        const shouldLiveRefreshTemplatePreview =
+          field === "sourceHtml" &&
+          isMarketplaceTemplateMode() &&
+          Number(marketplaceCreateStep) === 2 &&
+          currentStudioToolId === "marketplace";
+        if (shouldLiveRefreshTemplatePreview) {
+          if (marketplaceTemplatePreviewRefreshTimer) {
+            clearTimeout(marketplaceTemplatePreviewRefreshTimer);
+          }
+          marketplaceTemplatePreviewRefreshTimer = setTimeout(() => {
+            marketplaceTemplatePreviewRefreshTimer = null;
+            mountMarketplaceTool("all");
+          }, 120);
+          return;
         }
+        syncMarketplaceCreateActions();
       }
       function handleMarketplaceSearchInput(event) {
         marketplaceSearchTerm = String(event?.target?.value || "");
@@ -9674,6 +9997,11 @@
         });
       }
       function handleMarketplaceScreenshotInput(input) {
+        if (isMarketplaceTemplateMode()) {
+          if (input) input.value = "";
+          showBuilderSnackbar("Screenshot upload is only for project listings.", "error");
+          return;
+        }
         const files = Array.from(input?.files || []).slice(0, 4);
         if (!files.length) return;
         const availableSlots = Math.max(
@@ -9743,6 +10071,10 @@
         })();
       }
       function removeMarketplaceScreenshot(index) {
+        if (isMarketplaceTemplateMode()) {
+          showBuilderSnackbar("Template screenshot is auto-managed.", "error");
+          return;
+        }
         marketplaceDraftListing = {
           ...marketplaceDraftListing,
           screenshots: (marketplaceDraftListing.screenshots || []).filter((_, itemIndex) => itemIndex !== index),
@@ -9871,6 +10203,22 @@
           marketplaceDraftListing = {
             ...marketplaceDraftListing,
             purpose: currentDescription.slice(0, 180),
+          };
+        }
+        if (String(marketplaceDraftListing.listingKind || "").trim().toLowerCase() === "template") {
+          const templateCode = String(marketplaceDraftListing.sourceHtml || "").trim();
+          marketplaceDraftListing = {
+            ...marketplaceDraftListing,
+            category: String(marketplaceDraftListing.category || "").trim() || "Template",
+            purpose:
+              String(marketplaceDraftListing.purpose || "").trim() ||
+              String(marketplaceDraftListing.description || "").trim().slice(0, 180),
+            sourceType: "template-code",
+            projectId: "template-code",
+            projectLabel: "Pasted template code",
+            sourceHtml: templateCode,
+            sourceEntryPath: "index.html",
+            sourceFiles: [{ path: "index.html", name: "index.html", content: templateCode, mimeType: "text/html" }],
           };
         }
         if (String(marketplaceDraftListing.sourceType || "").trim() === "draft") {

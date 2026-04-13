@@ -63,7 +63,7 @@ const MarketplaceItemSchema = new mongoose.Schema({
   purpose: { type: String, default: "", trim: true },
   sourceType: {
     type: String,
-    enum: ["live", "draft", "upload"],
+    enum: ["live", "draft", "upload", "template-code"],
     default: "draft",
   },
   listingKind: {

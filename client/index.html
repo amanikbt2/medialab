@@ -5522,7 +5522,7 @@
             let builderCommunityTemplates = [];
             function createEmptyMarketplaceDraftListing() {
               return {
-                sellingAsTemplate: false,
+                sellingAsTemplate: null,
                 templateCode: "",
                 sourceType: "",
                 listingKind: "sale",
@@ -6651,6 +6651,60 @@
               }
               return issues;
             }
+            function validateMarketplaceTemplateCode(code = "") {
+              const raw = String(code || "").trim();
+              if (!raw) {
+                return {
+                  valid: false,
+                  reason: "Paste your template code.",
+                  rootHtml: "",
+                };
+              }
+              try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(raw, "text/html");
+                const body = doc?.body;
+                if (!body) {
+                  return {
+                    valid: false,
+                    reason: "Invalid template. Could not parse HTML.",
+                    rootHtml: "",
+                  };
+                }
+                const significantNodes = Array.from(body.childNodes || []).filter((node) => {
+                  if (node.nodeType === Node.TEXT_NODE) {
+                    return String(node.textContent || "").trim().length > 0;
+                  }
+                  return true;
+                });
+                if (significantNodes.length !== 1) {
+                  return {
+                    valid: false,
+                    reason: "Template must contain exactly one root element, and it must be a <div>.",
+                    rootHtml: "",
+                  };
+                }
+                const root = significantNodes[0];
+                if (root.nodeType !== Node.ELEMENT_NODE || String(root.tagName || "").toLowerCase() !== "div") {
+                  return {
+                    valid: false,
+                    reason: "Invalid template. Root element must be a <div>.",
+                    rootHtml: "",
+                  };
+                }
+                return {
+                  valid: true,
+                  reason: "",
+                  rootHtml: root.outerHTML || raw,
+                };
+              } catch (_error) {
+                return {
+                  valid: false,
+                  reason: "Invalid template HTML. Fix syntax and try again.",
+                  rootHtml: "",
+                };
+              }
+            }
             function getMarketplaceStepIssues(step = marketplaceCreateStep) {
               const sourceType = String(marketplaceDraftListing.sourceType || "").trim();
               const projectId = String(marketplaceDraftListing.projectId || "").trim();
@@ -6688,9 +6742,10 @@
               if (Number(step) === 1) {
                 const issues = [];
                 if (marketplaceDraftListing.sellingAsTemplate) {
+                  const templateValidation = validateMarketplaceTemplateCode(templateCode);
                   if (!templateCode) issues.push("Paste your template code.");
-                  if (templateCode && !templateCode.match(/<div[^>]*>[\s\S]*<\/div>/i)) {
-                    issues.push("Template code must be wrapped in a <div> element.");
+                  if (templateCode && !templateValidation.valid) {
+                    issues.push(templateValidation.reason || "Template code must be wrapped in a <div> element.");
                   }
                 } else {
                   if (!sourceType) issues.push("Choose a project source type.");
@@ -6735,6 +6790,7 @@
               marketplaceDraftListing = {
                 ...marketplaceDraftListing,
                 sellingAsTemplate: Boolean(asTemplate),
+                listingKind: Boolean(asTemplate) ? "template" : "sale",
                 sourceType: "",
                 projectId: "",
                 projectLabel: "",
@@ -6742,6 +6798,9 @@
                 sourceHtml: "",
                 templateCode: "",
               };
+              if (Boolean(asTemplate) && marketplaceCreateStep === 0) {
+                marketplaceCreateStep = 1;
+              }
               if (currentStudioToolId === "marketplace") {
                 const pane = document.getElementById("marketplace-pane");
                 if (pane) {
@@ -6768,7 +6827,7 @@
                   ? marketplaceDraftListing.screenshotAssets
                   : [],
                 sourceType: newType,
-                sellingAsTemplate: marketplaceDraftListing.sellingAsTemplate || false,
+                sellingAsTemplate: marketplaceDraftListing.sellingAsTemplate === true,
                 templateCode: marketplaceDraftListing.templateCode || "",
               };
               marketplaceEditingListingId = "";
@@ -7007,6 +7066,10 @@
               const stepOneReady = canAdvanceMarketplaceStep(1);
               const stepTwoReady = canAdvanceMarketplaceStep(2);
               const stepThreeReady = canAdvanceMarketplaceStep(3);
+              const templateValidation = validateMarketplaceTemplateCode(marketplaceDraftListing.templateCode);
+              const templatePreviewDoc = templateValidation.valid
+                ? `<!doctype html><html><head><meta charset="utf-8" /><style>html,body{margin:0;padding:0;background:#0f172a;color:#e2e8f0;font-family:Inter,Arial,sans-serif;}body{padding:12px;}*{box-sizing:border-box;max-width:100%;}</style></head><body>${templateValidation.rootHtml}</body></html>`
+                : "";
               if (!loggedIn) {
                 return `<div class="rounded-[2rem] border border-dashed border-white/10 bg-slate-900/70 p-10 text-center">
                   <p class="text-xl font-semibold text-white">Sign in to sell your projects</p>
@@ -7060,17 +7123,35 @@
                     </div>` : marketplaceCreateStep === 1 ? `
                     <div class="space-y-4">
                       ${marketplaceDraftListing.sellingAsTemplate ? `
+                        <div class="rounded-[1.6rem] border border-cyan-400/20 bg-slate-950/70 p-4">
+                          <div class="flex items-center justify-between gap-3">
+                            <p class="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">Smart Template Preview</p>
+                            <span class="rounded-full border ${templateValidation.valid ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-200" : "border-rose-400/25 bg-rose-500/10 text-rose-200"} px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]">${templateValidation.valid ? "Valid" : "Invalid"}</span>
+                          </div>
+                          <div class="mt-3 overflow-hidden rounded-2xl border ${templateValidation.valid ? "border-emerald-400/20" : "border-white/10"} bg-slate-900/80">
+                            ${
+                              templateValidation.valid
+                                ? `<iframe sandbox="allow-same-origin" class="h-40 w-full bg-slate-900" srcdoc="${escapeHtmlText(templatePreviewDoc)}"></iframe>`
+                                : `<div class="flex h-40 items-center justify-center px-4 text-center text-sm text-slate-400">Preview will appear after your code passes strict root &lt;div&gt; validation.</div>`
+                            }
+                          </div>
+                        </div>
                         <label class="block">
                           <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Template Code</span>
-                          <p class="mt-2 text-xs text-slate-400">Paste your HTML template code. Must be wrapped in a &lt;div&gt; element.</p>
-                          <textarea rows="8" data-marketplace-focus="templateCode" oninput="handleMarketplaceLiveInput(event, 'templateCode')" class="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white font-mono text-xs outline-none resize-none focus:border-cyan-400" placeholder="&lt;div class=&quot;container&quot;&gt;&#10;  Your HTML content here&#10;&lt;/div&gt;">${escapeHtmlText(marketplaceDraftListing.templateCode)}</textarea>
+                          <p class="mt-2 text-xs text-slate-400">Paste your HTML template code. Strict mode: exactly one root element, and it must be a &lt;div&gt;.</p>
                           ${
-                            marketplaceDraftListing.templateCode.trim() && !marketplaceDraftListing.templateCode.match(/<div[^>]*>[\s\S]*<\/div>/i)
+                            marketplaceDraftListing.templateCode.trim() && !templateValidation.valid
+                              ? `<div class="mt-3 h-1 w-full rounded-t-2xl bg-rose-500"></div>`
+                              : ""
+                          }
+                          <textarea rows="8" data-marketplace-focus="templateCode" oninput="handleMarketplaceLiveInput(event, 'templateCode')" class="mt-${marketplaceDraftListing.templateCode.trim() && !templateValidation.valid ? "0" : "3"} w-full rounded-2xl border ${marketplaceDraftListing.templateCode.trim() && !templateValidation.valid ? "border-rose-400/40 focus:border-rose-400" : "border-white/10 focus:border-cyan-400"} bg-white/5 px-4 py-3 text-white font-mono text-xs outline-none resize-none" placeholder="&lt;div class=&quot;container&quot;&gt;&#10;  Your HTML content here&#10;&lt;/div&gt;">${escapeHtmlText(marketplaceDraftListing.templateCode)}</textarea>
+                          ${
+                            marketplaceDraftListing.templateCode.trim() && !templateValidation.valid
                               ? `<div class="mt-2 rounded-[1.2rem] border border-rose-400/20 bg-rose-500/10 p-3 text-sm text-rose-200">
                                   <p class="font-semibold">⚠️ Invalid template</p>
-                                  <p class="mt-1">Your code must be wrapped in a &lt;div&gt; element.</p>
+                                  <p class="mt-1">${escapeHtmlText(templateValidation.reason || "Root element must be a <div>.")}</p>
                                 </div>`
-                              : marketplaceDraftListing.templateCode.trim() && marketplaceDraftListing.templateCode.match(/<div[^>]*>[\s\S]*<\/div>/i)
+                              : marketplaceDraftListing.templateCode.trim() && templateValidation.valid
                                 ? `<div class="mt-2 rounded-[1.2rem] border border-emerald-400/20 bg-emerald-500/10 p-3 text-sm text-emerald-200">
                                     <p class="font-semibold">✓ Valid template</p>
                                   </div>`
