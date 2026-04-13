@@ -2763,11 +2763,11 @@
             ></span>
           </span>
           <span class="drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)] text-white">
-            Workflow AI
+            Create Instantly
           </span>
         </h1>
         <p class="text-lg sm:text-xl text-gray-400 max-w-lg mx-auto">
-          Convert • Clone • Speak • Edit • Develop.
+          Click • Create • Customize • Launch
         </p>
         <button
           onclick="handleStartFree()"
@@ -3095,18 +3095,6 @@
                 >
               </button>
               <button
-                data-tool-switch="console"
-                onclick="switchTool('console')"
-                class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-gray-800 border border-white/5 px-5 py-2.5 rounded-3xl cursor-pointer"
-              >
-                <i class="fas fa-gauge-high text-cyan-400"></i
-                ><span class="font-medium text-sm text-gray-200">Console</span>
-                <span
-                  class="text-[7px] font-black bg-cyan-500 text-gray-950 px-1.5 py-0.5 rounded ml-1 uppercase"
-                  >New</span
-                >
-              </button>
-              <button
                 data-tool-switch="marketplace"
                 onclick="switchTool('marketplace')"
                 class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-gray-800 border border-white/5 px-5 py-2.5 rounded-3xl cursor-pointer"
@@ -3115,6 +3103,18 @@
                 ><span class="font-medium text-sm text-gray-200"
                   >Marketplace</span
                 >
+                <span
+                  class="text-[7px] font-black bg-cyan-500 text-gray-950 px-1.5 py-0.5 rounded ml-1 uppercase"
+                  >New</span
+                >
+              </button>
+              <button
+                data-tool-switch="console"
+                onclick="switchTool('console')"
+                class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-gray-800 border border-white/5 px-5 py-2.5 rounded-3xl cursor-pointer"
+              >
+                <i class="fas fa-gauge-high text-cyan-400"></i
+                ><span class="font-medium text-sm text-gray-200">Console</span>
                 <span
                   class="text-[7px] font-black bg-cyan-500 text-gray-950 px-1.5 py-0.5 rounded ml-1 uppercase"
                   >New</span
@@ -5054,6 +5054,7 @@
       let dataExplorerEngineConfirmed = false;
       let dataExplorerBindTarget = null;
       let virtualDbModelIndex = [];
+      let virtualDbModalPrimaryBusy = false;
       let currentRenderHostingProject = null;
       let currentRenderLiveProject = null;
       let renderProjectSyncPoller = null;
@@ -6895,6 +6896,7 @@
         const role = document.getElementById("builder-collaboration-role");
         const linkWrap = document.getElementById("builder-share-link-wrap");
         const linkInput = document.getElementById("builder-collaboration-link");
+        const infoCard = document.getElementById("builder-share-link-info-card");
         const audioToggle = document.getElementById("builder-collab-audio-toggle");
         const videoToggle = document.getElementById("builder-collab-video-toggle");
         if (toggle) {
@@ -6923,6 +6925,7 @@
         }
         if (linkWrap) linkWrap.classList.toggle("hidden", !collaborationShareLink);
         if (linkInput) linkInput.value = collaborationShareLink || "";
+        if (infoCard) infoCard.classList.toggle("hidden", Boolean(collaborationShareLink));
         if (audioToggle) {
           audioToggle.classList.toggle("hidden", !isCollaborationActive());
           audioToggle.classList.toggle("opacity-40", !isCollaborationActive() || collaborationMediaUpdating);
@@ -7889,6 +7892,7 @@
           title: "Create Virtual Model",
           subtitle: "This model is scoped to your account and stored in VirtualDB.",
           primaryLabel: "Create Model",
+          primaryBusyLabel: "Creating...",
           bodyHtml: `<label class="block">
               <span class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Model name</span>
               <input id="virtualdb-model-name" class="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-white outline-none focus:border-fuchsia-400" placeholder="e.g. Product" />
@@ -7934,11 +7938,45 @@
         }
       }
 
+      function openVirtualDbInsertModal() {
+        if (!dataExplorerSelectedCollection) {
+          showBuilderSnackbar("Select a virtual model first.", "error");
+          return;
+        }
+        openVirtualDbModal({
+          title: "Insert Document",
+          subtitle: `Insert a document into ${dataExplorerSelectedCollection}.`,
+          primaryLabel: "Insert",
+          primaryBusyLabel: "Inserting...",
+          bodyHtml: `<label class="block">
+              <span class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">JSON document</span>
+              <textarea id="virtualdb-insert-json" rows="8" class="data-explorer-mono mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-xs leading-6 text-slate-100 outline-none focus:border-fuchsia-400" placeholder='{"title":"Hello","status":"draft"}'>{}</textarea>
+            </label>`,
+          onPrimary: async () => {
+            const payload = String(document.getElementById("virtualdb-insert-json")?.value || "{}");
+            const res = await fetch("/api/virtualdb/document", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ modelName: dataExplorerSelectedCollection, data: payload }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+              throw new Error(data.message || "Could not insert document.");
+            }
+            closeVirtualDbModal();
+            await loadDataExplorerCollection(dataExplorerSelectedCollection);
+            showBuilderSnackbar("Document inserted.", "success");
+          },
+        });
+      }
+
       function openVirtualDbDisconnectModal() {
         openVirtualDbModal({
           title: "Disconnect VirtualDB",
           subtitle: "Choose what to do with your VirtualDB models before disconnecting.",
           primaryLabel: "Disconnect",
+          primaryBusyLabel: "Disconnecting...",
           bodyHtml: `<label class="block">
               <span class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Cleanup policy</span>
               <select id="virtualdb-retention" class="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-white outline-none focus:border-fuchsia-400">
@@ -7978,7 +8016,7 @@
         });
       }
 
-      function openVirtualDbModal({ title = "VirtualDB", subtitle = "", primaryLabel = "Continue", bodyHtml = "", onPrimary = null } = {}) {
+      function openVirtualDbModal({ title = "VirtualDB", subtitle = "", primaryLabel = "Continue", primaryBusyLabel = "Working...", bodyHtml = "", onPrimary = null } = {}) {
         const layer = document.getElementById("virtualdb-modal-layer");
         if (!layer) return;
         const titleEl = document.getElementById("virtualdb-modal-title");
@@ -7989,8 +8027,31 @@
         if (subEl) subEl.textContent = subtitle;
         if (bodyEl) bodyEl.innerHTML = bodyHtml;
         if (primary) {
+          virtualDbModalPrimaryBusy = false;
+          primary.disabled = false;
           primary.textContent = primaryLabel;
-          primary.onclick = typeof onPrimary === "function" ? onPrimary : closeVirtualDbModal;
+          primary.onclick =
+            typeof onPrimary === "function"
+              ? async () => {
+                  if (virtualDbModalPrimaryBusy) return;
+                  virtualDbModalPrimaryBusy = true;
+                  const originalLabel = primaryLabel;
+                  primary.disabled = true;
+                  primary.textContent = String(primaryBusyLabel || "Working...");
+                  try {
+                    await onPrimary();
+                  } finally {
+                    // If modal is still open, restore the button state.
+                    const stillOpen =
+                      !document.getElementById("virtualdb-modal-layer")?.classList.contains("hidden");
+                    if (stillOpen) {
+                      virtualDbModalPrimaryBusy = false;
+                      primary.disabled = false;
+                      primary.textContent = originalLabel;
+                    }
+                  }
+                }
+              : closeVirtualDbModal;
         }
         layer.classList.remove("hidden");
         layer.classList.add("flex");
@@ -7999,12 +8060,17 @@
       function closeVirtualDbModal() {
         const layer = document.getElementById("virtualdb-modal-layer");
         if (!layer) return;
+        virtualDbModalPrimaryBusy = false;
         layer.classList.add("hidden");
         layer.classList.remove("flex");
       }
       async function connectDataExplorer() {
         if (!dataExplorerEngineConfirmed) {
           showBuilderSnackbar("Select a database type and continue first.", "error");
+          return;
+        }
+        if (dataExplorerEngine === "virtual-medialabdb") {
+          await connectVirtualMediaLabDb();
           return;
         }
         if (dataExplorerEngine === "sql") {
@@ -8186,6 +8252,31 @@
       }
       async function commitDataExplorerInlineEdit(documentId = "", fieldPath = "", value = "") {
         try {
+          if (dataExplorerEngine === "virtual-medialabdb") {
+            const res = await fetch("/api/virtualdb/document", {
+              method: "PATCH",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                modelName: dataExplorerSelectedCollection,
+                documentId,
+                fieldPath,
+                value,
+              }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+              throw new Error(data.message || "Could not update that field.");
+            }
+            const index = dataExplorerDocuments.findIndex(
+              (item) => String(item?._id || "") === String(documentId || ""),
+            );
+            if (index >= 0 && data.document) {
+              dataExplorerDocuments[index] = data.document;
+            }
+            renderDataExplorerTool(documentId);
+            return;
+          }
           const res = await fetch("/api/data-explorer/document", {
             method: "PATCH",
             credentials: "include",
@@ -8257,6 +8348,7 @@
               ${
                 dataExplorerEngine === "virtual-medialabdb"
                   ? `<button onclick="openVirtualDbModelModal()" class="rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-fuchsia-100 hover:bg-fuchsia-500/20">Create Model</button>
+                     <button onclick="openVirtualDbInsertModal()" class="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100 hover:bg-emerald-500/20">Insert</button>
                      <button onclick="openVirtualDbDisconnectModal()" class="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-rose-100 hover:bg-rose-500/20">Disconnect DB</button>`
                   : `<button onclick="disconnectDataExplorer()" class="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-rose-100 hover:bg-rose-500/20">Disconnect DB</button>`
               }`
@@ -8281,6 +8373,15 @@
               ? `<div class="data-explorer-panel p-6 sm:p-8"><div class="mx-auto max-w-3xl"><p class="text-[10px] font-black uppercase tracking-[0.24em] text-amber-300">SQL (Coming Later)</p><h3 class="mt-2 text-2xl font-semibold text-white">SQL connector is planned next.</h3><p class="mt-3 text-sm text-slate-400">Keep MongoDB mode for now. SQL functionality will be added in a later update.</p><div class="mt-5 flex flex-wrap gap-3"><button onclick="resetDataExplorerEngineSelection()" class="rounded-[1.2rem] border border-white/10 bg-white/5 px-5 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-slate-200 hover:bg-white/10">Back</button><button onclick="setDataExplorerEngine('mongodb'); continueDataExplorerEngineSelection();" class="rounded-[1.2rem] bg-cyan-500 px-5 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-slate-950 hover:bg-cyan-400">Use MongoDB</button></div></div></div>`
               : `<div class="data-explorer-panel p-6 sm:p-8"><div class="mx-auto max-w-3xl"><p class="text-[10px] font-black uppercase tracking-[0.24em] ${dataExplorerEngine === "virtual-medialabdb" ? "text-fuchsia-300" : "text-cyan-300"}">${dataExplorerEngine === "virtual-medialabdb" ? "virtual-MedialabDB" : "Connect To Database"}</p>${dataExplorerEngine === "virtual-medialabdb" ? `<p class="mt-2 text-sm text-slate-400">Use your real MongoDB URI as the base; MediaLab will layer temporary virtual models over that structure.</p>` : ``}<div class="mt-4 flex flex-col gap-3 lg:flex-row"><input id="data-explorer-uri-input" oninput="setDataExplorerUriDraft(this.value)" class="data-explorer-mono min-w-0 flex-1 rounded-[1.4rem] border border-cyan-400/20 bg-[#020617] px-5 py-4 text-sm text-cyan-100 outline-none focus:border-cyan-400" placeholder="mongodb+srv://..." value="${escapeAttr(dataExplorerUriDraft)}" /><button onclick="connectDataExplorer()" class="rounded-[1.4rem] bg-cyan-500 px-6 py-4 text-sm font-black text-slate-950 hover:bg-cyan-400">${dataExplorerLoading ? "Connecting..." : "Verify & Connect"}</button></div><div class="mt-4"><button onclick="resetDataExplorerEngineSelection()" class="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-300 hover:bg-white/10">Back</button></div></div></div>`
           : `<div class="data-explorer-grid"><aside class="data-explorer-panel p-4 sm:p-5"><div class="flex items-center justify-between gap-3"><p class="text-[10px] font-black uppercase tracking-[0.22em] ${dataExplorerEngine === "virtual-medialabdb" ? "text-fuchsia-300" : "text-cyan-300"}">${dataExplorerEngine === "virtual-medialabdb" ? "Virtual_Models" : "Collections"}</p><button onclick="refreshDataExplorerCollections()" class="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-200 hover:bg-white/10">Refresh</button></div><div class="mt-4 space-y-2 max-h-[62vh] overflow-y-auto custom-scrollbar">${collectionMarkup}</div></aside><section class="data-explorer-panel p-4 sm:p-5 overflow-hidden"><div><p class="text-[10px] font-black uppercase tracking-[0.22em] ${dataExplorerEngine === "virtual-medialabdb" ? "text-fuchsia-300" : "text-cyan-300"}">${escapeHtmlText(dataExplorerSelectedCollection || (dataExplorerEngine === "virtual-medialabdb" ? "Virtual Model" : "Collection"))}</p><p class="mt-1 text-sm text-slate-400">${dataExplorerEngine === "virtual-medialabdb" ? "Model definition loaded" : `${dataExplorerDocuments.length} documents loaded • Double-click a cell to edit`}</p></div><div class="mt-4 overflow-auto custom-scrollbar rounded-[1.4rem] border border-white/10">${dataExplorerViewMode === "json" ? `<pre class="data-explorer-mono min-h-[420px] whitespace-pre-wrap px-4 py-4 text-xs leading-6 text-slate-200">${escapeHtmlText(JSON.stringify(dataExplorerDocuments, null, 2))}</pre>` : `<table class="min-w-full table-fixed border-collapse"><thead class="bg-white/[0.03]"><tr>${gridFields.map((field) => `<th class="px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">${escapeHtmlText(field)}</th>`).join("")}</tr></thead><tbody>${tableRows}</tbody></table>`}</div></section></div>`;
+        if (!dataExplorerConnected && dataExplorerEngineConfirmed && dataExplorerEngine === "virtual-medialabdb") {
+          const uriInput = document.getElementById("data-explorer-uri-input");
+          const uriLayout = uriInput?.closest(".mt-4.flex.flex-col.gap-3.lg\\:flex-row");
+          if (uriInput) uriInput.classList.add("hidden");
+          if (uriLayout) {
+            uriLayout.classList.remove("lg:flex-row");
+            uriLayout.classList.add("lg:flex-col");
+          }
+        }
       }
       function openBuilderDataBindingModal() {
         if (!dataExplorerConnected) {
@@ -16899,7 +17000,7 @@
                         </button>
                     </div>
                     <div class="space-y-5 px-5 py-5">
-                        <div class="rounded-[1.6rem] border border-cyan-400/15 bg-cyan-500/[0.06] p-4">
+                        <div id="builder-share-link-info-card" class="rounded-[1.6rem] border border-cyan-400/15 bg-cyan-500/[0.06] p-4">
                             <p class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Session Link</p>
                             <p class="mt-2 text-sm leading-6 text-slate-300">Guests open this room link and join as viewers by default. You can grant edit access from the live session menu.</p>
                             <div class="mt-4 flex flex-wrap items-center gap-3">

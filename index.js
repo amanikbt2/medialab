@@ -37,6 +37,7 @@ import Notification from "./models/Notification.js";
 import ReferralLedger from "./models/ReferralLedger.js";
 import CollaborationMeeting from "./models/CollaborationMeeting.js";
 import VirtualDbModelSchema from "./models/VirtualDbModel.js";
+import VirtualDbDocumentSchema from "./models/VirtualDbDocument.js";
 import {
   createRenderBlueprintInstance,
   extractRenderDeploySuccessPayload,
@@ -111,12 +112,16 @@ async function getOrCreateVirtualDbConnection() {
   const VirtualDbModel =
     connection.models.VirtualDbModel ||
     connection.model("VirtualDbModel", VirtualDbModelSchema, "virtual_models");
+  const VirtualDbDocument =
+    connection.models.VirtualDbDocument ||
+    connection.model("VirtualDbDocument", VirtualDbDocumentSchema, "virtual_documents");
   virtualDbConnectionState = {
     uri,
     uriLabel: "virtual-medialabdb",
     dbName: connection.name,
     connection,
     VirtualDbModel,
+    VirtualDbDocument,
     createdAt: new Date(),
   };
   return virtualDbConnectionState;
@@ -3642,19 +3647,98 @@ app.get("/api/virtualdb/model/:name", async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
     const serialized = serializeExplorerValue(model || null);
-    const fieldSet = new Set();
-    if (serialized) {
-      collectExplorerFieldPaths(serialized, "", fieldSet);
-    }
-    const fields = Array.from(fieldSet).sort((a, b) => a.localeCompare(b));
+    const docs = await state.VirtualDbDocument.find({
+      userId: req.user._id,
+      modelName: name,
+      $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+    })
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+    const viewDocuments = docs.map((doc) => ({
+      _id: String(doc?._id || ""),
+      ...(doc?.data && typeof doc.data === "object" ? serializeExplorerValue(doc.data) : {}),
+    }));
+    const dataFieldSet = new Set();
+    viewDocuments.forEach((doc) => collectExplorerFieldPaths(doc, "", dataFieldSet));
+    const fields = Array.from(dataFieldSet).sort((a, b) => a.localeCompare(b));
     res.json({
       success: true,
       model: serialized,
-      documents: serialized ? [serialized] : [],
+      documents: viewDocuments,
       fields,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message || "Could not load that model." });
+  }
+});
+
+app.post("/api/virtualdb/document", async (req, res) => {
+  try {
+    if (!requireAuth(req, res)) return;
+    const state = await getOrCreateVirtualDbConnection();
+    const modelName = normalizeVirtualModelName(req.body?.modelName || "");
+    if (!modelName) {
+      return res.status(400).json({ success: false, message: "modelName is required." });
+    }
+    const exists = await state.VirtualDbModel.findOne({
+      userId: req.user._id,
+      name: modelName,
+      $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+    })
+      .select("_id")
+      .lean();
+    if (!exists) {
+      return res.status(404).json({ success: false, message: "Virtual model not found." });
+    }
+    const rawData = req.body?.data;
+    const data =
+      rawData && typeof rawData === "object"
+        ? rawData
+        : typeof rawData === "string"
+          ? (() => {
+              try {
+                return JSON.parse(rawData);
+              } catch {
+                return {};
+              }
+            })()
+          : {};
+    const created = await state.VirtualDbDocument.create({
+      userId: req.user._id,
+      modelName,
+      data,
+      expiresAt: null,
+    });
+    res.json({
+      success: true,
+      document: { _id: String(created?._id || ""), ...(serializeExplorerValue(created?.data || {}) || {}) },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || "Could not insert document." });
+  }
+});
+
+app.patch("/api/virtualdb/document", async (req, res) => {
+  try {
+    if (!requireAuth(req, res)) return;
+    const state = await getOrCreateVirtualDbConnection();
+    const modelName = normalizeVirtualModelName(req.body?.modelName || "");
+    const documentId = String(req.body?.documentId || "").trim();
+    const fieldPath = String(req.body?.fieldPath || "").trim();
+    if (!modelName || !documentId || !fieldPath) {
+      return res.status(400).json({ success: false, message: "modelName, documentId, and fieldPath are required." });
+    }
+    const filter = { _id: new mongoose.Types.ObjectId(documentId), userId: req.user._id, modelName };
+    const value = parseExplorerInputValue(req.body?.value);
+    await state.VirtualDbDocument.updateOne(filter, { $set: { [`data.${fieldPath}`]: value } });
+    const updated = await state.VirtualDbDocument.findOne(filter).lean();
+    const view = updated
+      ? { _id: String(updated?._id || ""), ...(serializeExplorerValue(updated?.data || {}) || {}) }
+      : null;
+    res.json({ success: true, document: view });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || "Could not update document." });
   }
 });
 
@@ -3702,9 +3786,11 @@ app.post("/api/virtualdb/disconnect", async (req, res) => {
     let action = "cleared";
     if (retentionHours <= 0) {
       await state.VirtualDbModel.deleteMany(filter);
+      await state.VirtualDbDocument.deleteMany(filter);
     } else {
       const expiresAt = new Date(Date.now() + retentionHours * 60 * 60 * 1000);
       await state.VirtualDbModel.updateMany(filter, { $set: { expiresAt } });
+      await state.VirtualDbDocument.updateMany(filter, { $set: { expiresAt } });
       action = "scheduled";
     }
     if (req.session) {
