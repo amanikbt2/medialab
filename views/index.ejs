@@ -9731,6 +9731,13 @@
             .find(Boolean);
           return fromShots || "";
         };
+        const getTemplateLivePreviewDoc = (item = {}) => {
+          const sourceHtml = String(item?.sourceHtml || "").trim();
+          if (!sourceHtml) return "";
+          const validation = validateMarketplaceTemplateCode(sourceHtml);
+          const renderHtml = validation.valid && validation.rootHtml ? validation.rootHtml : sourceHtml;
+          return `<!doctype html><html><head><meta charset="utf-8" /><style>html,body{margin:0;padding:0;background:#020617;overflow:hidden;}*{box-sizing:border-box;max-width:none;}body{min-height:100vh;}</style></head><body>${renderHtml}</body></html>`;
+        };
         const controls = `<div class="col-span-full mb-1 flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2">
           <p class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Purchased Templates</p>
           <button type="button" title="${builderTemplateGridExpanded ? "Minimize" : "Expand"}" onclick="toggleBuilderTemplateGridExpanded()" class="rounded-xl border ${builderTemplateGridExpanded ? "border-fuchsia-400/30 bg-fuchsia-500/10 text-fuchsia-200" : "border-cyan-400/20 bg-cyan-500/10 text-cyan-200"} px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em]">${builderTemplateGridExpanded ? "&gt;&lt;" : "&lt;&gt;"}</button>
@@ -9744,6 +9751,7 @@
                 .map((item) => {
                   const iconMeta = getTemplateIconMeta(item.slug || item.title || item.marketplaceItemId || "");
                   const preview = getTemplatePreviewUrl(item);
+                  const livePreviewDoc = getTemplateLivePreviewDoc(item);
                   return `<div class="group relative overflow-hidden rounded-2xl border border-fuchsia-400/15 bg-slate-950/80 text-left hover:border-fuchsia-400/35">
                     <button type="button" title="Remove from workspace" onclick="event.stopPropagation(); removePurchasedBuilderTemplate('${escapeInlineJsString(item.marketplaceItemId || "")}')" class="absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-rose-400/30 bg-rose-500/15 text-rose-200 hover:bg-rose-500/25">
                       <i class="fas fa-trash text-[10px]"></i>
@@ -9751,8 +9759,10 @@
                     <button onclick="loadBuilderSiteTemplate('${escapeInlineJsString(item.slug || "")}'); hideBuilderPanels();" class="block w-full text-left">
                     <div class="relative h-28 w-full bg-slate-900">
                       ${
-                        preview
-                          ? `<img src="${escapeHtmlText(preview)}" alt="${escapeHtmlText(item.title || "Template preview")}" class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />`
+                        livePreviewDoc
+                          ? `<iframe sandbox="allow-same-origin allow-scripts" srcdoc="${escapeHtmlText(livePreviewDoc)}" class="h-full w-full border-0 bg-slate-900 pointer-events-none"></iframe>`
+                          : preview
+                            ? `<img src="${escapeHtmlText(preview)}" alt="${escapeHtmlText(item.title || "Template preview")}" class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />`
                           : `<div class="flex h-full w-full items-center justify-center text-sm ${iconMeta.tone}"><i class="fas ${iconMeta.icon} mr-2"></i>Template Preview</div>`
                       }
                     </div>
@@ -10520,31 +10530,55 @@
         const subtitle = document.getElementById("marketplace-detail-subtitle");
         if (!body || !title || !subtitle || !item) return;
         const access = canInteractWithMarketplaceItem(item);
+        const isTemplateItem = String(item?.listingKind || "sale").toLowerCase() === "template";
+        const templateValidation = isTemplateItem
+          ? validateMarketplaceTemplateCode(String(item?.sourceHtml || ""))
+          : { valid: false, rootHtml: "" };
+        const templateLiveDoc =
+          templateValidation.valid && templateValidation.rootHtml
+            ? `<!doctype html><html><head><meta charset="utf-8" /><style>html,body{margin:0;padding:0;background:#020617;overflow:auto;}*{box-sizing:border-box;max-width:none;}body{min-height:100vh;}</style></head><body>${templateValidation.rootHtml}</body></html>`
+            : "";
         title.textContent = item.title || "Marketplace Project";
-        subtitle.textContent = `${item.category || "General"} project by ${item.authorName || "MediaLab Creator"}`;
+        subtitle.textContent = `${item.category || "General"} ${isTemplateItem ? "template" : "project"} by ${item.authorName || "MediaLab Creator"}`;
         const gallery = (Array.isArray(item.screenshots) && item.screenshots.length
           ? item.screenshots
           : [item.previewImage]).slice(0, 4);
         body.innerHTML = `
           <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] gap-6">
             <div class="space-y-5">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                ${gallery.map((shot) => `<div class="overflow-hidden rounded-[1.8rem] border border-white/10 bg-slate-950"><img src="${escapeHtmlText(shot || item.previewImage || "")}" class="h-56 w-full object-cover" /></div>`).join("")}
-              </div>
+              ${
+                isTemplateItem
+                  ? `<div class="overflow-hidden rounded-[1.8rem] border border-fuchsia-400/20 bg-slate-950">
+                      ${
+                        templateLiveDoc
+                          ? `<iframe sandbox="allow-same-origin allow-scripts" srcdoc="${escapeHtmlText(templateLiveDoc)}" class="h-[420px] w-full bg-slate-900" title="Marketplace template live preview"></iframe>`
+                          : `<div class="flex h-[420px] items-center justify-center px-6 text-center text-sm text-slate-400">Template preview source is unavailable for this listing.</div>`
+                      }
+                    </div>`
+                  : `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      ${gallery.map((shot) => `<div class="overflow-hidden rounded-[1.8rem] border border-white/10 bg-slate-950"><img src="${escapeHtmlText(shot || item.previewImage || "")}" class="h-56 w-full object-cover" /></div>`).join("")}
+                    </div>`
+              }
               <div class="rounded-[1.8rem] border border-white/10 bg-slate-900/80 p-5">
                 <div class="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <p class="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">Live Preview</p>
-                    <p class="mt-2 text-sm text-slate-400">${item.allowTest ? "Run this hosted project for up to 30 seconds before you decide." : "The seller did not enable public test mode for this project."}</p>
+                    <p class="mt-2 text-sm text-slate-400">${
+                      isTemplateItem
+                        ? "This template runs as a live element preview with animations."
+                        : item.allowTest
+                          ? "Run this hosted project for up to 30 seconds before you decide."
+                          : "The seller did not enable public test mode for this project."
+                    }</p>
                   </div>
                   <div class="flex gap-2">
-                    ${item.allowTest && item.liveUrl ? `<button onclick="toggleMarketplacePreview()" class="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-200 hover:bg-emerald-500/15">Run Test</button>` : ``}
+                    ${!isTemplateItem && item.allowTest && item.liveUrl ? `<button onclick="toggleMarketplacePreview()" class="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-200 hover:bg-emerald-500/15">Run Test</button>` : ``}
                   </div>
                 </div>
-                <div id="marketplace-preview-wrap" class="${marketplacePreviewVisible ? "" : "hidden"} mt-4 overflow-hidden rounded-[1.5rem] border border-white/10 bg-slate-950">
+                <div id="marketplace-preview-wrap" class="${isTemplateItem ? "hidden" : marketplacePreviewVisible ? "" : "hidden"} mt-4 overflow-hidden rounded-[1.5rem] border border-white/10 bg-slate-950">
                   <iframe src="${escapeHtmlText(item.liveUrl || "")}" class="h-[420px] w-full bg-white" title="Marketplace preview"></iframe>
                 </div>
-                ${marketplacePreviewVisible && item.allowTest ? `<p class="mt-3 text-xs text-amber-200">Test mode will close automatically after 30 seconds.</p>` : ``}
+                ${!isTemplateItem && marketplacePreviewVisible && item.allowTest ? `<p class="mt-3 text-xs text-amber-200">Test mode will close automatically after 30 seconds.</p>` : ``}
               </div>
               <div class="rounded-[1.8rem] border border-white/10 bg-slate-900/80 p-5">
                 <p class="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">Professional Description</p>
