@@ -8119,9 +8119,11 @@
         ).join("");
       }
       function renderMarketplaceTemplateAnimatedPreview(item = {}, className = "h-full w-full") {
-        const validation = validateMarketplaceTemplateCode(String(item?.sourceHtml || ""));
-        if (!validation.valid || !validation.rootHtml) return "";
-        const previewDoc = `<!doctype html><html><head><meta charset="utf-8" /><style>html,body{margin:0;padding:0;background:#020617;overflow:hidden;}*{box-sizing:border-box;max-width:none;}body{min-height:100vh;}</style></head><body>${validation.rootHtml}</body></html>`;
+        const rawHtml = String(item?.sourceHtml || "").trim();
+        if (!rawHtml) return "";
+        const validation = validateMarketplaceTemplateCode(rawHtml);
+        const renderHtml = validation.valid && validation.rootHtml ? validation.rootHtml : rawHtml;
+        const previewDoc = `<!doctype html><html><head><meta charset="utf-8" /><style>html,body{margin:0;padding:0;background:#020617;overflow:hidden;}*{box-sizing:border-box;max-width:none;}body{min-height:100vh;}</style></head><body>${renderHtml}</body></html>`;
         return `<iframe sandbox="allow-same-origin allow-scripts" srcdoc="${escapeHtmlText(previewDoc)}" class="${className} border-0 bg-slate-950 pointer-events-none"></iframe>`;
       }
       function getMarketplaceStatusBadge(status = "") {
@@ -8519,18 +8521,77 @@
           wrapper.style.left = "-100000px";
           wrapper.style.top = "0";
           wrapper.style.width = "1200px";
-          wrapper.style.minHeight = "700px";
-          wrapper.style.padding = "24px";
+          wrapper.style.height = "700px";
           wrapper.style.background = "#0f172a";
           wrapper.style.zIndex = "-1";
-          wrapper.innerHTML = validation.rootHtml;
+          wrapper.innerHTML = `<div data-marketplace-capture-stage style="position:relative;width:1200px;height:700px;overflow:hidden;background:#0f172a;padding:24px;">${validation.rootHtml}</div>`;
           document.body.appendChild(wrapper);
-          const canvas = await html2canvas(wrapper, {
+          const stage = wrapper.querySelector('[data-marketplace-capture-stage]');
+          if (!stage) throw new Error("Capture stage is unavailable.");
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          const fullCanvas = await html2canvas(stage, {
             backgroundColor: "#0f172a",
             useCORS: true,
             scale: 1.4,
             logging: false,
+            width: 1200,
+            height: 700,
+            windowWidth: 1200,
+            windowHeight: 700,
           });
+          const stageRect = stage.getBoundingClientRect();
+          const rootElement = stage.firstElementChild;
+          const safeRect = rootElement ? rootElement.getBoundingClientRect() : stageRect;
+          const contentLeft = Math.max(0, Math.min(stageRect.width, safeRect.left - stageRect.left));
+          const contentTop = Math.max(0, Math.min(stageRect.height, safeRect.top - stageRect.top));
+          const contentRight = Math.max(contentLeft + 1, Math.min(stageRect.width, safeRect.right - stageRect.left));
+          const contentBottom = Math.max(contentTop + 1, Math.min(stageRect.height, safeRect.bottom - stageRect.top));
+          const contentWidth = Math.max(1, contentRight - contentLeft);
+          const contentHeight = Math.max(1, contentBottom - contentTop);
+          const targetWidth = fullCanvas.width;
+          const targetHeight = fullCanvas.height;
+          const targetRatio = targetWidth / targetHeight;
+          const paddingX = Math.max(18, contentWidth * 0.08);
+          const paddingY = Math.max(18, contentHeight * 0.08);
+          let cropWidth = contentWidth + paddingX * 2;
+          let cropHeight = contentHeight + paddingY * 2;
+          if (cropWidth / cropHeight > targetRatio) {
+            cropHeight = cropWidth / targetRatio;
+          } else {
+            cropWidth = cropHeight * targetRatio;
+          }
+          let cropLeft = contentLeft + contentWidth / 2 - cropWidth / 2;
+          let cropTop = contentTop + contentHeight / 2 - cropHeight / 2;
+          cropLeft = Math.max(0, Math.min(stageRect.width - cropWidth, cropLeft));
+          cropTop = Math.max(0, Math.min(stageRect.height - cropHeight, cropTop));
+          if (!Number.isFinite(cropLeft) || !Number.isFinite(cropTop)) {
+            cropLeft = 0;
+            cropTop = 0;
+            cropWidth = stageRect.width;
+            cropHeight = stageRect.height;
+          }
+          const scaleX = fullCanvas.width / stageRect.width;
+          const scaleY = fullCanvas.height / stageRect.height;
+          const sourceX = Math.max(0, cropLeft * scaleX);
+          const sourceY = Math.max(0, cropTop * scaleY);
+          const sourceWidth = Math.max(1, Math.min(fullCanvas.width - sourceX, cropWidth * scaleX));
+          const sourceHeight = Math.max(1, Math.min(fullCanvas.height - sourceY, cropHeight * scaleY));
+          const canvas = document.createElement("canvas");
+          canvas.width = fullCanvas.width;
+          canvas.height = fullCanvas.height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Could not prepare screenshot canvas.");
+          ctx.drawImage(
+            fullCanvas,
+            sourceX,
+            sourceY,
+            sourceWidth,
+            sourceHeight,
+            0,
+            0,
+            canvas.width,
+            canvas.height,
+          );
           wrapper.remove();
           const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png", 0.92));
           if (!blob) throw new Error("Could not create screenshot file.");
@@ -8554,8 +8615,8 @@
           };
           marketplaceDraftListing = {
             ...marketplaceDraftListing,
-            screenshots: [newAsset.url, ...(marketplaceDraftListing.screenshots || []).filter((url) => String(url || "").trim() !== newAsset.url)].slice(0, 4),
-            screenshotAssets: [newAsset, ...(marketplaceDraftListing.screenshotAssets || []).filter((item) => String(item?.url || "").trim() !== newAsset.url)].slice(0, 4),
+            screenshots: [newAsset.url],
+            screenshotAssets: [newAsset],
           };
           completeUniversalProgress("Template screenshot captured.");
           if (currentStudioToolId === "marketplace") mountMarketplaceTool("all");
@@ -8575,6 +8636,10 @@
         captureMarketplaceTemplateScreenshot().finally(() => {
           marketplaceTemplateScreenshotAutoCapturing = false;
         });
+      }
+      function retakeMarketplaceTemplateScreenshot() {
+        if (!isMarketplaceTemplateMode()) return;
+        captureMarketplaceTemplateScreenshot();
       }
       function bindMarketplaceCreateDelegates() {
         if (marketplaceCreateDelegatesBound) return;
@@ -9241,8 +9306,13 @@
                         <input type="file" accept="image/*" multiple onchange="handleMarketplaceScreenshotInput(this)" class="mt-3 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300" />
                       </label>`
                     : `<div class="rounded-[1.6rem] border border-fuchsia-400/15 bg-fuchsia-500/[0.06] p-4 text-sm text-slate-300">
-                        <p class="font-semibold text-white">Template preview screenshot</p>
-                        <p class="mt-2 text-xs text-slate-300">Screenshot is generated from your template preview flow. Upload is disabled in template mode.</p>
+                        <div class="flex items-center justify-between gap-3">
+                          <p class="font-semibold text-white">Template preview screenshot</p>
+                          <button onclick="retakeMarketplaceTemplateScreenshot()" class="inline-flex items-center gap-2 rounded-xl border border-fuchsia-400/25 bg-fuchsia-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-fuchsia-200 hover:bg-fuchsia-500/20">
+                            <i class="fas fa-camera"></i>Retake Screenshot
+                          </button>
+                        </div>
+                        <p class="mt-2 text-xs text-slate-300">Retake auto-centers your template content to reduce empty space. Upload is disabled in template mode.</p>
                       </div>`
                 }
                 <div class="grid grid-cols-1 ${isTemplateMode ? "" : "sm:grid-cols-2 xl:grid-cols-4"} gap-3">
@@ -22397,18 +22467,66 @@ console.log("Triggered ${eventName}", { source, event });
         };
         const editor = document.getElementById("builder-code-editor");
         if (!editor) return;
+        const centerCanvasElementsInViewport = () => {
+          const canvas = document.getElementById("web-canvas");
+          const container = document.getElementById("canvas-container");
+          if (!canvas || !container) return;
+          const nodes = Array.from(canvas.querySelectorAll(":scope > .canvas-element"));
+          if (!nodes.length) return;
+          let minLeft = Number.POSITIVE_INFINITY;
+          let minTop = Number.POSITIVE_INFINITY;
+          let maxRight = Number.NEGATIVE_INFINITY;
+          let maxBottom = Number.NEGATIVE_INFINITY;
+          nodes.forEach((node) => {
+            const left = Number.parseFloat(node.style.left || "") || node.offsetLeft || 0;
+            const top = Number.parseFloat(node.style.top || "") || node.offsetTop || 0;
+            const width = Math.max(1, node.offsetWidth || 1);
+            const height = Math.max(1, node.offsetHeight || 1);
+            minLeft = Math.min(minLeft, left);
+            minTop = Math.min(minTop, top);
+            maxRight = Math.max(maxRight, left + width);
+            maxBottom = Math.max(maxBottom, top + height);
+          });
+          if (!Number.isFinite(minLeft) || !Number.isFinite(minTop)) return;
+          const contentWidth = Math.max(1, maxRight - minLeft);
+          const contentHeight = Math.max(1, maxBottom - minTop);
+          const viewportCenterX = container.scrollLeft + container.clientWidth / 2;
+          const viewportCenterY = container.scrollTop + container.clientHeight / 2;
+          const desiredLeft = viewportCenterX - contentWidth / 2;
+          const desiredTop = viewportCenterY - contentHeight / 2;
+          const dx = desiredLeft - minLeft;
+          const dy = desiredTop - minTop;
+          nodes.forEach((node) => {
+            const left = Number.parseFloat(node.style.left || "") || node.offsetLeft || 0;
+            const top = Number.parseFloat(node.style.top || "") || node.offsetTop || 0;
+            node.style.left = `${left + dx}px`;
+            node.style.top = `${top + dy}px`;
+          });
+        };
         try {
-          beginUniversalProgress(`Loading ${selectedTemplate?.title || labels[slug] || "website"} template...`, 14, 88);
-          let html = String(selectedTemplate?.sourceHtml || "");
-          if (!html) {
-            const res = await fetch(`/templates/${slug}`, {
-              credentials: "same-origin",
+          const timeoutMs = 15000;
+          const timeoutController = new AbortController();
+          let timeoutId = null;
+          const startTimeout = () =>
+            new Promise((_, reject) => {
+              timeoutId = setTimeout(() => {
+                timeoutController.abort();
+                reject(new Error("FAILED_TEMPLATE_INSERT_TIMEOUT"));
+              }, timeoutMs);
             });
-            if (!res.ok) {
-              throw new Error(`Template request failed: ${res.status}`);
+          beginUniversalProgress(`Loading ${selectedTemplate?.title || labels[slug] || "website"} template...`, 14, 88);
+          const loadOperation = async () => {
+            let html = String(selectedTemplate?.sourceHtml || "");
+            if (!html) {
+              const res = await fetch(`/templates/${slug}`, {
+                credentials: "same-origin",
+                signal: timeoutController.signal,
+              });
+              if (!res.ok) {
+                throw new Error(`Template request failed: ${res.status}`);
+              }
+              html = await res.text();
             }
-            html = await res.text();
-          }
           const ownerName = String(currentUser?.name || "Your Game World").trim() || "Your Game World";
           html = html.replace(/__MEDIALAB_OWNER_NAME__/g, ownerName);
           builderImportedProject = null;
@@ -22421,6 +22539,7 @@ console.log("Triggered ${eventName}", { source, event });
           editor.value = html;
           handleBuilderCodeInput();
           tryApplyCodeModeToCanvas(true);
+          centerCanvasElementsInViewport();
           builderCodeMode = false;
           updateBuilderUI();
           preserveBuilderFullscreenAfterUpload();
@@ -22429,11 +22548,18 @@ console.log("Triggered ${eventName}", { source, event });
             `${selectedTemplate?.title || labels[slug] || "Website"} loaded into the canvas.`,
             "success",
           );
+          };
+          await Promise.race([loadOperation(), startTimeout()]);
+          if (timeoutId) clearTimeout(timeoutId);
         } catch (error) {
+          const isInsertTimeout =
+            error?.message === "FAILED_TEMPLATE_INSERT_TIMEOUT" || error?.name === "AbortError";
           console.error("Template load failed:", error);
           failUniversalProgress("Template loading failed.");
           showBuilderSnackbar(
-            "Could not load that website template right now.",
+            isInsertTimeout
+              ? "failed to insert template, please try again"
+              : "Could not load that website template right now.",
             "error",
           );
         }

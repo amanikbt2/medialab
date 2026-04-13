@@ -1918,6 +1918,7 @@ function buildMarketplacePublicItem(item = {}, viewerId = "") {
     allowTest: Boolean(item.allowTest),
     purpose: item.purpose || "",
     sourceType: item.sourceType || "draft",
+    sourceHtml: String(item.sourceHtml || ""),
     listingKind: item.listingKind || "sale",
     status: item.status || "pending",
     authorName: item.authorName || "",
