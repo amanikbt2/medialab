@@ -8338,6 +8338,40 @@
       function canAdvanceMarketplaceStep(step = marketplaceCreateStep) {
         return getMarketplaceStepIssues(step).length === 0;
       }
+      function setMarketplaceListingKind(kind = "sale") {
+        const normalized = String(kind || "sale").trim().toLowerCase() === "template" ? "template" : "sale";
+        if (normalized === String(marketplaceDraftListing.listingKind || "sale").trim().toLowerCase()) return;
+        if (normalized === "template") {
+          marketplaceDraftListing = {
+            ...marketplaceDraftListing,
+            listingKind: "template",
+            sourceType: "template-code",
+            projectId: "template-code",
+            projectLabel: "Pasted template code",
+            allowTest: false,
+          };
+        } else {
+          marketplaceDraftListing = {
+            ...marketplaceDraftListing,
+            listingKind: "sale",
+            sourceType:
+              String(marketplaceDraftListing.sourceType || "").trim() === "template-code"
+                ? ""
+                : marketplaceDraftListing.sourceType,
+            projectId:
+              String(marketplaceDraftListing.projectId || "").trim() === "template-code"
+                ? ""
+                : marketplaceDraftListing.projectId,
+            projectLabel:
+              String(marketplaceDraftListing.projectId || "").trim() === "template-code"
+                ? ""
+                : marketplaceDraftListing.projectLabel,
+          };
+        }
+        if (currentStudioToolId === "marketplace" && marketplaceActiveTab === "create") {
+          mountMarketplaceTool("drawer");
+        }
+      }
       function setMarketplaceSourceType(type = "") {
         marketplaceDraftListing = {
           ...createEmptyMarketplaceDraftListing(),
@@ -8659,18 +8693,15 @@
         const profileView = marketplaceBrowseView === "templates" ? "templates" : "projects";
         const showingTemplates = profileView === "templates";
         return `<div class="space-y-6">
-          <div class="rounded-[1.6rem] border border-white/10 bg-slate-950/70 p-4">
-            <p class="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-300">My Sales</p>
-            <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <button type="button" onclick="setMarketplaceProfileContentView('projects')" class="rounded-[1.4rem] border p-4 text-left transition-all ${!showingTemplates ? "border-cyan-400/35 bg-cyan-500/[0.12] shadow-[0_0_20px_rgba(34,211,238,0.12)]" : "border-cyan-400/15 bg-cyan-500/[0.06] hover:border-cyan-400/25"}">
-                <p class="text-slate-400">Projects</p>
-                <p class="mt-2 text-2xl font-semibold text-white">${groups.projects.length}</p>
-              </button>
-              <button type="button" onclick="setMarketplaceProfileContentView('templates')" class="rounded-[1.4rem] border p-4 text-left transition-all ${showingTemplates ? "border-fuchsia-400/35 bg-fuchsia-500/[0.12] shadow-[0_0_20px_rgba(232,121,249,0.12)]" : "border-fuchsia-400/15 bg-fuchsia-500/[0.06] hover:border-fuchsia-400/25"}">
-                <p class="text-slate-400">Templates</p>
-                <p class="mt-2 text-2xl font-semibold text-white">${groups.templates.length}</p>
-              </button>
-            </div>
+          <div class="flex flex-wrap items-center gap-3">
+            <button type="button" onclick="setMarketplaceProfileContentView('projects')" class="inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] transition-all ${!showingTemplates ? "border-cyan-400/35 bg-cyan-500/[0.14] text-cyan-200" : "border-white/10 bg-white/[0.04] text-slate-300 hover:border-cyan-400/25"}">
+              <span>Projects</span>
+              <span class="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2 py-0.5 text-[10px] text-cyan-200">${groups.projects.length}</span>
+            </button>
+            <button type="button" onclick="setMarketplaceProfileContentView('templates')" class="inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] transition-all ${showingTemplates ? "border-fuchsia-400/35 bg-fuchsia-500/[0.14] text-fuchsia-200" : "border-white/10 bg-white/[0.04] text-slate-300 hover:border-fuchsia-400/25"}">
+              <span>Templates</span>
+              <span class="rounded-full border border-fuchsia-400/20 bg-fuchsia-500/10 px-2 py-0.5 text-[10px] text-fuchsia-200">${groups.templates.length}</span>
+            </button>
           </div>
           <div>
             <p class="text-[11px] font-black uppercase tracking-[0.18em] ${showingTemplates ? "text-fuchsia-300" : "text-cyan-300"}">${showingTemplates ? "Templates" : "Projects"}</p>
@@ -8706,18 +8737,15 @@
               )
               .join("")}</div>`;
         return `<div class="space-y-6">
-          <div class="rounded-[1.6rem] border border-white/10 bg-slate-950/70 p-4">
-            <p class="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-300">Purchased</p>
-            <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <button type="button" onclick="setMarketplaceProfileContentView('projects')" class="rounded-[1.4rem] border p-4 text-left transition-all ${!showingTemplates ? "border-cyan-400/35 bg-cyan-500/[0.12] shadow-[0_0_20px_rgba(34,211,238,0.12)]" : "border-cyan-400/15 bg-cyan-500/[0.06] hover:border-cyan-400/25"}">
-                <p class="text-slate-400">Projects</p>
-                <p class="mt-2 text-2xl font-semibold text-white">${groups.projects.length}</p>
-              </button>
-              <button type="button" onclick="setMarketplaceProfileContentView('templates')" class="rounded-[1.4rem] border p-4 text-left transition-all ${showingTemplates ? "border-fuchsia-400/35 bg-fuchsia-500/[0.12] shadow-[0_0_20px_rgba(232,121,249,0.12)]" : "border-fuchsia-400/15 bg-fuchsia-500/[0.06] hover:border-fuchsia-400/25"}">
-                <p class="text-slate-400">Templates</p>
-                <p class="mt-2 text-2xl font-semibold text-white">${groups.templates.length}</p>
-              </button>
-            </div>
+          <div class="flex flex-wrap items-center gap-3">
+            <button type="button" onclick="setMarketplaceProfileContentView('projects')" class="inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] transition-all ${!showingTemplates ? "border-cyan-400/35 bg-cyan-500/[0.14] text-cyan-200" : "border-white/10 bg-white/[0.04] text-slate-300 hover:border-cyan-400/25"}">
+              <span>Projects</span>
+              <span class="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2 py-0.5 text-[10px] text-cyan-200">${groups.projects.length}</span>
+            </button>
+            <button type="button" onclick="setMarketplaceProfileContentView('templates')" class="inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] transition-all ${showingTemplates ? "border-fuchsia-400/35 bg-fuchsia-500/[0.14] text-fuchsia-200" : "border-white/10 bg-white/[0.04] text-slate-300 hover:border-fuchsia-400/25"}">
+              <span>Templates</span>
+              <span class="rounded-full border border-fuchsia-400/20 bg-fuchsia-500/10 px-2 py-0.5 text-[10px] text-fuchsia-200">${groups.templates.length}</span>
+            </button>
           </div>
           <div>
             <p class="text-[11px] font-black uppercase tracking-[0.18em] ${showingTemplates ? "text-fuchsia-300" : "text-cyan-300"}">${showingTemplates ? "Purchased Templates" : "Purchased Projects"}</p>
@@ -8773,6 +8801,13 @@
           <div class="mt-6">
             ${marketplaceCreateStep === 1 ? `
               <div class="space-y-4">
+                <label class="block">
+                  <span class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Listing type</span>
+                  <select onchange="setMarketplaceListingKind(this.value)" class="mt-3 w-full rounded-2xl border border-white/10 bg-slate-950/85 px-4 py-3 text-white outline-none transition-all focus:border-cyan-400 focus:bg-slate-950">
+                    <option value="sale" ${marketplaceDraftListing.listingKind === "template" ? "" : "selected"} class="bg-slate-950 text-white">Project</option>
+                    <option value="template" ${marketplaceDraftListing.listingKind === "template" ? "selected" : ""} class="bg-slate-950 text-white">Template</option>
+                  </select>
+                </label>
                 ${
                   marketplaceDraftListing.listingKind === "template"
                     ? `<div class="rounded-[1.8rem] border border-fuchsia-400/15 bg-fuchsia-500/[0.06] p-5">
@@ -8929,13 +8964,6 @@
                     <span class="mt-2 block text-sm leading-6 text-slate-300">Let people run this sale project for 30 seconds from its marketplace dashboard before they decide.</span>
                   </span>
                 </label>
-                <label class="flex items-start gap-3 rounded-[1.6rem] border border-fuchsia-400/15 bg-fuchsia-500/[0.06] p-4">
-                  <input type="checkbox" ${marketplaceDraftListing.listingKind === "template" ? "checked" : ""} onchange="toggleMarketplaceTemplateMode(this.checked, this)" class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-fuchsia-400 accent-fuchsia-400" />
-                  <span class="min-w-0">
-                    <span class="block text-[11px] font-black uppercase tracking-[0.18em] text-fuchsia-200">Sell as template</span>
-                    <span class="mt-2 block text-sm leading-6 text-slate-300">List this as a reusable starter in Marketplace Templates instead of a standalone sale project.</span>
-                  </span>
-                </label>
               </div>`}
           </div>
           <div class="mt-6 flex items-center justify-between gap-3">
@@ -9056,7 +9084,7 @@
               <p class="mt-2 text-sm text-slate-400">Browse polished standalone sites and reusable builder starters from MediaLab creators.</p>
             </div>
             <div class="flex items-center gap-3">
-              <button type="button" onclick="toggleMarketplaceProfileMode()" class="inline-flex h-12 items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 text-cyan-200 hover:bg-cyan-500/15 transition-all">
+              <button type="button" onclick="toggleMarketplaceProfileMode()" class="inline-flex h-12 items-center gap-2 rounded-2xl border px-4 transition-all ${profileMode ? "border-fuchsia-400/30 bg-fuchsia-500/[0.12] text-fuchsia-100 shadow-[0_0_24px_rgba(232,121,249,0.2)]" : "border-cyan-400/20 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/15"}">
                 <i id="marketplace-profile-toggle-icon" class="fas ${profileMode ? "fa-globe" : "fa-user-circle"}"></i>
                 <span id="marketplace-profile-toggle-label" class="text-[11px] font-black uppercase tracking-[0.18em]">${profileMode ? "Global" : "Me"}</span>
               </button>
