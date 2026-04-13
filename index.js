@@ -4989,7 +4989,7 @@ app.post("/api/marketplace", publishRateLimit, express.json({ limit: "15mb" }), 
     const description = sanitizeMarketplaceText(req.body?.description || "", 1200);
     const purpose = sanitizeMarketplaceText(req.body?.purpose || "", 800);
     const category = sanitizeMarketplaceText(req.body?.category || "General", 80) || "General";
-    const price = normalizeMarketplacePrice(req.body?.price);
+    const price = listingKind === "template" ? 0 : normalizeMarketplacePrice(req.body?.price);
     const allowTest = Boolean(req.body?.allowTest);
     const screenshots = (Array.isArray(req.body?.screenshots) ? req.body.screenshots : [])
       .map((value) => String(value || "").trim())
@@ -5244,9 +5244,11 @@ app.patch("/api/marketplace/:id", publishRateLimit, express.json({ limit: "15mb"
     const purpose = sanitizeMarketplaceText(req.body?.purpose || item.purpose || "", 800);
     const category =
       sanitizeMarketplaceText(req.body?.category || item.category || "General", 80) || "General";
-    const price = normalizeMarketplacePrice(
-      req.body?.price !== undefined ? req.body.price : item.price,
-    );
+    const price = listingKind === "template"
+      ? 0
+      : normalizeMarketplacePrice(
+          req.body?.price !== undefined ? req.body.price : item.price,
+        );
     const allowTest =
       req.body?.allowTest !== undefined ? Boolean(req.body.allowTest) : Boolean(item.allowTest);
     const screenshots = (Array.isArray(req.body?.screenshots) ? req.body.screenshots : item.screenshots || [])
