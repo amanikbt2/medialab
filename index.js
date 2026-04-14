@@ -3814,6 +3814,8 @@ app.post("/api/ai/chat-edit", async (req, res) => {
     let assistantReply = "";
     let modelUsed = "";
     let lastError = null;
+    let modelSwitchUsed = false;
+    let modelSwitchReason = "";
     for (const model of models) {
       try {
         const groqResponse = await nodeFetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -3884,6 +3886,16 @@ app.post("/api/ai/chat-edit", async (req, res) => {
         break;
       } catch (modelError) {
         lastError = modelError;
+        const errorText = String(modelError?.message || "").toLowerCase();
+        const hitRateLimit =
+          errorText.includes("rate_limit_exceeded") ||
+          errorText.includes("rate limit reached") ||
+          errorText.includes("tokens per minute") ||
+          errorText.includes("\"type\":\"tokens\"");
+        if (hitRateLimit) {
+          modelSwitchUsed = true;
+          modelSwitchReason = "rate_limit";
+        }
         await createUsageLog({
           user,
           action: "ai-model-error",
@@ -3896,10 +3908,18 @@ app.post("/api/ai/chat-edit", async (req, res) => {
             mode,
           },
         });
-        await AIModel.updateOne(
-          { _id: model._id },
-          { $set: { status: "offline", lastTested: new Date() } },
-        );
+        // Rate-limited models may recover quickly; keep them online for future retries.
+        if (hitRateLimit) {
+          await AIModel.updateOne(
+            { _id: model._id },
+            { $set: { status: "online", lastTested: new Date() } },
+          );
+        } else {
+          await AIModel.updateOne(
+            { _id: model._id },
+            { $set: { status: "offline", lastTested: new Date() } },
+          );
+        }
       }
     }
 
@@ -3934,6 +3954,8 @@ app.post("/api/ai/chat-edit", async (req, res) => {
       mode,
       modelUsed,
       modelRecoveryUsed,
+      modelSwitchUsed,
+      modelSwitchReason,
       creditsRemaining: hasUnlimitedAi
         ? null
         : Math.max(0, Number(user.aiQuota.dailyLimit || 10) - Number(user.aiQuota.usedToday || 0)),
@@ -4048,6 +4070,8 @@ app.post("/api/ai/autofix", async (req, res) => {
     let sanitizedContent = "";
     let selectedModel = "";
     let lastError = null;
+    let modelSwitchUsed = false;
+    let modelSwitchReason = "";
     for (const model of models) {
       try {
         const groqResponse = await nodeFetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -4089,6 +4113,16 @@ app.post("/api/ai/autofix", async (req, res) => {
         break;
       } catch (error) {
         lastError = error;
+        const errorText = String(error?.message || "").toLowerCase();
+        const hitRateLimit =
+          errorText.includes("rate_limit_exceeded") ||
+          errorText.includes("rate limit reached") ||
+          errorText.includes("tokens per minute") ||
+          errorText.includes("\"type\":\"tokens\"");
+        if (hitRateLimit) {
+          modelSwitchUsed = true;
+          modelSwitchReason = "rate_limit";
+        }
         await createUsageLog({
           user,
           action: "ai-model-error",
@@ -4100,10 +4134,17 @@ app.post("/api/ai/autofix", async (req, res) => {
             endpoint: "/api/ai/autofix",
           },
         });
-        await AIModel.updateOne(
-          { _id: model._id },
-          { $set: { status: "offline", lastTested: new Date() } },
-        );
+        if (hitRateLimit) {
+          await AIModel.updateOne(
+            { _id: model._id },
+            { $set: { status: "online", lastTested: new Date() } },
+          );
+        } else {
+          await AIModel.updateOne(
+            { _id: model._id },
+            { $set: { status: "offline", lastTested: new Date() } },
+          );
+        }
       }
     }
     if (!sanitizedContent) {
@@ -4130,6 +4171,8 @@ app.post("/api/ai/autofix", async (req, res) => {
       updatedCode: sanitizedContent,
       modelUsed: selectedModel || "unknown",
       modelRecoveryUsed,
+      modelSwitchUsed,
+      modelSwitchReason,
       creditsRemaining: hasUnlimitedAi
         ? null
         : Math.max(0, Number(user.aiQuota.dailyLimit || 10) - Number(user.aiQuota.usedToday || 0)),

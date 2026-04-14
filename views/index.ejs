@@ -19259,6 +19259,7 @@
       let aiHiddenAgentContext = "";
       let aiAgentStage = "idle";
       let aiModelRecoveryInFlight = false;
+      let aiModelSwitchingInFlight = false;
       let aiInfrastructureModels = [];
       let builderStyleSyncTimer = null;
       let builderProjectFiles = null;
@@ -27338,7 +27339,7 @@ ${interactionBlock}
           aiCreditsRemaining == null
             ? "Credits: Pro"
             : "Credits: " + String(Math.max(0, Number(aiCreditsRemaining || 0)));
-        if (recoveryEl) recoveryEl.classList.toggle("hidden", !aiModelRecoveryInFlight);
+        if (recoveryEl) recoveryEl.classList.toggle("hidden", !(aiModelRecoveryInFlight || aiModelSwitchingInFlight));
       }
       function setAiAgentStage(stage = "idle") {
         aiAgentStage = String(stage || "idle").trim().toLowerCase();
@@ -27929,6 +27930,14 @@ ${interactionBlock}
           }
           aiActiveModel = String(data.modelUsed || "").trim() || aiActiveModel;
           if (data.modelRecoveryUsed) aiModelRecoveryInFlight = true;
+          if (data.modelSwitchUsed && data.modelSwitchReason === "rate_limit") {
+            aiModelSwitchingInFlight = true;
+            aiChatMessages.push({
+              role: "assistant",
+              text: "Choosing the best model for your response...",
+            });
+            renderBuilderAiChat();
+          }
           if (data.creditsRemaining !== undefined) aiCreditsRemaining = data.creditsRemaining;
           return String(data.assistantReply || "").trim();
         };
@@ -28002,6 +28011,7 @@ ${interactionBlock}
         await syncAiContextSilently();
         aiChatSending = true;
         aiModelRecoveryInFlight = false;
+        aiModelSwitchingInFlight = false;
         if (input) input.value = "";
         if (sendBtn) {
           sendBtn.disabled = true;
@@ -28071,6 +28081,7 @@ ${interactionBlock}
         }
         aiMagicFixRunning = true;
         aiModelRecoveryInFlight = false;
+        aiModelSwitchingInFlight = false;
         if (canvas) canvas.classList.add("magic-fix-active");
         if (magicBtn) magicBtn.disabled = true;
         if (magicIcon) magicIcon.classList.add("is-spinning");
@@ -28092,6 +28103,14 @@ ${interactionBlock}
           }
           aiActiveModel = String(data.modelUsed || "deepseek-r1-distill-llama-70b");
           if (data.modelRecoveryUsed) aiModelRecoveryInFlight = true;
+          if (data.modelSwitchUsed && data.modelSwitchReason === "rate_limit") {
+            aiModelSwitchingInFlight = true;
+            aiChatMessages.push({
+              role: "assistant",
+              text: "Choosing the best model for your response...",
+            });
+            renderBuilderAiChat();
+          }
           if (data.creditsRemaining !== undefined) aiCreditsRemaining = data.creditsRemaining;
           if (editor) {
             editor.value = String(data.updatedCode || "");
