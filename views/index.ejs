@@ -1592,8 +1592,43 @@
         to { transform: rotate(360deg); }
       }
       #web-canvas.magic-fix-active {
-        filter: blur(15px) brightness(1.2) saturate(1.5);
-        transition: filter 0.3s ease;
+        filter: brightness(1.08) saturate(1.2);
+        transition: filter 0.28s ease;
+      }
+      #web-canvas.magic-fix-active::before {
+        content: "";
+        position: absolute;
+        inset: -25% -35%;
+        pointer-events: none;
+        z-index: 45;
+        background:
+          radial-gradient(circle at 20% 30%, rgba(34, 211, 238, 0.24), transparent 36%),
+          radial-gradient(circle at 78% 62%, rgba(251, 191, 36, 0.2), transparent 32%),
+          linear-gradient(
+            112deg,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 255, 255, 0) 38%,
+            rgba(255, 255, 255, 0.5) 50%,
+            rgba(255, 255, 255, 0) 62%,
+            rgba(255, 255, 255, 0) 100%
+          );
+        mix-blend-mode: screen;
+        opacity: 0;
+        animation: mlMagicWipeSweep 0.85s cubic-bezier(0.2, 0.72, 0.18, 1) forwards;
+      }
+      #web-canvas.magic-fix-active::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 44;
+        background-image:
+          radial-gradient(circle, rgba(255, 255, 255, 0.65) 0 1px, transparent 1.8px),
+          radial-gradient(circle, rgba(34, 211, 238, 0.42) 0 1px, transparent 2px);
+        background-size: 34px 34px, 48px 48px;
+        background-position: 0 0, 12px 18px;
+        opacity: 0;
+        animation: mlMagicSparkleField 0.8s ease-out forwards;
       }
       #btn-magic-fix {
         border: 1px solid rgba(251, 191, 36, 0.28);
@@ -1608,6 +1643,37 @@
       @keyframes mlMagicFixSpin {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
+      }
+      @keyframes mlMagicWipeSweep {
+        0% {
+          transform: translate3d(-48%, 0, 0) rotate(-6deg);
+          opacity: 0;
+        }
+        18% {
+          opacity: 0.95;
+        }
+        72% {
+          opacity: 0.8;
+        }
+        100% {
+          transform: translate3d(48%, 0, 0) rotate(6deg);
+          opacity: 0;
+        }
+      }
+      @keyframes mlMagicSparkleField {
+        0% {
+          opacity: 0;
+          transform: scale(0.98);
+          filter: blur(0.6px);
+        }
+        32% {
+          opacity: 0.55;
+        }
+        100% {
+          opacity: 0;
+          transform: scale(1.02);
+          filter: blur(1.1px);
+        }
       }
       .ml-section-active {
         animation: mlSectionFadeIn 0.3s ease;
@@ -2078,6 +2144,15 @@
             transparent 32%
           ),
           rgba(15, 23, 42, 0.72);
+      }
+      #tool-grid {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1.5rem;
+      }
+      #tool-grid .tool-card {
+        width: min(100%, 320px);
       }
       .feature-gate-lockline {
         display: flex;
@@ -27321,6 +27396,7 @@ ${interactionBlock}
           planning: "planning",
           parsing: "parsing",
           applying: "applying",
+          normalizing: "normalizing for canvas",
           implementing: "implementing changes",
           done: "done",
         };
@@ -27354,6 +27430,7 @@ ${interactionBlock}
             planning: "Agent is planning surgical patch",
             parsing: "Agent is parsing action blocks",
             applying: "Agent is applying changes",
+            normalizing: "Agent is making canvas-ready structure",
             implementing: "Agent is implementing changes",
             done: "Agent update complete",
           };
@@ -27730,24 +27807,55 @@ ${interactionBlock}
         }
         return null;
       }
-      function forceImplementAiCanvasSync() {
+      async function forceImplementAiCanvasSync(options = {}) {
+        const { allowNormalizer = true } = options || {};
         const activePath = normalizeBuilderFilePath(activeBuilderFilePath || "index.html") || "index.html";
-        if (!isBuilderHtmlFile(activePath)) return false;
+        if (!isBuilderHtmlFile(activePath)) return { applied: false, normalized: false };
         const editor = document.getElementById("builder-code-editor");
         const latestHtml =
           getBuilderFileContent(activePath) ||
           editor?.value ||
           buildCodeModeDocument() ||
           "";
-        if (!String(latestHtml || "").trim()) return false;
+        if (!String(latestHtml || "").trim()) return { applied: false, normalized: false };
         if (editor) {
           editor.value = String(latestHtml);
           handleBuilderCodeInput();
         }
-        tryApplyCodeModeToCanvas({ silent: true });
+        const converted = tryApplyCodeModeToCanvas({ silent: true });
+        if (!converted && allowNormalizer && loggedIn && currentUser) {
+          try {
+            setAiAgentStage("normalizing");
+            const normalizePrompt =
+              "Convert this HTML into MediaLab canvas-ready structure. Ensure key visible blocks are wrapped as absolute .canvas-element nodes (or ml-container/ml-content compatible wrappers) with preserved layout, readable spacing, and valid inline-safe styles. Return ONLY HTML code, no markdown.";
+            const normalizeRes = await fetch("/api/ai/chat-edit", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                mode: "edit",
+                prompt: normalizePrompt,
+                currentCode: String(latestHtml),
+              }),
+            });
+            const normalizeData = await normalizeRes.json().catch(() => ({}));
+            if (normalizeRes.ok && normalizeData.success && String(normalizeData.updatedCode || "").trim()) {
+              const normalizedHtml = String(normalizeData.updatedCode || "");
+              updateBuilderFileContent(activePath, normalizedHtml);
+              if (editor) {
+                editor.value = normalizedHtml;
+                handleBuilderCodeInput();
+              }
+              tryApplyCodeModeToCanvas({ silent: true });
+              builderCodeMode = false;
+              updateBuilderUI();
+              return { applied: true, normalized: true };
+            }
+          } catch {}
+        }
         builderCodeMode = false;
         updateBuilderUI();
-        return true;
+        return { applied: true, normalized: false };
       }
       function stripAgentActionBlocks(responseText = "") {
         return String(responseText || "")
@@ -28135,7 +28243,13 @@ ${interactionBlock}
             });
           }
           setAiAgentStage("implementing");
-          forceImplementAiCanvasSync();
+          const syncResult = await forceImplementAiCanvasSync({ allowNormalizer: true });
+          if (syncResult?.normalized) {
+            aiChatMessages.push({
+              role: "assistant",
+              text: "Canvas normalization pass complete. Elements are now mapped for editing.",
+            });
+          }
           setAiAgentStage("done");
           renderBuilderAiChat();
         } catch (error) {
