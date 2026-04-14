@@ -12,8 +12,6 @@ import passport from "passport";
 import mongoose from "mongoose";
 import "dotenv/config";
 import multer from "multer";
-import ffmpeg from "fluent-ffmpeg";
-import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import { google } from "googleapis";
 import PDFDocument from "pdfkit";
 
@@ -46,8 +44,6 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Ensure FFmpeg path
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 const app = express();
 const httpServer = createServer(app);
@@ -7796,68 +7792,6 @@ app.post("/api/upload", upload.single("file"), (req, res) => {
     return res.status(400).json({ success: false, message: "No file" });
   res.json({ success: true, filename: req.file.filename });
 });
-
-// --- VIDEO TO AUDIO ---
-app.post("/api/convert/video-to-audio", async (req, res) => {
-  const { videoFile, socketId, requestedFormat } = req.body;
-  const format = requestedFormat || "mp3";
-  const outputFileName = `audio_${Date.now()}.${format}`;
-  const outputPath = path.join(exportDir, outputFileName);
-  const inputPath = path.join(uploadDir, videoFile);
-
-  if (!fs.existsSync(inputPath))
-    return res.status(404).json({ success: false, message: "File not found" });
-
-  ffmpeg(inputPath)
-    .toFormat(format)
-    .on("start", () => {
-      if (socketId)
-        io.to(socketId).emit("process-step", {
-          message: "🎸 Extracting Audio...",
-          percent: 30,
-        });
-    })
-    .on("progress", (progress) => {
-      if (progress.percent && socketId) {
-        const overallPercent = 30 + Math.round(progress.percent) * 0.6;
-        io.to(socketId).emit("process-step", {
-          message: "AI Converting...",
-          percent: Math.min(overallPercent, 95),
-        });
-      }
-    })
-    .on("end", async () => {
-      const finalUrl = `/exports/${outputFileName}`;
-      if (socketId)
-        io.to(socketId).emit("process-step", {
-          message: "✨ Optimization Complete!",
-          percent: 100,
-        });
-
-      if (req.user) {
-        const user = await User.findById(req.user._id);
-        if (user) {
-          user.projects = user.projects.filter((item) => item.fileUrl !== finalUrl);
-          user.projects.push({
-            toolType: "Video → Audio",
-            fileName: videoFile,
-            fileUrl: finalUrl,
-            createdAt: new Date(),
-          });
-          user.projects = user.projects
-            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
-            .slice(-10);
-          await user.save();
-        }
-      }
-      res.json({ success: true, audioUrl: finalUrl });
-    })
-    .on("error", (err) =>
-      res.status(500).json({ success: false, message: err.message }),
-    )
-    .save(outputPath);
-});
-
 
 app.post("/api/community-feedback", async (req, res) => {
   try {

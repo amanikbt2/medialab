@@ -28,7 +28,7 @@
     <meta name="google-adsense-account" content="ca-pub-8914021980453978" />
     <meta
       name="description"
-      content="Convert your images into pdf, videos into audio, text to any type of document conversion, AI voice clonning, drag and drop website builder, text to speech and AI image editing."
+      content="Developer-focused visual IDE with drag-and-drop web builder, database explorer, project collaboration, and live deployment workflows."
     />
     <meta property="og:title" content="MediaLab | AI Creative Studio" />
     <meta
@@ -2878,58 +2878,6 @@
             <span class="font-medium text-sm text-gray-200">Database</span>
           </div>
           <div
-            data-tool-switch="text-doc"
-            onclick="switchTool('text-doc')"
-            class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-gray-800 px-5 py-2.5 rounded-3xl cursor-pointer"
-          >
-            <i class="fas fa-file-alt text-cyan-400"></i>
-            <span class="font-medium text-sm text-gray-200">Text → Word</span>
-          </div>
-          <div
-            data-tool-switch="video-audio"
-            onclick="switchTool('video-audio')"
-            class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-gray-800 px-5 py-2.5 rounded-3xl cursor-pointer"
-          >
-            <i class="fas fa-video text-cyan-400"></i>
-            <span class="font-medium text-sm text-gray-200">Video → Audio</span>
-          </div>
-          <div
-            data-tool-switch="text-to-speech"
-            onclick="switchTool('text-to-speech')"
-            class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-gray-800/50 border border-amber-500/10 px-5 py-2.5 rounded-3xl cursor-pointer hover:border-amber-500/40 transition-all relative"
-          >
-            <i class="fas fa-volume-up text-amber-500 text-sm"></i>
-            <span class="font-medium text-sm text-gray-200">Text → Speech</span>
-            <span
-              class="text-[6px] font-black bg-amber-500/20 text-amber-500 border border-amber-500/30 px-1.5 py-0.5 rounded-md uppercase tracking-tighter"
-              >Pro</span
-            >
-          </div>
-          <div
-            data-tool-switch="voice-clone"
-            onclick="switchTool('voice-clone')"
-            class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-gray-800/50 border border-amber-500/10 px-5 py-2.5 rounded-3xl cursor-pointer hover:border-amber-500/40 transition-all relative"
-          >
-            <i class="fas fa-microphone-alt text-amber-500 text-sm"></i>
-            <span class="font-medium text-sm text-gray-200">Voice Clone</span>
-            <span
-              class="text-[6px] font-black bg-amber-500/20 text-amber-500 border border-amber-500/30 px-1.5 py-0.5 rounded-md uppercase tracking-tighter"
-              >Pro</span
-            >
-          </div>
-          <div
-            data-tool-switch="image-edit"
-            onclick="switchTool('image-edit')"
-            class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-gray-800/50 border border-amber-500/10 px-5 py-2.5 rounded-3xl cursor-pointer hover:border-amber-500/40 transition-all relative"
-          >
-            <i class="fas fa-magic text-amber-500 text-sm"></i>
-            <span class="font-medium text-sm text-gray-200">AI Editor</span>
-            <span
-              class="text-[6px] font-black bg-amber-500/20 text-amber-500 border border-amber-500/30 px-1.5 py-0.5 rounded-md uppercase tracking-tighter"
-              >Pro</span
-            >
-          </div>
-          <div
             data-tool-switch="history"
             onclick="switchTool('history')"
             class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-gray-800 px-5 py-2.5 rounded-3xl cursor-pointer"
@@ -3009,7 +2957,7 @@
             <p
               class="text-[10px] font-black text-gray-500 px-5 mt-8 mb-4 uppercase tracking-[0.2em]"
             >
-              Standard Tools
+              Developer Tools
             </p>
             <div
               onclick="switchTool('data-explorer')"
@@ -3021,83 +2969,6 @@
               <span
                 class="font-bold text-sm text-gray-400 group-hover:text-white"
                 >Database</span
-              >
-            </div>
-            <div
-              onclick="switchTool('text-doc')"
-              class="flex items-center gap-x-4 px-5 py-3.5 hover:bg-gray-800 rounded-2xl cursor-pointer group transition-all"
-            >
-              <i
-                class="fas fa-file-word text-lg text-gray-500 group-hover:text-cyan-400"
-              ></i>
-              <span
-                class="font-bold text-sm text-gray-400 group-hover:text-white"
-                >Text → Word</span
-              >
-            </div>
-            <div
-              onclick="switchTool('video-audio')"
-              class="flex items-center gap-x-4 px-5 py-3.5 hover:bg-gray-800 rounded-2xl cursor-pointer group transition-all"
-            >
-              <i
-                class="fas fa-video text-lg text-gray-500 group-hover:text-cyan-400"
-              ></i>
-              <span
-                class="font-bold text-sm text-gray-400 group-hover:text-white"
-                >Video → Audio</span
-              >
-            </div>
-            <p
-              class="text-[10px] font-black text-amber-500/60 px-5 mt-8 mb-4 uppercase tracking-[0.2em]"
-            >
-              Premium Tools
-            </p>
-            <div
-              onclick="switchTool('text-to-speech')"
-              class="relative flex items-center gap-x-4 px-5 py-3.5 hover:bg-amber-500/5 rounded-2xl cursor-pointer group transition-all border border-transparent hover:border-amber-500/20"
-            >
-              <i
-                class="fas fa-volume-up text-lg text-gray-500 group-hover:text-amber-500"
-              ></i>
-              <span
-                class="font-bold text-sm text-gray-400 group-hover:text-white"
-                >Text to Speech</span
-              >
-              <span
-                class="ml-auto bg-amber-500/10 text-amber-500 text-[8px] font-black px-1.5 py-0.5 rounded border border-amber-500/20"
-                >PRO</span
-              >
-            </div>
-            <div
-              onclick="switchTool('voice-clone')"
-              class="relative flex items-center gap-x-4 px-5 py-3.5 hover:bg-amber-500/5 rounded-2xl cursor-pointer group transition-all border border-transparent hover:border-amber-500/20"
-            >
-              <i
-                class="fas fa-microphone-alt text-lg text-gray-500 group-hover:text-amber-500"
-              ></i>
-              <span
-                class="font-bold text-sm text-gray-400 group-hover:text-white"
-                >Voice Cloning</span
-              >
-              <span
-                class="ml-auto bg-amber-500/10 text-amber-500 text-[8px] font-black px-1.5 py-0.5 rounded border border-amber-500/20"
-                >PRO</span
-              >
-            </div>
-            <div
-              onclick="switchTool('image-edit')"
-              class="relative flex items-center gap-x-4 px-5 py-3.5 hover:bg-amber-500/5 rounded-2xl cursor-pointer group transition-all border border-transparent hover:border-amber-500/20"
-            >
-              <i
-                class="fas fa-magic text-lg text-gray-500 group-hover:text-amber-500"
-              ></i>
-              <span
-                class="font-bold text-sm text-gray-400 group-hover:text-white"
-                >AI Image Editor</span
-              >
-              <span
-                class="ml-auto bg-amber-500/10 text-amber-500 text-[8px] font-black px-1.5 py-0.5 rounded border border-amber-500/20"
-                >PRO</span
               >
             </div>
             <div class="mt-8 pt-8 border-t border-gray-800">
@@ -3173,56 +3044,6 @@
                 <i class="fas fa-database text-cyan-400"></i
                 ><span class="font-medium text-sm text-gray-200"
                   >Database</span
-                >
-              </button>
-              <button
-                data-tool-switch="text-doc"
-                onclick="switchTool('text-doc')"
-                class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-gray-800 border border-white/5 px-5 py-2.5 rounded-3xl cursor-pointer"
-              >
-                <i class="fas fa-file-alt text-cyan-400"></i
-                ><span class="font-medium text-sm text-gray-200"
-                  >Text → Word</span
-                >
-              </button>
-              <button
-                data-tool-switch="video-audio"
-                onclick="switchTool('video-audio')"
-                class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-gray-800 border border-white/5 px-5 py-2.5 rounded-3xl cursor-pointer"
-              >
-                <i class="fas fa-video text-cyan-400"></i
-                ><span class="font-medium text-sm text-gray-200"
-                  >Video to Audio</span
-                >
-              </button>
-              <button
-                data-tool-switch="text-to-speech"
-                onclick="switchTool('text-to-speech')"
-                class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-gray-800 border border-amber-500/10 px-5 py-2.5 rounded-3xl cursor-pointer"
-              >
-                <i class="fas fa-volume-up text-amber-500 text-sm"></i
-                ><span class="font-medium text-sm text-gray-200"
-                  >Text to Speech</span
-                >
-              </button>
-              <button
-                data-tool-switch="voice-clone"
-                onclick="switchTool('voice-clone')"
-                class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-gray-800 border border-amber-500/10 px-5 py-2.5 rounded-3xl cursor-pointer"
-              >
-                <i class="fas fa-microphone-alt text-amber-500 text-sm"></i
-                ><span class="font-medium text-sm text-gray-200"
-                  >Voice Clone</span
-                >
-              </button>
-              <button
-                data-tool-switch="image-edit"
-                onclick="switchTool('image-edit')"
-                class="toolbar-item flex-shrink-0 flex items-center gap-x-3 bg-gray-800 border border-amber-500/10 px-5 py-2.5 rounded-3xl cursor-pointer"
-              >
-                <i class="fas fa-magic text-amber-500 text-sm"></i
-                ><span class="font-medium text-sm text-gray-200"
-                  >AI Editor</span
                 >
               </button>
               <button
@@ -5219,7 +5040,7 @@
       let marketplaceTemplateScreenshotAutoCapturing = false;
       let builderTemplateGridExpanded = false;
       const LOGIN_REQUIRED_TOOL_IDS = ["console", "data-explorer"];
-      const PREMIUM_TOOL_IDS = ["voice-clone", "text-to-speech", "image-edit"];
+      const PREMIUM_TOOL_IDS = [];
       function normalizeHostedBaseUrl(url = "") {
         return String(url || "").trim().replace(/\/$/, "");
       }
@@ -5298,24 +5119,6 @@
           icon: "fa-database",
           desc: "Connect MongoDB and inspect live collections",
         },
-        {
-          id: "voice-clone",
-          title: "Voice Cloning",
-          icon: "fa-microphone",
-          desc: "Clone any voice with AI",
-        },
-        {
-          id: "text-to-speech",
-          title: "Text to Speech",
-          icon: "fa-volume-up",
-          desc: "Natural voice synthesis",
-        },
-        {
-          id: "video-audio",
-          title: "Video → Audio",
-          icon: "fa-video",
-          desc: "Extract high-quality MP3/WAV",
-        },
       ];
       function renderCards() {
         document.getElementById("tool-grid").innerHTML = toolsData
@@ -5393,33 +5196,13 @@
         });
       }
       function renderPremiumFeatureGate(id) {
-        const labels = {
-          "voice-clone": {
-            icon: "fa-microphone-alt",
-            title: "AI Voice Clone",
-            descLoggedOut:
-              "Sign in to request access to MediaLab Pro and unlock studio-grade voice cloning.",
-            descLoggedIn:
-              "Upgrade to MediaLab Pro to unlock studio-grade voice cloning and premium AI voice tools.",
-          },
-          "text-to-speech": {
-            icon: "fa-volume-up",
-            title: "Text to Speech",
-            descLoggedOut:
-              "Sign in to request access to MediaLab Pro and unlock premium neural voice generation.",
-            descLoggedIn:
-              "Upgrade to MediaLab Pro to unlock premium neural voice generation and longer sessions.",
-          },
-          "image-edit": {
-            icon: "fa-magic",
-            title: "AI Image Editor",
-            descLoggedOut:
-              "Sign in to request access to MediaLab Pro and unlock the AI image editing studio.",
-            descLoggedIn:
-              "Upgrade to MediaLab Pro to unlock the AI image editing studio and premium enhancement tools.",
-          },
+        const config = {
+          title: "Premium Feature",
+          descLoggedOut:
+            "Sign in to request access to MediaLab Pro features.",
+          descLoggedIn:
+            "Upgrade to MediaLab Pro to unlock additional premium capabilities.",
         };
-        const config = labels[id] || labels["voice-clone"];
         const pendingMessage = hasPendingPremiumRequest()
           ? `<div class="feature-gate-status feature-gate-status--pending">Pending. Your premium request is being processed. You'll get feedback within 48 hours.</div>`
           : "";
@@ -7815,11 +7598,7 @@
           marketplace: "Loading Marketplace...",
           history: "Loading Projects...",
           "web-builder": "Loading Web Builder...",
-          "text-doc": "Loading Data Explorer...",
           "data-explorer": "Loading Database...",
-          "video-audio": "Loading Video to Audio...",
-          "text-to-speech": "Loading Text to Speech...",
-          "voice-clone": "Loading Voice Clone...",
           "image-edit": "Loading AI Editor...",
         };
         return `<div class="animate-fadeIn min-h-[320px] flex items-center justify-center">
@@ -15009,10 +14788,6 @@
         if (customUpgradeFeatureLabel) return customUpgradeFeatureLabel;
         const labels = {
           "candycrush-template": "Candy Crush Premium Template",
-          "voice-clone": "AI Voice Clone Pro",
-          "text-to-speech": "Text to Speech Pro",
-          "video-audio": "Video to Audio Pro",
-          "text-doc": "Text → Word",
           "data-explorer": "Database",
           "image-edit": "AI Image Editor Pro",
         };
@@ -17312,7 +17087,7 @@
         }
         // 3. VIDEO → AUDIO CONVERTER
         // =============================================================
-        else if (id === "video-audio") {
+        else if (id === "__removed_video_audio__") {
           html = `
             <div class="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 animate-fadeIn">
                 <h2 class="text-3xl sm:text-4xl font-semibold text-white tracking-tighter">Video → Audio</h2>
@@ -17358,7 +17133,7 @@
         // =============================================================
         // 4. TEXT → DOCUMENT
         // =============================================================
-        else if (id === "text-doc") {
+        else if (id === "__removed_text_doc__") {
           html = `
             <div id="word-processor-container" class="word-processor-shell animate-fadeIn">
                 <div id="word-processor-welcome" class="studio-launch-overlay">
@@ -17536,7 +17311,7 @@
         // =============================================================
         // 5. PREMIUM / PRO TOOLS (LOCKED)
         // =============================================================
-        else if (id === "voice-clone") {
+        else if (id === "__removed_voice_clone__") {
           html = `
             <div class="animate-fadeIn space-y-8">
                 <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -17636,7 +17411,7 @@
                     </div>
                 </div>
             </div>`;
-        } else if (id === "text-to-speech") {
+        } else if (id === "__removed_text_to_speech__") {
           html = `
             <div class="feature-gate-shell max-w-3xl">
                 <div class="feature-gate-card feature-gate-card--premium">
