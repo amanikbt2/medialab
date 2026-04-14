@@ -22569,12 +22569,22 @@ console.log("Triggered ${eventName}", { source, event });
         return builderRawImportDocument || buildCodeModeDocument();
       }
       async function buildImportedProjectPreview(files) {
-        const normalizedFiles = Array.from(files || []).map((file) => ({
+        const shouldSkipImportedProjectPath = (rawPath = "") => {
+          const normalized = normalizeImportedProjectPath(rawPath).toLowerCase();
+          if (!normalized) return true;
+          const segments = normalized.split("/").filter(Boolean);
+          return segments.some((segment) =>
+            ["node_modules", ".git", ".next", ".cache", "coverage"].includes(segment),
+          );
+        };
+        const allFiles = Array.from(files || []).map((file) => ({
           file,
           path: normalizeImportedProjectPath(
             file.webkitRelativePath || file.name || "",
           ),
         }));
+        const normalizedFiles = allFiles.filter(({ path }) => !shouldSkipImportedProjectPath(path));
+        const skippedFilesCount = Math.max(0, allFiles.length - normalizedFiles.length);
         if (!normalizedFiles.length) {
           throw new Error("No project files were selected.");
         }
@@ -22608,7 +22618,9 @@ console.log("Triggered ${eventName}", { source, event });
         const percentLabel = document.getElementById("universal-percent");
         if (progressDiv && statusText && bar && percentLabel) {
           progressDiv.classList.remove("hidden");
-          statusText.innerText = "Scanning project files...";
+          statusText.innerText = skippedFilesCount
+            ? `Scanning project files... (${skippedFilesCount} skipped)`
+            : "Scanning project files...";
           bar.classList.remove("bg-green-500", "bg-rose-500");
           bar.classList.add("bg-cyan-400");
           bar.style.width = "10%";
@@ -22729,6 +22741,7 @@ console.log("Triggered ${eventName}", { source, event });
           rootFolder,
           assetMap,
           resolvedCssMap,
+          skippedFilesCount,
         };
       }
       async function handleBuilderFolderImport(fileList) {
@@ -22751,7 +22764,9 @@ console.log("Triggered ${eventName}", { source, event });
           renderRawImportedHtmlPreview(project.rootHtml);
           preserveBuilderFullscreenAfterUpload();
           showBuilderSnackbar(
-            `${project.projectName} loaded as a full hosted preview.`,
+            project.skippedFilesCount
+              ? `${project.projectName} loaded. Skipped ${project.skippedFilesCount} heavy dependency files (node_modules, cache folders).`
+              : `${project.projectName} loaded as a full hosted preview.`,
             "success",
           );
         } catch (error) {
