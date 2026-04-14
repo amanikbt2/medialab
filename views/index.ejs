@@ -19038,6 +19038,8 @@
       let builderInteractionDraft = null;
       let builderInteractionPickMode = false;
       let currentActiveSectionId = "section_main";
+      let builderImportedGlobalCss = "";
+      let builderLastSavedFingerprint = "";
       let builderProjectFiles = null;
       let activeBuilderFilePath = "index.html";
       let selectedBuilderFilePath = "index.html";
@@ -20490,12 +20492,15 @@
           if (isBuilderHtmlFile(normalizedPath) && isBuilderFullHtmlDocument(content)) {
             const parsed = new DOMParser().parseFromString(content, "text/html");
             canvas.innerHTML = String(parsed.body?.innerHTML || "");
+            builderImportedGlobalCss = extractGlobalImportCss(parsed, {});
           } else {
             canvas.innerHTML = content;
+            builderImportedGlobalCss = "";
           }
           ensureBuilderGuides(canvas);
           initCanvasSelection(canvas);
           hydrateCanvasElements();
+          syncBuilderImportedGlobalStyle();
           deselectAll();
         }
         updateBuilderUI();
@@ -20542,23 +20547,36 @@
         document.getElementById("studio-workspace").classList.add("hidden");
         document.getElementById("editor-welcome").classList.remove("hidden");
       }
-      async function quickExitStudio() {
-        if (loggedIn && builderHasCanvasContent()) {
-          try {
-            await saveBuilderDraft({ silent: true, isAutoSave: true });
-          } catch {}
+      function requestBuilderExitConfirmation(onExit) {
+        if (!isBuilderDirty()) {
+          onExit?.();
+          return;
         }
-        performExitStudio();
+        openBuilderConfirmModal(
+          "Exit builder without saving?",
+          "Your work has not been saved. Exit now or save it to Drafts first.",
+          "Exit",
+          () => onExit?.(),
+          "Save Draft",
+          async () => {
+            if (!loggedIn) {
+              showLogin();
+              return;
+            }
+            await saveBuilderDraft({ silent: false, isAutoSave: false });
+            onExit?.();
+          },
+        );
+      }
+      async function quickExitStudio() {
+        requestBuilderExitConfirmation(() => performExitStudio());
       }
       async function exitStudio() {
         if (!builderHasCanvasContent()) {
           performExitStudio();
           return;
         }
-        if (loggedIn) {
-          await saveBuilderDraft({ silent: true, isAutoSave: true });
-        }
-        openFeedbackModal({ exitAfter: true });
+        requestBuilderExitConfirmation(() => performExitStudio());
       }
       function builderHasCanvasContent() {
         const canvas = document.getElementById("web-canvas");
@@ -22140,12 +22158,34 @@ console.log("Triggered ${eventName}", { source, event });
           if (!data.success)
             throw new Error(data.message || "Could not save draft.");
           if (currentUser) currentUser.builderDrafts = data.drafts || [];
+          builderLastSavedFingerprint = getBuilderUnsavedFingerprint();
         } catch (error) {
           if (!silent)
             alert(error.message || "Could not save draft right now.");
           return;
         }
         renderBuilderDrafts();
+      }
+      function getBuilderUnsavedFingerprint() {
+        persistActiveBuilderFileContent();
+        const canvas = document.getElementById("web-canvas");
+        const projectTree = cloneBuilderProjectFiles(ensureBuilderProjectFiles());
+        return JSON.stringify({
+          projectName: builderProjectName || "",
+          activeFilePath: normalizeBuilderFilePath(activeBuilderFilePath || "index.html"),
+          projectFiles: projectTree,
+          pageBackground: getCanvasPageStyleState(canvas).background,
+          importedGlobalCss: builderImportedGlobalCss || "",
+          activeSection: currentActiveSectionId || "section_main",
+        });
+      }
+      function markBuilderSavedState() {
+        builderLastSavedFingerprint = getBuilderUnsavedFingerprint();
+      }
+      function isBuilderDirty() {
+        if (!builderHasCanvasContent()) return false;
+        if (!builderLastSavedFingerprint) return true;
+        return builderLastSavedFingerprint !== getBuilderUnsavedFingerprint();
       }
       function loadBuilderDraftByIndex(index) {
         const drafts = getBuilderDrafts();
@@ -22173,6 +22213,7 @@ console.log("Triggered ${eventName}", { source, event });
         deselectAll();
         loadBuilderFileIntoWorkspace(activeBuilderFilePath);
         renderBuilderProjectExplorer();
+        markBuilderSavedState();
         saveToHistory();
       }
       function newBuilderProject() {
@@ -22183,6 +22224,7 @@ console.log("Triggered ${eventName}", { source, event });
         builderLoadedTemplateSlug = "";
         builderTemplateRuntimeDocument = "";
         resetBuilderProjectFiles();
+        builderImportedGlobalCss = "";
         canvas.innerHTML = "";
         applyCanvasDesignPreset("clean", true);
         ensureBuilderGuides(canvas);
@@ -22190,6 +22232,7 @@ console.log("Triggered ${eventName}", { source, event });
         deselectAll();
         renderBuilderProjectExplorer();
         refreshBuilderCodeMode();
+        markBuilderSavedState();
         saveToHistory();
       }
       function requestNewBuilderProject() {
@@ -22338,6 +22381,26 @@ console.log("Triggered ${eventName}", { source, event });
           },
         );
       }
+      function extractGlobalImportCss(doc, rewriteLookup = {}) {
+        return Array.from(doc.querySelectorAll("style"))
+          .map((styleNode) =>
+            rewriteCssAssetUrls(styleNode.textContent || "", rewriteLookup).trim(),
+          )
+          .filter(Boolean)
+          .join("\n\n");
+      }
+      function syncBuilderImportedGlobalStyle() {
+        const canvas = document.getElementById("web-canvas");
+        if (!canvas) return;
+        canvas
+          .querySelectorAll(":scope > style[data-builder-import-global='true']")
+          .forEach((node) => node.remove());
+        if (!String(builderImportedGlobalCss || "").trim()) return;
+        const styleTag = document.createElement("style");
+        styleTag.dataset.builderImportGlobal = "true";
+        styleTag.textContent = String(builderImportedGlobalCss || "");
+        canvas.prepend(styleTag);
+      }
       function buildImportedProjectPreviewDocument(
         htmlText = "",
         rootFolder = "",
@@ -22381,6 +22444,7 @@ console.log("Triggered ${eventName}", { source, event });
             rewriteCssAssetUrls(node.getAttribute("style") || "", rewriteLookup),
           );
         });
+        builderImportedGlobalCss = extractGlobalImportCss(doc, rewriteLookup);
         return "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
       }
       function getBuilderEditorDocument() {
@@ -23958,15 +24022,13 @@ console.log("Triggered ${eventName}", { source, event });
         e.preventDefault();
         const isResizer = e.target.classList.contains("resizer");
         const isDragHandle = e.target.closest(".drag-handle");
+        const isToolbarControl = e.target.closest(".absolute.-top-10");
+        const canDragFromBody = !isResizer && !isToolbarControl;
         const isAlreadySingleSelected =
           !multiSelectMode &&
           selectedElements.length === 1 &&
           selectedElements[0] === el;
-        if (isAlreadySingleSelected && !isResizer && !isDragHandle) {
-          deselectAll();
-          return;
-        }
-        if (multiSelectMode && !isResizer && !isDragHandle) {
+        if (multiSelectMode && !isResizer && !isDragHandle && !canDragFromBody) {
           if (!selectedElements.includes(el)) {
             addElementSelection(el);
             return;
@@ -23979,7 +24041,7 @@ console.log("Triggered ${eventName}", { source, event });
         ) {
           selectElement(el);
         }
-        if (!isResizer && !isDragHandle) return;
+        if (!isResizer && !isDragHandle && !canDragFromBody) return;
         const movingSelection =
           !isResizer &&
           selectedElements.length > 1 &&
@@ -24731,6 +24793,7 @@ console.log("Triggered ${eventName}", { source, event });
           applyBuilderViewportToCanvas();
           canvas.classList.toggle("collaboration-view-only", isCollaborationViewOnly());
           ensureBuilderSections({ skipHistory: true });
+          syncBuilderImportedGlobalStyle();
         }
         const editor = document.getElementById("builder-code-editor");
         if (editor) editor.readOnly = isCollaborationViewOnly();
@@ -26050,6 +26113,89 @@ console.log("Triggered ${eventName}", { source, event });
           Boolean(styleMap["z-index"])
         );
       }
+      function buildComputedImportStyleText(style, {
+        includeLayout = false,
+        width = 0,
+        height = 0,
+      } = {}) {
+        if (!style) return "";
+        const keys = includeLayout
+          ? [
+              "position",
+              "left",
+              "top",
+              "right",
+              "bottom",
+              "z-index",
+              "opacity",
+              "mix-blend-mode",
+              "transform",
+            ]
+          : [
+              "display",
+              "flex-direction",
+              "flex-wrap",
+              "align-items",
+              "justify-content",
+              "gap",
+              "padding",
+              "padding-top",
+              "padding-right",
+              "padding-bottom",
+              "padding-left",
+              "margin",
+              "margin-top",
+              "margin-right",
+              "margin-bottom",
+              "margin-left",
+              "border",
+              "border-top",
+              "border-right",
+              "border-bottom",
+              "border-left",
+              "border-radius",
+              "background",
+              "background-color",
+              "background-image",
+              "background-size",
+              "background-position",
+              "background-repeat",
+              "box-shadow",
+              "color",
+              "font",
+              "font-family",
+              "font-size",
+              "font-weight",
+              "line-height",
+              "letter-spacing",
+              "text-align",
+              "text-transform",
+              "text-decoration",
+              "white-space",
+              "word-break",
+              "overflow",
+              "overflow-x",
+              "overflow-y",
+              "object-fit",
+              "object-position",
+              "filter",
+              "backdrop-filter",
+            ];
+        const styleMap = {};
+        keys.forEach((key) => {
+          const value = String(style.getPropertyValue(key) || "").trim();
+          if (!value || value === "initial" || value === "normal" || value === "none") return;
+          styleMap[key] = value;
+        });
+        if (includeLayout) {
+          styleMap.position = "absolute";
+          styleMap.left = `${Math.max(0, Number(width?.left ?? 0))}px`;
+          styleMap.top = `${Math.max(0, Number(width?.top ?? 0))}px`;
+          styleMap.width = `${Math.max(40, Number(height?.width ?? 0) || 0)}px`;
+          styleMap.height = `${Math.max(24, Number(height?.height ?? 0) || 0)}px`;
+        }
+        return buildInlineStyleText(styleMap);
+      }
       function buildSyntheticImportNode(sourceNode, index, stackedTop = 32, layout = {}) {
         const type = inferBuilderImportType(sourceNode);
         const wrapper = document.createElement("div");
@@ -26057,7 +26203,7 @@ console.log("Triggered ${eventName}", { source, event });
         clonedContent
           .querySelectorAll("script,style,link,meta,noscript,template")
           .forEach((node) => node.remove());
-        const currentStyle = String(sourceNode.getAttribute("style") || "").trim();
+        const currentStyle = String(layout?.wrapperStyle || sourceNode.getAttribute("style") || "").trim();
         const measuredLeft = Math.max(0, Number(layout?.left || 0));
         const measuredTop = Math.max(0, Number(layout?.top || stackedTop));
         const measuredWidth = Math.max(40, Number(layout?.width || 0));
@@ -26081,6 +26227,10 @@ console.log("Triggered ${eventName}", { source, event });
           div: "220px",
         };
         clonedContent.classList.add("ml-content");
+        const computedContentStyle = String(layout?.contentStyle || "").trim();
+        if (computedContentStyle) {
+          clonedContent.setAttribute("style", computedContentStyle);
+        }
         wrapper.id = sourceNode.id || `imported-node-${Date.now()}-${index + 1}`;
         wrapper.className = "ml-container";
         wrapper.setAttribute("data-type", type);
@@ -26130,11 +26280,28 @@ console.log("Triggered ${eventName}", { source, event });
           const rootRect = root.getBoundingClientRect();
           return measuredNodes.map((node) => {
             const rect = node.getBoundingClientRect();
+            const computed = window.getComputedStyle(node);
             return {
               left: Math.max(0, rect.left - rootRect.left),
               top: Math.max(0, rect.top - rootRect.top),
               width: Math.max(40, rect.width || node.offsetWidth || 0),
               height: Math.max(24, rect.height || node.offsetHeight || 0),
+              wrapperStyle: buildInlineStyleText({
+                position: "absolute",
+                left: `${Math.max(0, rect.left - rootRect.left)}px`,
+                top: `${Math.max(0, rect.top - rootRect.top)}px`,
+                width: `${Math.max(40, rect.width || node.offsetWidth || 0)}px`,
+                height: `${Math.max(24, rect.height || node.offsetHeight || 0)}px`,
+                zIndex: String(computed.zIndex || "").trim(),
+                opacity: String(computed.opacity || "").trim(),
+                mixBlendMode: String(computed.mixBlendMode || "").trim(),
+                transform:
+                  String(computed.transform || "").trim() &&
+                  String(computed.transform || "").trim() !== "none"
+                    ? String(computed.transform || "").trim()
+                    : "",
+              }),
+              contentStyle: buildComputedImportStyleText(computed),
             };
           });
         } finally {
@@ -26337,6 +26504,7 @@ console.log("Triggered ${eventName}", { source, event });
             });
           });
         const css = cssBlocks.join("\n\n");
+        const globalImportCss = String(builderImportedGlobalCss || "").trim();
         const body = exportNodes
           .map((markup) => formatHtmlFragment(markup, "  "))
           .join("\n\n");
@@ -26352,13 +26520,14 @@ console.log("Triggered ${eventName}", { source, event });
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
     <link rel="stylesheet" href="${baseName}.css" />
+    ${globalImportCss ? `<style>\n${globalImportCss}\n    </style>` : ""}
   </head>
   <body>
 ${body}
 ${interactionBlock}
   </body>
 </html>`;
-        return { html, css, body, interactionScript };
+        return { html, css, body, interactionScript, globalImportCss };
       }
       function buildCodeModeDocument() {
         if (builderRawImportDocument) return builderRawImportDocument;
@@ -26368,6 +26537,9 @@ ${interactionBlock}
           .split("\n")
           .map((line) => (line ? `    ${line}` : ""))
           .join("\n");
+        const globalImportBlock = payload.globalImportCss
+          ? `\n    ${String(payload.globalImportCss).split("\n").join("\n    ")}`
+          : "";
         const interactionBlock = payload.interactionScript
           ? `\n${payload.interactionScript}`
           : "";
@@ -26379,6 +26551,7 @@ ${interactionBlock}
     <title>MediaLab Creative Export</title>
     <style>
 ${cssBlock}
+${globalImportBlock}
     </style>
     <script>
       (() => {
@@ -26474,6 +26647,7 @@ ${interactionBlock}
         position: relative;
         font-family: Inter, system-ui, sans-serif;
       }
+${String(builderImportedGlobalCss || "").trim()}
       .canvas-element,
       .absolute {
         position: absolute;
@@ -27107,6 +27281,7 @@ ${interactionBlock}
         });
         importCodeNodesToCanvas(importNodes, { onProgress: reportProgress });
         builderRawImportDocument = "";
+        syncBuilderImportedGlobalStyle();
         reportProgress?.(98, "Finalizing editable canvas...");
         if (!silent) {
           showBuilderSnackbar("Code converted into editable visual blocks.", "success");
