@@ -1592,7 +1592,7 @@
         to { transform: rotate(360deg); }
       }
       #web-canvas.magic-fix-active {
-        filter: brightness(1.08) saturate(1.2);
+        filter: blur(11px) brightness(1.12) saturate(1.28);
         transition: filter 0.28s ease;
       }
       #web-canvas.magic-fix-active::before {
@@ -27484,6 +27484,20 @@ ${interactionBlock}
           aiContextSyncInFlight = false;
         }
       }
+      function buildLatestAiCodeSnapshot() {
+        persistActiveBuilderFileContent();
+        const editor = document.getElementById("builder-code-editor");
+        const activePath = normalizeBuilderFilePath(activeBuilderFilePath || "index.html") || "index.html";
+        const fromFile = getBuilderFileContent(activePath);
+        const fromEditor = String(editor?.value || "").trim();
+        const fromCanvas = buildCodeModeDocument();
+        return (
+          String(fromFile || "").trim() ||
+          fromEditor ||
+          String(fromCanvas || "").trim() ||
+          `<div id="ml-root" class="ml-container"><div class="ml-content">New MediaLab template</div></div>`
+        );
+      }
       function getWorkspaceIndex() {
         const root = ensureBuilderProjectFiles();
         const output = [];
@@ -28094,21 +28108,23 @@ ${interactionBlock}
         let strictExecutionRetried = false;
         const workspaceIndex = getWorkspaceIndex();
         const activeFileName = normalizeBuilderFilePath(activeBuilderFilePath || "index.html") || "index.html";
-        const activeFileContent = getBuilderFileContent(activeFileName) || currentCode;
         const repoMap = buildSemanticRepoMap();
         const runPhase = async (agentPhase = "execute", extraContext = "") => {
+          const latestCode = buildLatestAiCodeSnapshot();
+          const latestActiveFile = normalizeBuilderFilePath(activeBuilderFilePath || activeFileName || "index.html") || "index.html";
+          const latestActiveFileContent = getBuilderFileContent(latestActiveFile) || latestCode;
           const res = await fetch("/api/ai/chat-edit", {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               prompt,
-              currentCode,
+              currentCode: latestCode,
               mode: "agent",
               agentPhase,
               workspaceIndex,
-              activeFileName,
-              activeFileContent,
+              activeFileName: latestActiveFile,
+              activeFileContent: latestActiveFileContent,
               agentContext: [extraContext, `RepoMap: ${JSON.stringify(repoMap)}`].filter(Boolean).join("\n\n"),
             }),
           });
@@ -28207,10 +28223,7 @@ ${interactionBlock}
           renderBuilderAiChat();
           return;
         }
-        const currentCode =
-          editor?.value?.trim() ||
-          buildCodeModeDocument() ||
-          `<div id="ml-root" class="ml-container"><div class="ml-content">New MediaLab template</div></div>`;
+        const currentCode = buildLatestAiCodeSnapshot();
         await syncAiContextSilently();
         aiChatSending = true;
         aiModelRecoveryInFlight = false;
