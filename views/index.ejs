@@ -27505,6 +27505,15 @@ ${interactionBlock}
           .replace(/\[ACTION\]\s*[\s\S]*?\s*\[\/ACTION\]/gi, "")
           .trim();
       }
+      function hasActionableAgentPayload(responseText = "") {
+        const text = String(responseText || "");
+        if (!text) return false;
+        if (extractAgentActionBlocks(text).length) return true;
+        if (/REQUEST_FILE:\s*[^\n\r]+/i.test(text)) return true;
+        if (/(UPDATE_FILE|CREATE_FILE|CREATE_FOLDER|EDIT_CANVAS):/i.test(text)) return true;
+        if (/<(?:!doctype|html|head|body|div|section|main|style|script)[\s>]/i.test(text)) return true;
+        return false;
+      }
       function ensureBuilderFolderByPath(path = "") {
         const parts = splitBuilderFilePath(path);
         let currentPath = "";
@@ -27689,6 +27698,7 @@ ${interactionBlock}
       async function runBuilderAiAgent(prompt = "", currentCode = "") {
         let responseText = "";
         let agentContext = String(aiHiddenAgentContext || "").trim();
+        let strictExecutionRetried = false;
         const workspaceIndex = getWorkspaceIndex();
         const activeFileName = normalizeBuilderFilePath(activeBuilderFilePath || "index.html") || "index.html";
         const activeFileContent = getBuilderFileContent(activeFileName) || currentCode;
@@ -27757,6 +27767,19 @@ ${interactionBlock}
           aiChatMessages.push({ role: "system_hidden", text: hiddenMessage });
           agentContext = [agentContext, hiddenMessage].filter(Boolean).join("\n\n");
           aiHiddenAgentContext = agentContext;
+        }
+        if (!hasActionableAgentPayload(responseText) && !strictExecutionRetried) {
+          strictExecutionRetried = true;
+          responseText = await runPhase(
+            "execute",
+            [
+              agentContext,
+              "STRICT_EXECUTION_RULE: Return at least one [ACTION]{...}[/ACTION] block now. Do not return proposal-only text.",
+              "If user asked style/background changes, emit UPDATE_CSS. If user asked structure changes, emit UPDATE_FILE or EDIT_CANVAS.",
+            ]
+              .filter(Boolean)
+              .join("\n\n"),
+          );
         }
         return responseText;
       }
