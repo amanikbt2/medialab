@@ -25722,9 +25722,59 @@ console.log("Triggered ${eventName}", { source, event });
           }
         }
         persistActiveBuilderFileContent();
-        builderCodeMode = !builderCodeMode;
+        const nextCodeMode = !builderCodeMode;
+        if (!nextCodeMode && isBuilderHtmlFile(activePath)) {
+          compileCodeBackToVisualMode().finally(() => {
+            builderCodeMode = false;
+            updateBuilderUI();
+          });
+          return;
+        }
+        builderCodeMode = nextCodeMode;
         if (builderCodeMode) refreshBuilderCodeMode();
         updateBuilderUI();
+      }
+      async function runBuilderCodeConverterAgent(sourceHtml = "", mode = "run") {
+        const html = String(sourceHtml || "").trim();
+        if (!html) return "";
+        if (!loggedIn || !currentUser) return html;
+        const prompt =
+          mode === "visual"
+            ? "You are the MediaLab Visual Compiler. Convert this HTML into canvas-ready builder code that reconstructs clean draggable objects. Preserve intended visual layout, IDs where possible, and stable spacing. Return ONLY valid HTML (no markdown). Ensure output is compatible with ml-container/ml-content parsing."
+            : "You are the MediaLab Run Cleaner. Convert this builder HTML into accurate production-ready runnable HTML. Preserve full visual fidelity, spacing, hierarchy, and interactions. Remove editor noise and keep final output clean. Return ONLY valid HTML (no markdown).";
+        try {
+          const res = await fetch("/api/ai/chat-edit", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              mode: "edit",
+              prompt,
+              currentCode: html,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.success) return html;
+          return String(data.updatedCode || "").trim() || html;
+        } catch {
+          return html;
+        }
+      }
+      async function compileCodeBackToVisualMode() {
+        const activePath = normalizeBuilderFilePath(activeBuilderFilePath || getFirstBuilderHtmlFilePath() || "index.html");
+        if (!isBuilderHtmlFile(activePath)) return;
+        const editor = document.getElementById("builder-code-editor");
+        const sourceHtml = String(editor?.value || getBuilderFileContent(activePath) || "").trim();
+        if (!sourceHtml) return;
+        showBuilderSnackbar("Compiling code back to visual mode...", "info");
+        const compiled = await runBuilderCodeConverterAgent(sourceHtml, "visual");
+        updateBuilderFileContent(activePath, compiled);
+        if (editor) {
+          editor.value = compiled;
+          handleBuilderCodeInput();
+        }
+        tryApplyCodeModeToCanvas({ silent: true });
+        showBuilderSnackbar("Visual compiler complete.", "success");
       }
       function nudgeSelectedElement(dx, dy) {
         if (!selectedEl) return;
