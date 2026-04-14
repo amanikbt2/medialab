@@ -2915,7 +2915,7 @@
             ></span>
           </span>
           <span class="drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)] text-white">
-            Create Instantly
+            Workflow AI
           </span>
         </h1>
         <p class="text-lg sm:text-xl text-gray-400 max-w-lg mx-auto">
@@ -27495,10 +27495,96 @@ ${interactionBlock}
           const raw = String(match[1] || "").trim();
           if (!raw) continue;
           try {
-            actions.push(JSON.parse(raw));
-          } catch {}
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) parsed.forEach((item) => actions.push(item));
+            else if (parsed && Array.isArray(parsed.actions)) parsed.actions.forEach((item) => actions.push(item));
+            else actions.push(parsed);
+          } catch {
+            try {
+              const repaired = raw
+                .replace(/([{,]\s*)([A-Za-z_][\w-]*)\s*:/g, '$1"$2":')
+                .replace(/:\s*'([^']*)'/g, ': "$1"');
+              const parsed = JSON.parse(repaired);
+              if (Array.isArray(parsed)) parsed.forEach((item) => actions.push(item));
+              else if (parsed && Array.isArray(parsed.actions)) parsed.actions.forEach((item) => actions.push(item));
+              else actions.push(parsed);
+            } catch {}
+          }
         }
         return actions;
+      }
+      function inferBackgroundFromPrompt(prompt = "") {
+        const text = String(prompt || "").toLowerCase();
+        if (!text.includes("background")) return "";
+        const colorMatch = text.match(/\b(green|red|blue|black|white|gray|grey|yellow|purple|pink|orange|teal|cyan)\b/);
+        if (!colorMatch) return "";
+        const colorMap = {
+          green: "#16a34a",
+          red: "#dc2626",
+          blue: "#2563eb",
+          black: "#111827",
+          white: "#ffffff",
+          gray: "#6b7280",
+          grey: "#6b7280",
+          yellow: "#eab308",
+          purple: "#7c3aed",
+          pink: "#db2777",
+          orange: "#ea580c",
+          teal: "#0d9488",
+          cyan: "#0891b2",
+        };
+        return colorMap[colorMatch[1]] || "";
+      }
+      function applyHtmlToActiveBuilderFile(html = "") {
+        const nextHtml = String(html || "").trim();
+        if (!nextHtml) return false;
+        const activePath = normalizeBuilderFilePath(activeBuilderFilePath || "index.html") || "index.html";
+        updateBuilderFileContent(activePath, nextHtml);
+        const editor = document.getElementById("builder-code-editor");
+        if (editor) {
+          editor.value = nextHtml;
+          handleBuilderCodeInput();
+        }
+        renderBuilderProjectExplorer();
+        applyCodeModeToCanvas();
+        return true;
+      }
+      function runIntentSafetyFallback(userPrompt = "") {
+        const prompt = String(userPrompt || "").toLowerCase();
+        const activePath = normalizeBuilderFilePath(activeBuilderFilePath || "index.html") || "index.html";
+        const currentHtml =
+          getBuilderFileContent(activePath) ||
+          document.getElementById("builder-code-editor")?.value ||
+          `<div id="ml-root" class="ml-container"><div class="ml-content"></div></div>`;
+        if (prompt.includes("background")) {
+          const color = inferBackgroundFromPrompt(prompt) || "#16a34a";
+          const doc = new DOMParser().parseFromString(currentHtml, "text/html");
+          if (doc.body) {
+            doc.body.style.background = color;
+            const nextHtml = /<html[\s>]/i.test(currentHtml)
+              ? "<!doctype html>\n" + doc.documentElement.outerHTML
+              : `<style>body{background:${color};}</style>\n${currentHtml}`;
+            applyCanvasPageBackground(color, true);
+            if (applyHtmlToActiveBuilderFile(nextHtml)) {
+              return [`UPDATE_CSS body background ${color}`];
+            }
+          }
+        }
+        if (/(insert|add|create).*(form)|\bform\b/.test(prompt)) {
+          const doc = new DOMParser().parseFromString(currentHtml, "text/html");
+          const formBlock = doc.createElement("div");
+          formBlock.className = "ml-container";
+          formBlock.innerHTML =
+            '<div class="ml-content" style="position:absolute;left:120px;top:140px;width:340px;padding:16px;border-radius:14px;border:1px solid #cbd5e1;background:#ffffff;box-shadow:0 10px 26px rgba(15,23,42,0.12);"><h3 style="margin:0 0 10px;font-weight:700;">Contact Form</h3><input placeholder="Your name" style="display:block;width:100%;padding:10px;margin:0 0 8px;border:1px solid #cbd5e1;border-radius:8px;" /><input placeholder="Email" style="display:block;width:100%;padding:10px;margin:0 0 8px;border:1px solid #cbd5e1;border-radius:8px;" /><textarea placeholder="Message" style="display:block;width:100%;min-height:90px;padding:10px;margin:0 0 10px;border:1px solid #cbd5e1;border-radius:8px;"></textarea><button style="padding:10px 14px;border:none;border-radius:8px;background:#06b6d4;color:white;font-weight:700;">Send</button></div>';
+          if (doc.body) doc.body.appendChild(formBlock);
+          const nextHtml = /<html[\s>]/i.test(currentHtml)
+            ? "<!doctype html>\n" + doc.documentElement.outerHTML
+            : `${currentHtml}\n${formBlock.outerHTML}`;
+          if (applyHtmlToActiveBuilderFile(nextHtml)) {
+            return ["INSERT_FORM fallback"];
+          }
+        }
+        return [];
       }
       function stripAgentActionBlocks(responseText = "") {
         return String(responseText || "")
@@ -27543,8 +27629,9 @@ ${interactionBlock}
         }
         return String(data.content || "");
       }
-      function executeAIActions(responseText = "") {
+      function executeAIActions(responseText = "", userPrompt = "") {
         const response = String(responseText || "");
+        const promptText = String(userPrompt || "").trim();
         const applied = [];
         let shouldRefreshCanvas = false;
         let renderTargetPath = "";
@@ -27592,8 +27679,11 @@ ${interactionBlock}
           if (type === "UPDATE_CSS") {
             const selector = String(action.selector || "").trim().toLowerCase();
             const styles = action?.styles && typeof action.styles === "object" ? action.styles : {};
-            if (selector === "body" && styles.background) {
-              applyCanvasPageBackground(String(styles.background), true);
+            const bgValue = String(
+              styles.background || styles.backgroundColor || styles["background-color"] || "",
+            ).trim();
+            if ((selector === "body" || selector === "html" || selector === ":root") && bgValue) {
+              applyCanvasPageBackground(bgValue, true);
               applied.push("UPDATE_CSS body");
               markRenderTarget(normalizeBuilderFilePath(activeBuilderFilePath || "index.html") || "index.html");
             }
@@ -27692,6 +27782,13 @@ ${interactionBlock}
             { source: "ai-agent" },
           );
           showBuilderSnackbar(`[AI Agent]: Successfully patched ${applied.length} action(s).`, "success");
+        }
+        if (!applied.length && promptText) {
+          const fallbackActions = runIntentSafetyFallback(promptText);
+          if (fallbackActions.length) {
+            showBuilderSnackbar("[AI Agent]: Applied recovery patch to canvas.", "success");
+            return fallbackActions;
+          }
         }
         return applied;
       }
@@ -27811,7 +27908,7 @@ ${interactionBlock}
           setAiAgentStage("thinking");
           const agentReply = await runBuilderAiAgent(prompt, currentCode);
           setAiAgentStage("parsing");
-          const actions = executeAIActions(agentReply);
+          const actions = executeAIActions(agentReply, prompt);
           const visibleReply = stripAgentActionBlocks(agentReply);
           if (actions.length) {
             setAiAgentStage("applying");
