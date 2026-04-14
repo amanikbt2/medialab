@@ -1546,6 +1546,29 @@
         background: rgba(148, 163, 184, 0.14);
         color: #e2e8f0;
       }
+      .ai-agent-stage {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.42rem;
+        font-size: 10px;
+        color: #94a3b8;
+      }
+      .ai-agent-stage-ring {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        border: 2px solid rgba(34, 211, 238, 0.25);
+        border-top-color: rgba(34, 211, 238, 0.95);
+        animation: mlAgentStageSpin 0.9s linear infinite;
+      }
+      .ai-agent-stage.is-idle .ai-agent-stage-ring {
+        animation: none;
+        border-color: rgba(34, 211, 238, 0.22);
+      }
+      @keyframes mlAgentStageSpin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
       #web-canvas.magic-fix-active {
         filter: blur(15px) brightness(1.2) saturate(1.5);
         transition: filter 0.3s ease;
@@ -19209,6 +19232,8 @@
       let aiMagicFixRunning = false;
       let aiContextSyncInFlight = false;
       let aiLastContextFingerprint = "";
+      let aiHiddenAgentContext = "";
+      let aiAgentStage = "idle";
       let aiInfrastructureModels = [];
       let builderStyleSyncTimer = null;
       let builderProjectFiles = null;
@@ -27250,17 +27275,40 @@ ${interactionBlock}
         if (!messagesEl || !statusEl || !creditsEl) return;
         const fallback =
           '<div class="ai-chat-bubble assistant">Hi! I can chat, plan, and apply builder fixes. Tell me your goal (for example: "build a SaaS hero", "set a cat background", or just "hello").</div>';
-        const rows = aiChatMessages.map((item) => {
+        const rows = aiChatMessages
+          .filter((item) => item.role !== "system_hidden")
+          .map((item) => {
           const roleClass = item.role === "user" ? "user" : "assistant";
           return '<div class="ai-chat-bubble ' + roleClass + '">' + escapeHtmlText(item.text || "") + "</div>";
-        });
+          });
         messagesEl.innerHTML = rows.join("") || fallback;
         messagesEl.scrollTop = messagesEl.scrollHeight;
-        statusEl.textContent = "Model: " + (aiActiveModel || "standby");
+        const stageTextMap = {
+          idle: "standby",
+          thinking: "thinking",
+          searching: "searching",
+          planning: "planning",
+          parsing: "parsing",
+          applying: "applying",
+          done: "done",
+        };
+        const stageText = stageTextMap[aiAgentStage] || "standby";
+        statusEl.innerHTML =
+          '<span class="ai-agent-stage ' +
+          (aiAgentStage === "idle" || aiAgentStage === "done" ? "is-idle" : "") +
+          '"><span class="ai-agent-stage-ring"></span><span>Model: ' +
+          escapeHtmlText(aiActiveModel || "standby") +
+          " · " +
+          escapeHtmlText(stageText) +
+          "</span></span>";
         creditsEl.textContent =
           aiCreditsRemaining == null
             ? "Credits: Pro"
             : "Credits: " + String(Math.max(0, Number(aiCreditsRemaining || 0)));
+      }
+      function setAiAgentStage(stage = "idle") {
+        aiAgentStage = String(stage || "idle").trim().toLowerCase();
+        renderBuilderAiChat();
       }
       function toggleBuilderAiPopup(force = null) {
         const popup = document.getElementById("ai-chat-popup");
@@ -27302,6 +27350,256 @@ ${interactionBlock}
           aiContextSyncInFlight = false;
         }
       }
+      function getWorkspaceIndex() {
+        const root = ensureBuilderProjectFiles();
+        const output = [];
+        const walk = (node, currentPath = "") => {
+          if (!node) return;
+          if (node.type === "file") {
+            output.push(normalizeBuilderFilePath(currentPath));
+            return;
+          }
+          const children = Array.isArray(node.children) ? node.children : [];
+          children.forEach((child) => {
+            const childPath = normalizeBuilderFilePath(
+              currentPath ? `${currentPath}/${child.name}` : child.name,
+            );
+            walk(child, childPath);
+          });
+        };
+        (Array.isArray(root.children) ? root.children : []).forEach((child) => walk(child, child.name));
+        return output.sort((a, b) => a.localeCompare(b));
+      }
+      function getWorkspaceSnapshot() {
+        const snapshot = {};
+        getWorkspaceIndex().forEach((filePath) => {
+          snapshot[filePath] = getBuilderFileContent(filePath);
+        });
+        return snapshot;
+      }
+      function extractSemanticSignatures(path = "", content = "") {
+        const ext = getBuilderFileExtension(path);
+        const lines = String(content || "").split(/\r?\n/);
+        if (!["js", "ts", "jsx", "tsx", "mjs", "cjs"].includes(ext)) return [];
+        const signatures = [];
+        const patterns = [
+          /^\s*export\s+function\s+([A-Za-z_$][\w$]*)\s*\(/,
+          /^\s*function\s+([A-Za-z_$][\w$]*)\s*\(/,
+          /^\s*export\s+const\s+([A-Za-z_$][\w$]*)\s*=\s*\(/,
+          /^\s*const\s+([A-Za-z_$][\w$]*)\s*=\s*\(/,
+          /^\s*class\s+([A-Za-z_$][\w$]*)\b/,
+          /^\s*export\s+class\s+([A-Za-z_$][\w$]*)\b/,
+        ];
+        lines.forEach((line) => {
+          for (const pattern of patterns) {
+            const match = line.match(pattern);
+            if (match?.[1]) {
+              signatures.push(match[1]);
+              break;
+            }
+          }
+        });
+        return Array.from(new Set(signatures)).slice(0, 48);
+      }
+      function buildSemanticRepoMap() {
+        const files = getWorkspaceIndex();
+        return files.map((path) => {
+          const content = getBuilderFileContent(path);
+          return {
+            path,
+            extension: getBuilderFileExtension(path),
+            signatures: extractSemanticSignatures(path, content),
+          };
+        });
+      }
+      function inferFunctionSymbolFromPrompt(prompt = "") {
+        const text = String(prompt || "");
+        const match =
+          text.match(/function\s+([A-Za-z_$][\w$]*)/i) ||
+          text.match(/\b([A-Za-z_$][\w$]*)\s*\(\s*\)/);
+        return String(match?.[1] || "").trim();
+      }
+      function traceFunctionCallsites(symbol = "") {
+        const target = String(symbol || "").trim();
+        if (!target) return [];
+        const escaped = target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const callRegex = new RegExp(`\\b${escaped}\\s*\\(`);
+        return getWorkspaceIndex().filter((path) => callRegex.test(getBuilderFileContent(path)));
+      }
+      function parseSearchFiles(responseText = "") {
+        const raw = String(responseText || "").trim();
+        const match = raw.match(/SEARCH_FILES:\s*([^\n\r]+)/i);
+        if (!match) return [];
+        return String(match[1] || "")
+          .split(",")
+          .map((item) => normalizeBuilderFilePath(item))
+          .filter(Boolean);
+      }
+      function parseRequestedFilePath(responseText = "") {
+        const match = String(responseText || "").match(/REQUEST_FILE:\s*([^\n\r]+)/i);
+        return String(match?.[1] || "").trim();
+      }
+      function ensureBuilderFolderByPath(path = "") {
+        const parts = splitBuilderFilePath(path);
+        let currentPath = "";
+        parts.forEach((part) => {
+          const nextPath = normalizeBuilderFilePath(currentPath ? `${currentPath}/${part}` : part);
+          const existing = findBuilderNodeByPath(nextPath);
+          if (!existing) {
+            addBuilderNodeToFolder(createBuilderFolderNode(part), currentPath);
+          }
+          currentPath = nextPath;
+        });
+      }
+      async function fetchRequestedWorkspaceFile(path = "") {
+        const normalized = normalizeBuilderFilePath(path);
+        const res = await fetch("/api/ai/workspace-fetch", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            path: normalized,
+            workspaceSnapshot: getWorkspaceSnapshot(),
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || "Could not read requested file.");
+        }
+        return String(data.content || "");
+      }
+      function executeAIActions(responseText = "") {
+        const response = String(responseText || "");
+        const applied = [];
+        let shouldRefreshCanvas = false;
+        const updateOrCreateRegex =
+          /(UPDATE_FILE|CREATE_FILE):\s*([^\n\r]+)\s*CONTENT:\s*([\s\S]*?)(?=\n(?:UPDATE_FILE|CREATE_FILE|CREATE_FOLDER|EDIT_CANVAS):|\s*$)/g;
+        let match;
+        while ((match = updateOrCreateRegex.exec(response)) !== null) {
+          const action = String(match[1] || "").trim();
+          const targetPath = normalizeBuilderFilePath(match[2] || "");
+          const content = String(match[3] || "").replace(/^\s+/, "");
+          if (!targetPath) continue;
+          const parentParts = splitBuilderFilePath(targetPath);
+          const fileName = parentParts.pop() || "file.txt";
+          const parentPath = normalizeBuilderFilePath(parentParts.join("/"));
+          if (!findBuilderNodeByPath(targetPath)) {
+            if (parentPath) ensureBuilderFolderByPath(parentPath);
+            addBuilderNodeToFolder(createBuilderFileNode(fileName, content), parentPath);
+          } else {
+            updateBuilderFileContent(targetPath, content);
+          }
+          applied.push(`${action} ${targetPath}`);
+          if (targetPath === normalizeBuilderFilePath(activeBuilderFilePath || "")) {
+            const editor = document.getElementById("builder-code-editor");
+            if (editor) {
+              editor.value = content;
+              handleBuilderCodeInput();
+            }
+            shouldRefreshCanvas = true;
+          }
+        }
+        const folderRegex = /CREATE_FOLDER:\s*([^\n\r]+)/g;
+        while ((match = folderRegex.exec(response)) !== null) {
+          const folderPath = normalizeBuilderFilePath(match[1] || "");
+          if (!folderPath) continue;
+          if (!findBuilderNodeByPath(folderPath)) {
+            ensureBuilderFolderByPath(folderPath);
+            applied.push(`CREATE_FOLDER ${folderPath}`);
+          }
+        }
+        const canvasRegex = /EDIT_CANVAS:\s*([\s\S]*?)(?=\n(?:UPDATE_FILE|CREATE_FILE|CREATE_FOLDER|EDIT_CANVAS):|\s*$)/g;
+        while ((match = canvasRegex.exec(response)) !== null) {
+          const instruction = String(match[1] || "").trim();
+          if (!instruction) continue;
+          applied.push("EDIT_CANVAS");
+          shouldRefreshCanvas = true;
+        }
+        if (applied.length) {
+          renderBuilderProjectExplorer();
+          if (shouldRefreshCanvas) applyCodeModeToCanvas();
+          logUsageActivity(
+            `[AI Agent]: Successfully patched ${applied.join(", ")}`,
+            { source: "ai-agent" },
+          );
+          showBuilderSnackbar(`[AI Agent]: Successfully patched ${applied.length} action(s).`, "success");
+        }
+        return applied;
+      }
+      async function runBuilderAiAgent(prompt = "", currentCode = "") {
+        let responseText = "";
+        let agentContext = String(aiHiddenAgentContext || "").trim();
+        const workspaceIndex = getWorkspaceIndex();
+        const activeFileName = normalizeBuilderFilePath(activeBuilderFilePath || "index.html") || "index.html";
+        const activeFileContent = getBuilderFileContent(activeFileName) || currentCode;
+        const repoMap = buildSemanticRepoMap();
+        const runPhase = async (agentPhase = "execute", extraContext = "") => {
+          const res = await fetch("/api/ai/chat-edit", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt,
+              currentCode,
+              mode: "agent",
+              agentPhase,
+              workspaceIndex,
+              activeFileName,
+              activeFileContent,
+              agentContext: [extraContext, `RepoMap: ${JSON.stringify(repoMap)}`].filter(Boolean).join("\n\n"),
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.success) {
+            if (data.limitReached) {
+              openUpgradeModal();
+              throw new Error("Daily AI credits reached. Upgrade to MediaLab Pro to continue.");
+            }
+            throw new Error(data.message || "AI Agent request failed.");
+          }
+          aiActiveModel = String(data.modelUsed || "").trim() || aiActiveModel;
+          if (data.creditsRemaining !== undefined) aiCreditsRemaining = data.creditsRemaining;
+          return String(data.assistantReply || "").trim();
+        };
+        setAiAgentStage("searching");
+        const searchReply = await runPhase("search", agentContext);
+        const searchedFiles = parseSearchFiles(searchReply).filter((path) => workspaceIndex.includes(path));
+        const tracedSymbol = inferFunctionSymbolFromPrompt(prompt);
+        const tracedFiles = traceFunctionCallsites(tracedSymbol);
+        const preloadFiles = Array.from(new Set([...searchedFiles, ...tracedFiles])).slice(0, 14);
+        for (const path of preloadFiles) {
+          aiChatMessages.push({ role: "assistant", text: `Reading ${path}...` });
+          renderBuilderAiChat();
+          const requestedContent = await fetchRequestedWorkspaceFile(path);
+          const hiddenMessage = `REQUESTED_FILE ${path}\n${requestedContent}`;
+          aiChatMessages.push({ role: "system_hidden", text: hiddenMessage });
+          agentContext = [agentContext, hiddenMessage].filter(Boolean).join("\n\n");
+          aiHiddenAgentContext = agentContext;
+        }
+        setAiAgentStage("planning");
+        const proposal = await runPhase("plan", agentContext);
+        if (proposal) {
+          aiChatMessages.push({ role: "assistant", text: proposal });
+          renderBuilderAiChat();
+        }
+        setAiAgentStage("thinking");
+        for (let pass = 0; pass < 4; pass += 1) {
+          responseText = await runPhase("execute", agentContext);
+          const requestedPath = parseRequestedFilePath(responseText);
+          if (!requestedPath) break;
+          aiChatMessages.push({
+            role: "assistant",
+            text: `Reading ${requestedPath}...`,
+          });
+          renderBuilderAiChat();
+          const requestedContent = await fetchRequestedWorkspaceFile(requestedPath);
+          const hiddenMessage = `REQUESTED_FILE ${requestedPath}\n${requestedContent}`;
+          aiChatMessages.push({ role: "system_hidden", text: hiddenMessage });
+          agentContext = [agentContext, hiddenMessage].filter(Boolean).join("\n\n");
+          aiHiddenAgentContext = agentContext;
+        }
+        return responseText;
+      }
       async function sendBuilderAiChat() {
         if (aiChatSending) return;
         const input = document.getElementById("ai-chat-input");
@@ -27317,27 +27615,6 @@ ${interactionBlock}
           editor?.value?.trim() ||
           buildCodeModeDocument() ||
           `<div id="ml-root" class="ml-container"><div class="ml-content">New MediaLab template</div></div>`;
-        const lowerPrompt = prompt.toLowerCase();
-        const editKeywords = [
-          "fix",
-          "change",
-          "apply",
-          "update",
-          "generate",
-          "create",
-          "make",
-          "background",
-          "template",
-          "layout",
-          "responsive",
-          "add",
-          "remove",
-          "style",
-          "refactor",
-        ];
-        const mode = editKeywords.some((keyword) => lowerPrompt.includes(keyword))
-          ? "edit"
-          : "chat";
         await syncAiContextSilently();
         aiChatSending = true;
         if (input) input.value = "";
@@ -27348,45 +27625,23 @@ ${interactionBlock}
         aiChatMessages.push({ role: "user", text: prompt });
         renderBuilderAiChat();
         try {
-          const res = await fetch("/api/ai/chat-edit", {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt, currentCode, mode }),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok || !data.success) {
-            if (data.limitReached) {
-              aiChatMessages.push({
-                role: "assistant",
-                text: "Daily AI credits reached. Upgrade to MediaLab Pro to continue.",
-              });
-              renderBuilderAiChat();
-              openUpgradeModal();
-              return;
-            }
-            throw new Error(data.message || "AI Architect request failed.");
-          }
-          aiActiveModel = String(data.modelUsed || "").trim() || aiActiveModel;
-          if (data.creditsRemaining !== undefined) aiCreditsRemaining = data.creditsRemaining;
-          if (String(data.mode || mode) === "chat") {
+          setAiAgentStage("thinking");
+          const agentReply = await runBuilderAiAgent(prompt, currentCode);
+          setAiAgentStage("parsing");
+          const actions = executeAIActions(agentReply);
+          if (actions.length) {
+            setAiAgentStage("applying");
             aiChatMessages.push({
               role: "assistant",
-              text:
-                String(data.assistantReply || "").trim() ||
-                "Ready. Tell me what you want to build or fix next.",
+              text: `Applied ${actions.length} action(s) using ${aiActiveModel || "active model"}.`,
             });
           } else {
-            if (editor) {
-              editor.value = String(data.updatedCode || "");
-              handleBuilderCodeInput();
-            }
-            applyCodeModeToCanvas();
             aiChatMessages.push({
               role: "assistant",
-              text: "Patch applied successfully using " + (aiActiveModel || "active model") + ".",
+              text: agentReply || "Ready. Tell me what you want to build or fix next.",
             });
           }
+          setAiAgentStage("done");
           renderBuilderAiChat();
         } catch (error) {
           await logErrorEvent(
@@ -27398,6 +27653,7 @@ ${interactionBlock}
             role: "assistant",
             text: error.message || "Could not complete AI patch.",
           });
+          setAiAgentStage("idle");
           renderBuilderAiChat();
         } finally {
           aiChatSending = false;
@@ -27405,6 +27661,9 @@ ${interactionBlock}
             sendBtn.disabled = false;
             sendBtn.textContent = "Send";
           }
+          setTimeout(() => {
+            if (!aiChatSending) setAiAgentStage("idle");
+          }, 900);
         }
       }
       async function triggerMagicFix() {

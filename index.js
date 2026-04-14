@@ -3738,6 +3738,11 @@ app.post("/api/ai/chat-edit", async (req, res) => {
     const prompt = String(req.body?.prompt || "").trim();
     const mode = String(req.body?.mode || "edit").trim().toLowerCase();
     const currentCode = String(req.body?.currentCode || "").trim();
+    const activeFileName = String(req.body?.activeFileName || "").trim();
+    const activeFileContent = String(req.body?.activeFileContent || "").trim();
+    const workspaceIndex = Array.isArray(req.body?.workspaceIndex) ? req.body.workspaceIndex : [];
+    const agentContext = String(req.body?.agentContext || "").trim();
+    const agentPhase = String(req.body?.agentPhase || "execute").trim().toLowerCase();
     if (!prompt && mode !== "context") {
       return res.status(400).json({ success: false, message: "Prompt is required." });
     }
@@ -3811,6 +3816,12 @@ app.post("/api/ai/chat-edit", async (req, res) => {
                 content:
                   mode === "chat"
                     ? "You are the MediaLab AI Copilot, like a friendly mini Cursor assistant. Be concise, warm, and practical. Return plain text only. Do NOT perform, imply, or apply code changes unless the user explicitly asks for implementation/fixes. If user greets you (e.g. hello), reply naturally and briefly."
+                    : mode === "agent"
+                      ? agentPhase === "search"
+                        ? "You are the MediaLab Agent in SEARCH phase. Return only one line in this exact format: SEARCH_FILES: path/a.js, path/b.css. Select the minimum file set needed to implement the request. Use only files present in WorkspaceIndex."
+                        : agentPhase === "plan"
+                          ? "You are the MediaLab Agent in PLAN phase. Return only a concise proposal in plain text, prefixed with 'Proposal:'. Explain which files you will change and why. No code blocks."
+                          : "You are the MediaLab Agent in EXECUTION phase. Use this protocol only: REQUEST_FILE: [path] when more context is needed; otherwise emit ACTION blocks using UPDATE_FILE / CREATE_FILE / CREATE_FOLDER / EDIT_CANVAS. Keep patches surgical. Never replace whole files if a focused edit is enough."
                     : "You are the MediaLab AI Architect. Return ONLY raw HTML and CSS/Tailwind code. No markdown, no backticks. You can refactor code, generate full templates, and apply design updates like online background images via valid image URLs. Always return valid, renderable HTML that works immediately in MediaLab. Preserve existing element IDs whenever possible. Preserve and/or produce 'ml-container' and 'ml-content' class structure so the visual builder can map objects accurately. If user asks to change page/body background, set it with explicit CSS that does not depend on external frameworks (inline body style or <style> body { background: ... }).",
               },
               {
@@ -3818,6 +3829,17 @@ app.post("/api/ai/chat-edit", async (req, res) => {
                 content:
                   mode === "chat"
                     ? prompt
+                    : mode === "agent"
+                      ? [
+                          `WorkspaceIndex: ${JSON.stringify(workspaceIndex)}`,
+                          `AgentPhase: ${agentPhase}`,
+                          `activeFileName: ${activeFileName || "index.html"}`,
+                          `activeFileContent:\n${activeFileContent || currentCode}`,
+                          agentContext ? `AdditionalContext:\n${agentContext}` : "",
+                          `UserRequest:\n${prompt}`,
+                        ]
+                          .filter(Boolean)
+                          .join("\n\n")
                     : `Current HTML:\n${contextCode}\n\nInstruction:\n${prompt}`,
               },
             ],
@@ -3834,7 +3856,7 @@ app.post("/api/ai/chat-edit", async (req, res) => {
         if (!content) {
           throw new Error(`Empty completion from ${model.modelId}`);
         }
-        if (mode === "chat") {
+        if (mode === "chat" || mode === "agent") {
           assistantReply = content;
         } else {
           updatedCode = content;
@@ -3866,7 +3888,7 @@ app.post("/api/ai/chat-edit", async (req, res) => {
       }
     }
 
-    if ((!updatedCode && mode !== "chat") || (!assistantReply && mode === "chat") || !modelUsed) {
+    if ((!updatedCode && !["chat", "agent"].includes(mode)) || (!assistantReply && ["chat", "agent"].includes(mode)) || !modelUsed) {
       return res.status(503).json({
         success: false,
         message: lastError?.message || "No AI model could process the request.",
@@ -3917,6 +3939,29 @@ app.post("/api/ai/chat-edit", async (req, res) => {
       success: false,
       message: error.message || "AI edit failed.",
     });
+  }
+});
+
+app.post("/api/ai/workspace-fetch", async (req, res) => {
+  try {
+    if (!req.isAuthenticated?.() || !req.user?._id) {
+      return res.status(401).json({ success: false, message: "Login required." });
+    }
+    const path = String(req.body?.path || "").trim();
+    const snapshot = req.body?.workspaceSnapshot && typeof req.body.workspaceSnapshot === "object"
+      ? req.body.workspaceSnapshot
+      : {};
+    const hasPath = Object.prototype.hasOwnProperty.call(snapshot, path);
+    const content = hasPath ? String(snapshot[path] ?? "") : "";
+    if (!path) {
+      return res.status(400).json({ success: false, message: "Path is required." });
+    }
+    if (!hasPath) {
+      return res.status(404).json({ success: false, message: "File not found in current workspace snapshot." });
+    }
+    return res.json({ success: true, path, content });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || "Could not fetch workspace file." });
   }
 });
 
