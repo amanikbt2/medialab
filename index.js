@@ -14,6 +14,7 @@ import "dotenv/config";
 import multer from "multer";
 import { google } from "googleapis";
 import PDFDocument from "pdfkit";
+import nodeFetch from "node-fetch";
 
 // Models & Routes
 import authRoutes, {
@@ -34,6 +35,7 @@ import BuilderTemplate from "./models/BuilderTemplate.js";
 import Notification from "./models/Notification.js";
 import ReferralLedger from "./models/ReferralLedger.js";
 import CollaborationMeeting from "./models/CollaborationMeeting.js";
+import AIModel from "./models/AIModel.js";
 import VirtualDbModelSchema from "./models/VirtualDbModel.js";
 import VirtualDbDocumentSchema from "./models/VirtualDbDocument.js";
 import {
@@ -78,6 +80,50 @@ const collaborationHostGraceTimers = new Map();
 const dataExplorerConnections = new Map();
 const dataExplorerWatchers = new Map();
 let virtualDbConnectionState = null;
+const GROQ_API_KEY = String(process.env.GROQ_API_KEY || process.env.grog || "").trim();
+
+function isSameCalendarDay(a = null, b = null) {
+  if (!a || !b) return false;
+  const dateA = new Date(a);
+  const dateB = new Date(b);
+  return (
+    dateA.getFullYear() === dateB.getFullYear() &&
+    dateA.getMonth() === dateB.getMonth() &&
+    dateA.getDate() === dateB.getDate()
+  );
+}
+
+async function seedAIModelsIfNeeded() {
+  const count = await AIModel.countDocuments({});
+  if (count > 0) return;
+  await AIModel.insertMany([
+    {
+      modelId: "llama-3.3-70b-versatile",
+      provider: "groq",
+      priority: 1,
+      isActive: true,
+      status: "online",
+      lastTested: new Date(),
+    },
+    {
+      modelId: "deepseek-r1-distill-llama-70b",
+      provider: "groq",
+      priority: 2,
+      isActive: true,
+      status: "online",
+      lastTested: new Date(),
+    },
+    {
+      modelId: "llama-3.1-8b-instant",
+      provider: "groq",
+      priority: 3,
+      isActive: true,
+      status: "online",
+      lastTested: new Date(),
+    },
+  ]);
+  console.log("✅ AI model registry seeded");
+}
 
 function getVirtualDbUri() {
   return (
@@ -3474,7 +3520,10 @@ app.post("/api/history-projects", async (req, res) => {
 // --- 3. DATABASE & SESSION ---
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
+  .then(async () => {
+    console.log("✅ MongoDB Connected");
+    await seedAIModelsIfNeeded();
+  })
   .catch((err) => console.error("❌ MongoDB error:", err));
 
 app.use(
@@ -3500,6 +3549,152 @@ app.use(
 
 app.use(passport.initialize());
 app.use(passport.session());
+
+app.get("/api/ai/models", async (req, res) => {
+  try {
+    const models = await AIModel.find({})
+      .sort({ priority: 1, modelId: 1 })
+      .select("modelId provider priority isActive status lastTested")
+      .lean();
+    res.json({ success: true, models });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || "Could not load AI model registry.",
+    });
+  }
+});
+
+app.post("/api/ai/chat-edit", async (req, res) => {
+  try {
+    if (!req.isAuthenticated?.() || !req.user?._id) {
+      return res.status(401).json({ success: false, message: "Login required." });
+    }
+    if (!GROQ_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        message: "Missing GROQ_API_KEY configuration.",
+      });
+    }
+    const prompt = String(req.body?.prompt || "").trim();
+    const currentCode = String(req.body?.currentCode || "").trim();
+    if (!prompt) {
+      return res.status(400).json({ success: false, message: "Prompt is required." });
+    }
+    if (!currentCode) {
+      return res.status(400).json({ success: false, message: "Current code is required." });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    if (!user.aiQuota) {
+      user.aiQuota = { dailyLimit: 10, usedToday: 0, lastUsed: null };
+    }
+    const now = new Date();
+    if (!isSameCalendarDay(user.aiQuota.lastUsed, now)) {
+      user.aiQuota.usedToday = 0;
+    }
+    const dailyLimit = Number(user.aiQuota.dailyLimit ?? 10);
+    const usedToday = Number(user.aiQuota.usedToday ?? 0);
+    if (!user.isPro && usedToday >= dailyLimit) {
+      return res.status(403).json({
+        success: false,
+        limitReached: true,
+        message: "Daily AI credits reached. Upgrade to MediaLab Pro.",
+      });
+    }
+
+    const models = await AIModel.find({ isActive: true, status: "online" })
+      .sort({ priority: 1 })
+      .lean();
+    if (!models.length) {
+      return res.status(503).json({
+        success: false,
+        message: "All AI models are currently offline.",
+      });
+    }
+
+    let updatedCode = "";
+    let modelUsed = "";
+    let lastError = null;
+    for (const model of models) {
+      try {
+        const groqResponse = await nodeFetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${GROQ_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: model.modelId,
+            temperature: 0.2,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are the MediaLab AI Architect. Return ONLY raw HTML and Tailwind CSS code. No markdown, no backticks. Ensure you maintain the 'ml-container' and 'ml-content' class structure for visual builder parsing.",
+              },
+              {
+                role: "user",
+                content: `Current HTML:\n${currentCode}\n\nInstruction:\n${prompt}`,
+              },
+            ],
+          }),
+        });
+        if (!groqResponse.ok) {
+          const errText = await groqResponse.text();
+          throw new Error(errText || `Groq request failed for ${model.modelId}`);
+        }
+        const payload = await groqResponse.json();
+        const content = String(payload?.choices?.[0]?.message?.content || "").trim();
+        if (!content) {
+          throw new Error(`Empty completion from ${model.modelId}`);
+        }
+        updatedCode = content;
+        modelUsed = model.modelId;
+        await AIModel.updateOne(
+          { _id: model._id },
+          { $set: { status: "online", lastTested: new Date() } },
+        );
+        break;
+      } catch (modelError) {
+        lastError = modelError;
+        await AIModel.updateOne(
+          { _id: model._id },
+          { $set: { status: "offline", lastTested: new Date() } },
+        );
+      }
+    }
+
+    if (!updatedCode || !modelUsed) {
+      return res.status(503).json({
+        success: false,
+        message: lastError?.message || "No AI model could process the request.",
+      });
+    }
+
+    user.aiQuota.usedToday = Number(user.aiQuota.usedToday || 0) + 1;
+    user.aiQuota.lastUsed = now;
+    await user.save();
+
+    return res.json({
+      success: true,
+      updatedCode,
+      modelUsed,
+      creditsRemaining: user.isPro
+        ? null
+        : Math.max(0, Number(user.aiQuota.dailyLimit || 10) - Number(user.aiQuota.usedToday || 0)),
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || "AI edit failed.",
+    });
+  }
+});
 
 app.get("/api/data-explorer/status", async (req, res) => {
   try {

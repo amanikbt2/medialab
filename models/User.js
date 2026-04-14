@@ -116,6 +116,11 @@ const UserSchema = new mongoose.Schema({
 
   // --- PRO FEATURES & LIMITS ---
   isPro: { type: Boolean, default: false },
+  aiQuota: {
+    dailyLimit: { type: Number, default: 10, min: 0 },
+    usedToday: { type: Number, default: 0, min: 0 },
+    lastUsed: { type: Date, default: null },
+  },
   dailyUsageCount: { type: Number, default: 0 },
   lastUsageDate: { type: Date, default: Date.now },
 

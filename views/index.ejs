@@ -1504,6 +1504,48 @@
         color: #67e8f9;
         box-shadow: 0 0 20px rgba(34, 211, 238, 0.2);
       }
+      .ai-chat-popup {
+        position: fixed;
+        right: 1rem;
+        bottom: 1rem;
+        width: min(420px, calc(100vw - 1.5rem));
+        max-height: min(68vh, 620px);
+        display: flex;
+        flex-direction: column;
+        border: 1px solid rgba(34, 211, 238, 0.22);
+        background: linear-gradient(180deg, rgba(5, 10, 20, 0.97), rgba(2, 6, 23, 0.96));
+        border-radius: 1.2rem;
+        overflow: hidden;
+        z-index: 240;
+        box-shadow: 0 28px 70px rgba(2, 6, 23, 0.56);
+      }
+      .ai-chat-messages {
+        min-height: 180px;
+        max-height: 320px;
+        overflow-y: auto;
+        padding: 0.9rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+      }
+      .ai-chat-bubble {
+        border-radius: 0.95rem;
+        padding: 0.62rem 0.75rem;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      .ai-chat-bubble.user {
+        align-self: flex-end;
+        max-width: 88%;
+        background: rgba(34, 211, 238, 0.18);
+        color: #ecfeff;
+      }
+      .ai-chat-bubble.assistant {
+        align-self: flex-start;
+        max-width: 96%;
+        background: rgba(148, 163, 184, 0.14);
+        color: #e2e8f0;
+      }
       .ml-section-active {
         animation: mlSectionFadeIn 0.3s ease;
       }
@@ -13146,6 +13188,14 @@
             ? "fas fa-ban text-rose-300"
             : "fas fa-crown text-cyan-300";
         }
+        if (currentUser?.isPro) {
+          aiCreditsRemaining = null;
+        } else {
+          const limit = Number(currentUser?.aiQuota?.dailyLimit ?? 10);
+          const used = Number(currentUser?.aiQuota?.usedToday ?? 0);
+          aiCreditsRemaining = Math.max(0, limit - used);
+        }
+        renderBuilderAiChat();
         renderGithubStorageStatus();
         renderNotificationsUi();
         if (authBootstrapReady) {
@@ -16160,6 +16210,52 @@
           );
         }
       }
+      async function fetchAiInfrastructureModels() {
+        try {
+          const res = await fetch("/api/ai/models", { credentials: "include" });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || "Could not load AI model registry.");
+          }
+          return Array.isArray(data.models) ? data.models : [];
+        } catch {
+          return [];
+        }
+      }
+      function renderAiInfrastructureConsoleCard(models = []) {
+        const rows = Array.isArray(models) ? models : [];
+        return `
+          <div class="rounded-[2rem] border border-cyan-400/20 bg-[linear-gradient(145deg,rgba(34,211,238,0.14),rgba(2,6,23,0.92))] p-5 sm:p-6 shadow-[0_24px_70px_rgba(8,145,178,0.2)]">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">AI Infrastructure</p>
+                <h3 class="mt-2 text-2xl font-semibold text-white tracking-tight">Model failover registry</h3>
+                <p class="mt-2 text-xs leading-6 text-cyan-100/70">Active routing order for self-healing `/api/ai/chat-edit` requests.</p>
+              </div>
+              <div class="w-12 h-12 rounded-[1.3rem] border border-cyan-300/20 bg-cyan-400/10 flex items-center justify-center text-cyan-200">
+                <i class="fas fa-robot"></i>
+              </div>
+            </div>
+            <div class="mt-4 space-y-2">
+              ${
+                rows.length
+                  ? rows
+                      .map(
+                        (model) => `
+                    <div class="rounded-[1.2rem] border border-white/10 bg-slate-950/60 px-4 py-3 flex items-center justify-between gap-3">
+                      <div class="min-w-0">
+                        <p class="text-xs font-bold text-white truncate">${escapeHtmlText(model.modelId || "unknown-model")}</p>
+                        <p class="text-[10px] uppercase tracking-[0.16em] text-slate-500">${escapeHtmlText(model.provider || "groq")} • Priority ${Number(model.priority || 0)}</p>
+                      </div>
+                      <span class="text-[10px] font-black uppercase tracking-[0.16em] ${String(model.status || "").toLowerCase() === "online" ? "text-emerald-300" : "text-rose-300"}">${String(model.status || "offline").toUpperCase()}</span>
+                    </div>`,
+                      )
+                      .join("")
+                  : `<div class="rounded-[1.2rem] border border-dashed border-white/10 bg-slate-950/45 px-4 py-4 text-[11px] text-slate-400">No AI models configured yet.</div>`
+              }
+            </div>
+          </div>`;
+      }
       async function switchTool(id) {
         const switchToken = ++studioToolSwitchToken;
         currentStudioToolId = id;
@@ -16215,6 +16311,7 @@
               ? await fetchGithubProjects()
               : currentUser?.liveProjects || [];
           const adsenseReport = loggedIn ? await fetchAdsenseConsoleReport() : null;
+          aiInfrastructureModels = await fetchAiInfrastructureModels();
           const recentProjects = liveProjects.slice(0, 3);
           const balance = getCurrentBalance();
           const canWithdraw = loggedIn && balance >= 5;
@@ -16356,6 +16453,7 @@
                         }
                     </div>
                     ${buildGithubStorageStatusMarkup("console")}
+                    ${renderAiInfrastructureConsoleCard(aiInfrastructureModels)}
                   </div>
                   <div class="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(15,23,42,0.82))] backdrop-blur-2xl p-5 sm:p-6 shadow-[0_24px_60px_rgba(2,6,23,0.32)]">
                     <div class="flex items-start justify-between gap-4 mb-5">
@@ -16632,6 +16730,9 @@
                         </div>
                         <button id="builder-quick-run" onclick="openBuilderRunMode(); hideBuilderPanels();" class="w-9 h-9 shrink-0 flex items-center justify-center text-emerald-300 hover:text-white border border-emerald-400/20 rounded-xl bg-emerald-500/10 transition-colors shadow-[0_0_0_1px_rgba(16,185,129,0.06)]">
                             <i class="fas fa-play text-sm"></i>
+                        </button>
+                        <button id="builder-ai-toggle" onclick="toggleBuilderAiPopup()" class="w-9 h-9 shrink-0 flex items-center justify-center text-cyan-300 hover:text-white border border-cyan-400/20 rounded-xl bg-cyan-500/10 transition-colors shadow-[0_0_0_1px_rgba(6,182,212,0.12)]">
+                            <i class="fas fa-robot text-sm"></i>
                         </button>
                         <div class="builder-tabbar">
                         <button id="tab-insert" onclick="toggleBuilderTab('insert', event)" class="builder-tab">Insert</button>
@@ -16936,6 +17037,22 @@
                 <button id="builder-explorer-toggle" onclick="toggleBuilderExplorer()" class="pointer-events-auto w-11 h-11 flex items-center justify-center text-cyan-300 hover:text-white border border-cyan-400/20 rounded-2xl bg-[#08111f]/90 backdrop-blur-2xl transition-colors shadow-[0_18px_55px_rgba(2,6,23,0.45)]">
                     <i class="fas fa-sitemap text-sm"></i>
                 </button>
+            </div>
+            <div id="ai-chat-popup" class="ai-chat-popup hidden">
+                <div class="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-3">
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">MediaLab AI Architect</p>
+                        <p id="ai-status-indicator" class="text-[10px] text-slate-400">Model: standby</p>
+                    </div>
+                    <span id="ai-credits-badge" class="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-cyan-200">Credits: --</span>
+                </div>
+                <div id="ai-chat-messages" class="ai-chat-messages"></div>
+                <div class="px-3 pb-3 pt-2 border-t border-white/10">
+                    <div class="flex items-center gap-2">
+                        <input id="ai-chat-input" type="text" placeholder="Ask AI Architect to refine your current HTML..." onkeydown="if(event.key==='Enter'){event.preventDefault();sendBuilderAiChat();}" class="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950/85 px-3 py-2 text-sm text-slate-200 outline-none focus:border-cyan-400" />
+                        <button id="ai-chat-send" onclick="sendBuilderAiChat()" class="rounded-xl bg-cyan-500 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-950 hover:bg-cyan-400">Send</button>
+                    </div>
+                </div>
             </div>
             <div id="canvas-container" onclick="deselectAll(event)" class="flex-1 overflow-auto flex justify-center items-start px-2 sm:px-4 pt-2 sm:pt-4 pb-10 sm:pb-12 cursor-default custom-scrollbar" style="touch-action: pan-x pan-y pinch-zoom;">
                 <div class="relative flex w-max min-w-full flex-col items-center">
@@ -19040,6 +19157,11 @@
       let currentActiveSectionId = "section_main";
       let builderImportedGlobalCss = "";
       let builderLastSavedFingerprint = "";
+      let aiChatMessages = [];
+      let aiCreditsRemaining = null;
+      let aiActiveModel = "";
+      let aiChatSending = false;
+      let aiInfrastructureModels = [];
       let builderProjectFiles = null;
       let activeBuilderFilePath = "index.html";
       let selectedBuilderFilePath = "index.html";
@@ -26960,6 +27082,102 @@ ${interactionBlock}
             error.message || "Could not publish this project right now.",
             "error",
           );
+        }
+      }
+      function renderBuilderAiChat() {
+        const messagesEl = document.getElementById("ai-chat-messages");
+        const statusEl = document.getElementById("ai-status-indicator");
+        const creditsEl = document.getElementById("ai-credits-badge");
+        if (!messagesEl || !statusEl || !creditsEl) return;
+        const fallback =
+          '<div class="ai-chat-bubble assistant">Describe the change you want. I will patch your current builder HTML and re-apply it to canvas objects.</div>';
+        const rows = aiChatMessages.map((item) => {
+          const roleClass = item.role === "user" ? "user" : "assistant";
+          return '<div class="ai-chat-bubble ' + roleClass + '">' + escapeHtmlText(item.text || "") + "</div>";
+        });
+        messagesEl.innerHTML = rows.join("") || fallback;
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        statusEl.textContent = "Model: " + (aiActiveModel || "standby");
+        creditsEl.textContent =
+          aiCreditsRemaining == null
+            ? "Credits: Pro"
+            : "Credits: " + String(Math.max(0, Number(aiCreditsRemaining || 0)));
+      }
+      function toggleBuilderAiPopup(force = null) {
+        const popup = document.getElementById("ai-chat-popup");
+        if (!popup) return;
+        const shouldOpen = force == null ? popup.classList.contains("hidden") : Boolean(force);
+        popup.classList.toggle("hidden", !shouldOpen);
+        renderBuilderAiChat();
+      }
+      async function sendBuilderAiChat() {
+        if (aiChatSending) return;
+        const input = document.getElementById("ai-chat-input");
+        const sendBtn = document.getElementById("ai-chat-send");
+        const editor = document.getElementById("builder-code-editor");
+        const prompt = String(input?.value || "").trim();
+        if (!prompt) return;
+        if (!loggedIn || !currentUser) {
+          showLogin();
+          return;
+        }
+        const currentCode = editor?.value?.trim() || buildCodeModeDocument();
+        if (!currentCode.trim()) {
+          showBuilderSnackbar("Add HTML in builder before using AI Architect.", "error");
+          return;
+        }
+        aiChatSending = true;
+        if (input) input.value = "";
+        if (sendBtn) {
+          sendBtn.disabled = true;
+          sendBtn.textContent = "Sending...";
+        }
+        aiChatMessages.push({ role: "user", text: prompt });
+        renderBuilderAiChat();
+        try {
+          const res = await fetch("/api/ai/chat-edit", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt, currentCode }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.success) {
+            if (data.limitReached) {
+              aiChatMessages.push({
+                role: "assistant",
+                text: "Daily AI credits reached. Upgrade to MediaLab Pro to continue.",
+              });
+              renderBuilderAiChat();
+              openUpgradeModal();
+              return;
+            }
+            throw new Error(data.message || "AI Architect request failed.");
+          }
+          aiActiveModel = String(data.modelUsed || "").trim() || aiActiveModel;
+          if (data.creditsRemaining !== undefined) aiCreditsRemaining = data.creditsRemaining;
+          if (editor) {
+            editor.value = String(data.updatedCode || "");
+            handleBuilderCodeInput();
+          }
+          applyCodeModeToCanvas();
+          aiChatMessages.push({
+            role: "assistant",
+            text: "Patch applied successfully using " + (aiActiveModel || "active model") + ".",
+          });
+          renderBuilderAiChat();
+        } catch (error) {
+          aiChatMessages.push({
+            role: "assistant",
+            text: error.message || "Could not complete AI patch.",
+          });
+          renderBuilderAiChat();
+        } finally {
+          aiChatSending = false;
+          if (sendBtn) {
+            sendBtn.disabled = false;
+            sendBtn.textContent = "Send";
+          }
         }
       }
       function refreshBuilderCodeMode() {
