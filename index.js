@@ -51,6 +51,7 @@ const app = express();
 const httpServer = createServer(app);
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "spiderman";
 const ADMIN_EMAIL = String(process.env.ADMIN_EMAIL || "dev@gmail.com").trim().toLowerCase();
+const AI_MODEL_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const AI_MODEL_REGISTRY = [
   { modelId: "llama-3.3-70b-versatile", provider: "groq", priority: 1 },
   { modelId: "deepseek-r1-distill-llama-70b", provider: "groq", priority: 2 },
@@ -61,6 +62,17 @@ const AI_MODEL_REGISTRY = [
   { modelId: "gemma2-9b-it", provider: "groq", priority: 7 },
   { modelId: "llama3-70b-8192", provider: "groq", priority: 8 },
   { modelId: "llama3-8b-8192", provider: "groq", priority: 9 },
+];
+const AI_MODEL_PREFERRED_ORDER = [
+  "llama-3.3-70b-versatile",
+  "deepseek-r1-distill-llama-70b",
+  "llama-3.1-8b-instant",
+  "qwen-qwq-32b",
+  "qwen-2.5-32b-instruct",
+  "qwen-2.5-coder-32b",
+  "gemma2-9b-it",
+  "llama3-70b-8192",
+  "llama3-8b-8192",
 ];
 
 app.engine("ejs", (filePath, _options, callback) => {
@@ -92,6 +104,8 @@ const dataExplorerConnections = new Map();
 const dataExplorerWatchers = new Map();
 let virtualDbConnectionState = null;
 const GROQ_API_KEY = String(process.env.GROQ_API_KEY || process.env.grog || "").trim();
+let aiModelsLastRefreshedAt = 0;
+let aiModelsRefreshTimer = null;
 
 function isSameCalendarDay(a = null, b = null) {
   if (!a || !b) return false;
@@ -133,6 +147,97 @@ async function ensureAIModelsRegistry() {
   if (after > before) {
     console.log(`✅ AI model registry synced (${after} models)`);
   }
+}
+
+function buildPriorityForModel(modelId = "") {
+  const normalized = String(modelId || "").trim().toLowerCase();
+  const preferredIndex = AI_MODEL_PREFERRED_ORDER.findIndex(
+    (item) => item.toLowerCase() === normalized,
+  );
+  if (preferredIndex >= 0) return preferredIndex + 1;
+  return AI_MODEL_PREFERRED_ORDER.length + 100;
+}
+
+function isLikelyChatModel(modelId = "") {
+  const id = String(modelId || "").toLowerCase();
+  if (!id) return false;
+  return (
+    id.includes("llama") ||
+    id.includes("deepseek") ||
+    id.includes("qwen") ||
+    id.includes("gemma")
+  );
+}
+
+async function fetchAvailableGroqModels() {
+  if (!GROQ_API_KEY) return [];
+  const response = await nodeFetch("https://api.groq.com/openai/v1/models", {
+    headers: {
+      Authorization: `Bearer ${GROQ_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Could not fetch Groq models.");
+  }
+  const payload = await response.json();
+  const rows = Array.isArray(payload?.data) ? payload.data : [];
+  return rows
+    .map((row) => ({
+      modelId: String(row?.id || "").trim(),
+      provider: "groq",
+      priority: buildPriorityForModel(String(row?.id || "").trim()),
+    }))
+    .filter((row) => row.modelId && isLikelyChatModel(row.modelId))
+    .sort((a, b) => a.priority - b.priority || a.modelId.localeCompare(b.modelId));
+}
+
+async function refreshAIModelsRegistryIfNeeded(force = false) {
+  const now = Date.now();
+  if (!force && now - aiModelsLastRefreshedAt < AI_MODEL_REFRESH_INTERVAL_MS) return;
+  let sourceModels = [];
+  try {
+    sourceModels = await fetchAvailableGroqModels();
+  } catch (error) {
+    console.warn("Groq models refresh failed, falling back to static registry:", error.message);
+  }
+  if (!sourceModels.length) {
+    sourceModels = AI_MODEL_REGISTRY.map((item) => ({
+      modelId: item.modelId,
+      provider: item.provider,
+      priority: item.priority,
+    }));
+  }
+  await Promise.all(
+    sourceModels.map((model) =>
+      AIModel.updateOne(
+        { modelId: model.modelId },
+        {
+          $set: {
+            provider: model.provider || "groq",
+            priority: Number(model.priority || buildPriorityForModel(model.modelId)),
+            isActive: true,
+          },
+          $setOnInsert: {
+            status: "online",
+            lastTested: new Date(),
+          },
+        },
+        { upsert: true },
+      ),
+    ),
+  );
+  aiModelsLastRefreshedAt = now;
+}
+
+function startAIModelsRefreshLoop() {
+  if (aiModelsRefreshTimer) return;
+  aiModelsRefreshTimer = setInterval(() => {
+    refreshAIModelsRegistryIfNeeded(false).catch((error) => {
+      console.warn("Scheduled AI model refresh failed:", error.message);
+    });
+  }, Math.max(60_000, AI_MODEL_REFRESH_INTERVAL_MS));
 }
 
 function getVirtualDbUri() {
@@ -3533,6 +3638,8 @@ mongoose
   .then(async () => {
     console.log("✅ MongoDB Connected");
     await ensureAIModelsRegistry();
+    await refreshAIModelsRegistryIfNeeded(true);
+    startAIModelsRefreshLoop();
   })
   .catch((err) => console.error("❌ MongoDB error:", err));
 
@@ -3562,6 +3669,7 @@ app.use(passport.session());
 
 app.get("/api/ai/models", async (req, res) => {
   try {
+    await refreshAIModelsRegistryIfNeeded(false);
     const models = await AIModel.find({})
       .sort({ priority: 1, modelId: 1 })
       .select("modelId provider priority isActive status lastTested")
@@ -3577,6 +3685,7 @@ app.get("/api/ai/models", async (req, res) => {
 
 app.post("/api/ai/chat-edit", async (req, res) => {
   try {
+    await refreshAIModelsRegistryIfNeeded(false);
     if (!req.isAuthenticated?.() || !req.user?._id) {
       return res.status(401).json({ success: false, message: "Login required." });
     }
@@ -3587,11 +3696,12 @@ app.post("/api/ai/chat-edit", async (req, res) => {
       });
     }
     const prompt = String(req.body?.prompt || "").trim();
+    const mode = String(req.body?.mode || "edit").trim().toLowerCase();
     const currentCode = String(req.body?.currentCode || "").trim();
     if (!prompt) {
       return res.status(400).json({ success: false, message: "Prompt is required." });
     }
-    if (!currentCode) {
+    if (!currentCode && mode !== "chat") {
       return res.status(400).json({ success: false, message: "Current code is required." });
     }
 
@@ -3629,6 +3739,7 @@ app.post("/api/ai/chat-edit", async (req, res) => {
     }
 
     let updatedCode = "";
+    let assistantReply = "";
     let modelUsed = "";
     let lastError = null;
     for (const model of models) {
@@ -3646,11 +3757,16 @@ app.post("/api/ai/chat-edit", async (req, res) => {
               {
                 role: "system",
                 content:
-                  "You are the MediaLab AI Architect. Return ONLY raw HTML and CSS/Tailwind code. No markdown, no backticks. You can refactor code, generate full templates, and apply design updates like online background images via valid image URLs. Always return valid, renderable HTML that works immediately in MediaLab. Preserve existing element IDs whenever possible. Preserve and/or produce 'ml-container' and 'ml-content' class structure so the visual builder can map objects accurately. If user asks to change page/body background, set it with explicit CSS that does not depend on external frameworks (inline body style or <style> body { background: ... }).",
+                  mode === "chat"
+                    ? "You are the MediaLab AI Copilot, like a friendly mini Cursor assistant. Be concise, warm, and practical. Help users plan next steps, clarify intent, and suggest actionable UI/code tasks for their builder workflow. Return plain text only."
+                    : "You are the MediaLab AI Architect. Return ONLY raw HTML and CSS/Tailwind code. No markdown, no backticks. You can refactor code, generate full templates, and apply design updates like online background images via valid image URLs. Always return valid, renderable HTML that works immediately in MediaLab. Preserve existing element IDs whenever possible. Preserve and/or produce 'ml-container' and 'ml-content' class structure so the visual builder can map objects accurately. If user asks to change page/body background, set it with explicit CSS that does not depend on external frameworks (inline body style or <style> body { background: ... }).",
               },
               {
                 role: "user",
-                content: `Current HTML:\n${currentCode}\n\nInstruction:\n${prompt}`,
+                content:
+                  mode === "chat"
+                    ? prompt
+                    : `Current HTML:\n${currentCode}\n\nInstruction:\n${prompt}`,
               },
             ],
           }),
@@ -3666,7 +3782,11 @@ app.post("/api/ai/chat-edit", async (req, res) => {
         if (!content) {
           throw new Error(`Empty completion from ${model.modelId}`);
         }
-        updatedCode = content;
+        if (mode === "chat") {
+          assistantReply = content;
+        } else {
+          updatedCode = content;
+        }
         modelUsed = model.modelId;
         await AIModel.updateOne(
           { _id: model._id },
@@ -3682,7 +3802,7 @@ app.post("/api/ai/chat-edit", async (req, res) => {
       }
     }
 
-    if (!updatedCode || !modelUsed) {
+    if ((!updatedCode && mode !== "chat") || (!assistantReply && mode === "chat") || !modelUsed) {
       return res.status(503).json({
         success: false,
         message: lastError?.message || "No AI model could process the request.",
@@ -3707,6 +3827,8 @@ app.post("/api/ai/chat-edit", async (req, res) => {
     return res.json({
       success: true,
       updatedCode,
+      assistantReply,
+      mode,
       modelUsed,
       creditsRemaining: hasUnlimitedAi
         ? null
@@ -3722,6 +3844,7 @@ app.post("/api/ai/chat-edit", async (req, res) => {
 
 app.post("/api/ai/autofix", async (req, res) => {
   try {
+    await refreshAIModelsRegistryIfNeeded(false);
     if (!req.isAuthenticated?.() || !req.user?._id) {
       return res.status(401).json({ success: false, message: "Login required." });
     }
@@ -3760,37 +3883,67 @@ app.post("/api/ai/autofix", async (req, res) => {
       });
     }
 
-    const groqResponse = await nodeFetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "deepseek-r1-distill-llama-70b",
-        temperature: 0.15,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are the MediaLab UI Surgeon. Your task is to refactor the user's code to be modern, scalable, and professional. Fix overlapping elements and CSS layout conflicts. Optimize Tailwind CSS classes for responsiveness. Return ONLY raw HTML and Tailwind code. Do NOT use markdown backticks or triple quotes. Preserve all 'ml-container' and 'ml-content' IDs so the visual builder can re-map the objects.",
-          },
-          {
-            role: "user",
-            content: `Refactor and auto-fix this canvas code:\n${currentCode}`,
-          },
-        ],
-      }),
-    });
-    if (!groqResponse.ok) {
-      const errText = await groqResponse.text();
-      throw new Error(errText || "Groq Auto-Fix request failed.");
+    const models = await AIModel.find({ isActive: true, status: "online" })
+      .sort({ priority: 1 })
+      .lean();
+    if (!models.length) {
+      return res.status(503).json({
+        success: false,
+        message: "All AI models are currently offline.",
+      });
     }
-    const payload = await groqResponse.json();
-    const rawContent = String(payload?.choices?.[0]?.message?.content || "");
-    const sanitizedContent = rawContent.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    let sanitizedContent = "";
+    let selectedModel = "";
+    let lastError = null;
+    for (const model of models) {
+      try {
+        const groqResponse = await nodeFetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${GROQ_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: model.modelId,
+            temperature: 0.15,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are the MediaLab UI Surgeon. Your task is to refactor the user's code to be modern, scalable, and professional. Fix overlapping elements and CSS layout conflicts. Optimize Tailwind CSS classes for responsiveness. Return ONLY raw HTML and Tailwind code. Do NOT use markdown backticks or triple quotes. Preserve all 'ml-container' and 'ml-content' IDs so the visual builder can re-map the objects.",
+              },
+              {
+                role: "user",
+                content: `Refactor and auto-fix this canvas code:\n${currentCode}`,
+              },
+            ],
+          }),
+        });
+        if (!groqResponse.ok) {
+          const errText = await groqResponse.text();
+          throw new Error(errText || `Groq Auto-Fix request failed for ${model.modelId}.`);
+        }
+        const payload = await groqResponse.json();
+        const rawContent = String(payload?.choices?.[0]?.message?.content || "");
+        const candidate = rawContent.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+        if (!candidate) throw new Error(`Auto-Fix returned empty content for ${model.modelId}.`);
+        sanitizedContent = candidate;
+        selectedModel = model.modelId;
+        await AIModel.updateOne(
+          { _id: model._id },
+          { $set: { status: "online", lastTested: new Date() } },
+        );
+        break;
+      } catch (error) {
+        lastError = error;
+        await AIModel.updateOne(
+          { _id: model._id },
+          { $set: { status: "offline", lastTested: new Date() } },
+        );
+      }
+    }
     if (!sanitizedContent) {
-      throw new Error("Auto-Fix returned empty content.");
+      throw new Error(lastError?.message || "Auto-Fix failed for all active models.");
     }
 
     user.aiQuota.usedToday = Number(user.aiQuota.usedToday || 0) + 1;
@@ -3802,7 +3955,7 @@ app.post("/api/ai/autofix", async (req, res) => {
       summary: "used Magic Auto-Fix",
       source: "ai",
       metadata: {
-        modelUsed: "deepseek-r1-distill-llama-70b",
+        modelUsed: selectedModel || "unknown",
         usedToday: Number(user.aiQuota.usedToday || 0),
         dailyLimit: Number(user.aiQuota.dailyLimit || 10),
       },
@@ -3811,7 +3964,7 @@ app.post("/api/ai/autofix", async (req, res) => {
     return res.json({
       success: true,
       updatedCode: sanitizedContent,
-      modelUsed: "deepseek-r1-distill-llama-70b",
+      modelUsed: selectedModel || "unknown",
       creditsRemaining: hasUnlimitedAi
         ? null
         : Math.max(0, Number(user.aiQuota.dailyLimit || 10) - Number(user.aiQuota.usedToday || 0)),

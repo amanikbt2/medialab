@@ -27228,7 +27228,7 @@ ${interactionBlock}
         const creditsEl = document.getElementById("ai-credits-badge");
         if (!messagesEl || !statusEl || !creditsEl) return;
         const fallback =
-          '<div class="ai-chat-bubble assistant">Describe the change you want. I will patch your current builder HTML and re-apply it to canvas objects.</div>';
+          '<div class="ai-chat-bubble assistant">Hi! I can chat, plan, and apply builder fixes. Tell me your goal (for example: "build a SaaS hero", "set a cat background", or just "hello").</div>';
         const rows = aiChatMessages.map((item) => {
           const roleClass = item.role === "user" ? "user" : "assistant";
           return '<div class="ai-chat-bubble ' + roleClass + '">' + escapeHtmlText(item.text || "") + "</div>";
@@ -27263,6 +27263,27 @@ ${interactionBlock}
           editor?.value?.trim() ||
           buildCodeModeDocument() ||
           `<div id="ml-root" class="ml-container"><div class="ml-content">New MediaLab template</div></div>`;
+        const lowerPrompt = prompt.toLowerCase();
+        const editKeywords = [
+          "fix",
+          "change",
+          "apply",
+          "update",
+          "generate",
+          "create",
+          "make",
+          "background",
+          "template",
+          "layout",
+          "responsive",
+          "add",
+          "remove",
+          "style",
+          "refactor",
+        ];
+        const mode = editKeywords.some((keyword) => lowerPrompt.includes(keyword))
+          ? "edit"
+          : "chat";
         aiChatSending = true;
         if (input) input.value = "";
         if (sendBtn) {
@@ -27276,7 +27297,7 @@ ${interactionBlock}
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt, currentCode }),
+            body: JSON.stringify({ prompt, currentCode, mode }),
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok || !data.success) {
@@ -27293,15 +27314,24 @@ ${interactionBlock}
           }
           aiActiveModel = String(data.modelUsed || "").trim() || aiActiveModel;
           if (data.creditsRemaining !== undefined) aiCreditsRemaining = data.creditsRemaining;
-          if (editor) {
-            editor.value = String(data.updatedCode || "");
-            handleBuilderCodeInput();
+          if (String(data.mode || mode) === "chat") {
+            aiChatMessages.push({
+              role: "assistant",
+              text:
+                String(data.assistantReply || "").trim() ||
+                "Ready. Tell me what you want to build or fix next.",
+            });
+          } else {
+            if (editor) {
+              editor.value = String(data.updatedCode || "");
+              handleBuilderCodeInput();
+            }
+            applyCodeModeToCanvas();
+            aiChatMessages.push({
+              role: "assistant",
+              text: "Patch applied successfully using " + (aiActiveModel || "active model") + ".",
+            });
           }
-          applyCodeModeToCanvas();
-          aiChatMessages.push({
-            role: "assistant",
-            text: "Patch applied successfully using " + (aiActiveModel || "active model") + ".",
-          });
           renderBuilderAiChat();
         } catch (error) {
           aiChatMessages.push({
