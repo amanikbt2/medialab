@@ -27665,6 +27665,69 @@ ${interactionBlock}
         }
         return [];
       }
+      function extractColorFromPrompt(prompt = "", fallback = "#3b82f6") {
+        const text = String(prompt || "").toLowerCase();
+        const colorMap = {
+          blue: "#3b82f6",
+          red: "#ef4444",
+          green: "#22c55e",
+          yellow: "#eab308",
+          orange: "#f97316",
+          purple: "#a855f7",
+          pink: "#ec4899",
+          cyan: "#06b6d4",
+          teal: "#14b8a6",
+          white: "#ffffff",
+          black: "#111827",
+          gray: "#6b7280",
+          grey: "#6b7280",
+        };
+        for (const key of Object.keys(colorMap)) {
+          if (text.includes(key)) return colorMap[key];
+        }
+        const hex = text.match(/#([0-9a-f]{3}|[0-9a-f]{6})\b/i);
+        if (hex) return `#${hex[1]}`;
+        return fallback;
+      }
+      function runDeterministicBuilderCommand(userPrompt = "") {
+        const prompt = String(userPrompt || "").toLowerCase().trim();
+        if (!prompt) return null;
+        if (
+          /\b(insert|add|create)\b/.test(prompt) &&
+          /\b(ball|circle|dot|sphere)\b/.test(prompt)
+        ) {
+          const color = extractColorFromPrompt(prompt, "#3b82f6");
+          addObject(
+            "div",
+            {
+              width: "120px",
+              height: "120px",
+              borderRadius: "9999px",
+              background: color,
+              boxShadow: "0 18px 36px rgba(15,23,42,0.25)",
+            },
+            {
+              text: "",
+            },
+          );
+          const created = selectedElements?.[0] || selectedEl;
+          if (created) {
+            created.dataset.mlInnerStyle = JSON.stringify({
+              ...(JSON.parse(created.dataset.mlInnerStyle || "{}") || {}),
+              borderRadius: "9999px",
+              background: color,
+            });
+            scheduleSyncStyleTag();
+          }
+          applyCodeModeToCanvas();
+          return {
+            applied: true,
+            message: "Inserted a round blue ball and rendered it on canvas.",
+            actions: ["INSERT_BALL"],
+          };
+        }
+        return null;
+      }
       function stripAgentActionBlocks(responseText = "") {
         return String(responseText || "")
           .replace(/\[ACTION\]\s*[\s\S]*?\s*\[\/ACTION\]/gi, "")
@@ -28002,6 +28065,17 @@ ${interactionBlock}
         if (!prompt) return;
         if (!loggedIn || !currentUser) {
           showLogin();
+          return;
+        }
+        const deterministicResult = runDeterministicBuilderCommand(prompt);
+        if (deterministicResult?.applied) {
+          aiChatMessages.push({ role: "user", text: prompt });
+          aiChatMessages.push({
+            role: "assistant",
+            text: deterministicResult.message || "Command applied on canvas.",
+          });
+          setAiAgentStage("done");
+          renderBuilderAiChat();
           return;
         }
         const currentCode =
