@@ -7352,6 +7352,7 @@
               action,
               summary,
               source,
+              kind: metadata?.kind === "error" ? "error" : "activity",
               email: currentUser?.email || "",
               name: currentUser?.name || "",
               isPro: Boolean(currentUser?.isPro),
@@ -7364,6 +7365,24 @@
         } catch (error) {
           console.warn("Usage activity log skipped:", error);
         }
+      }
+      async function logErrorEvent(
+        summary = "",
+        source = "web",
+        metadata = {},
+      ) {
+        const safeSummary = String(summary || "").trim();
+        if (!safeSummary) return;
+        const message = `[error] ${safeSummary} - ${new Date().toISOString()} --source(${source})`;
+        await logUsageActivity(
+          "client-error",
+          message,
+          source,
+          {
+            kind: "error",
+            ...(metadata && typeof metadata === "object" ? metadata : {}),
+          },
+        );
       }
       const recentUsageLogEvents = new Map();
       async function logUsageActivityOnce(
@@ -27334,6 +27353,11 @@ ${interactionBlock}
           }
           renderBuilderAiChat();
         } catch (error) {
+          await logErrorEvent(
+            `AI chat failed: ${error.message || "unknown error"}`,
+            "ai-chat",
+            { promptPreview: prompt.slice(0, 160) },
+          );
           aiChatMessages.push({
             role: "assistant",
             text: error.message || "Could not complete AI patch.",
@@ -27396,6 +27420,11 @@ ${interactionBlock}
           renderBuilderAiChat();
           showBuilderSnackbar("Magic Auto-Fix complete.", "success");
         } catch (error) {
+          await logErrorEvent(
+            `Magic Auto-Fix failed: ${error.message || "unknown error"}`,
+            "ai-autofix",
+            { promptPreview: String(code || "").slice(0, 160) },
+          );
           showBuilderSnackbar(error.message || "Magic Auto-Fix failed.", "error");
         } finally {
           aiMagicFixRunning = false;
@@ -27404,6 +27433,20 @@ ${interactionBlock}
           if (magicIcon) magicIcon.classList.remove("is-spinning");
         }
       }
+      window.addEventListener("error", (event) => {
+        const message = String(event?.message || "").trim();
+        if (!message) return;
+        logErrorEvent(`Unhandled error: ${message}`, "client-runtime", {
+          filename: String(event?.filename || ""),
+          line: Number(event?.lineno || 0),
+          column: Number(event?.colno || 0),
+        });
+      });
+      window.addEventListener("unhandledrejection", (event) => {
+        const reasonText = String(event?.reason?.message || event?.reason || "").trim();
+        if (!reasonText) return;
+        logErrorEvent(`Unhandled rejection: ${reasonText}`, "client-runtime");
+      });
       function refreshBuilderCodeMode() {
         const editor = document.getElementById("builder-code-editor");
         const highlight = document.getElementById("builder-code-highlight");

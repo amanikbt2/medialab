@@ -403,6 +403,13 @@
                 Marketplace Desk
                 <span id="badge-marketplace" class="hidden ml-2 rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-black text-rose-200"></span>
               </button>
+              <button
+                data-tab="ai-models"
+                class="top-tab px-4 py-3 rounded-2xl text-sm font-bold transition-all"
+                onclick="showAdminTab('ai-models', this)"
+              >
+                AI Models
+              </button>
             </div>
           </div>
         </div>
@@ -418,6 +425,7 @@
       <section id="tab-payouts" class="mt-6 space-y-4 hidden"></section>
       <section id="tab-notify" class="mt-6 space-y-4 hidden"></section>
       <section id="tab-marketplace" class="mt-6 space-y-4 hidden"></section>
+      <section id="tab-ai-models" class="mt-6 space-y-4 hidden"></section>
     </main>
 
     <div
@@ -582,7 +590,7 @@
         document
           .querySelectorAll(`.top-tab[data-tab="${name}"]`)
           .forEach((tab) => tab.classList.add("active"));
-        ["analytics", "feedbacks", "logs", "users", "premium", "downloads", "withdrawals", "payouts", "notify", "marketplace"].forEach((tabName) => {
+        ["analytics", "feedbacks", "logs", "users", "premium", "downloads", "withdrawals", "payouts", "notify", "marketplace", "ai-models"].forEach((tabName) => {
           document
             .getElementById(`tab-${tabName}`)
             ?.classList.toggle("hidden", tabName !== name);
@@ -1188,6 +1196,7 @@
                 <div class="flex items-center justify-between"><span class="text-slate-300">Pending review</span><strong>${adminAnalytics.pendingUpgradeRequests || 0}</strong></div>
               </div>
             </div>
+            ${renderAiModelsSummaryCard()}
             <div class="glass border border-white/10 rounded-[1.5rem] p-5">
               <div class="text-[11px] uppercase tracking-[0.22em] text-slate-400 font-bold">Payout Summary</div>
               <div class="space-y-3 mt-4 text-sm">
@@ -1237,9 +1246,37 @@
               </div>
             </div>
           </div>
-          ${renderAiUsagePanel()}
         `;
         requestAnimationFrame(() => animateAnalyticsCounts());
+      }
+      function renderAiModelsSummaryCard() {
+        const usage = adminAiUsage || {};
+        const models = Array.isArray(usage.models) ? usage.models : [];
+        const recent = models
+          .slice()
+          .sort((a, b) => Number(b.runs24h || 0) - Number(a.runs24h || 0))
+          .slice(0, 5);
+        const current = recent[0] || models[0] || null;
+        return `
+          <div class="glass border border-cyan-400/20 rounded-[1.5rem] p-5">
+            <div class="text-[11px] uppercase tracking-[0.22em] text-cyan-300 font-bold">AI Models Summary</div>
+            <div class="mt-3 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-3">
+              <div class="text-[10px] uppercase tracking-[0.16em] text-cyan-200">Current highlighted model</div>
+              <div class="mt-1 text-sm font-bold text-white">${escapeHtml(current?.modelId || "No active model yet")}</div>
+            </div>
+            <div class="mt-3 space-y-2">
+              ${recent.length
+                ? recent
+                    .map(
+                      (item) => `<div class="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+                        <span class="truncate text-xs text-slate-200">${escapeHtml(item.modelId || "")}</span>
+                        <span class="text-[10px] font-black text-cyan-200">${Number(item.runs24h || 0)} runs</span>
+                      </div>`,
+                    )
+                    .join("")
+                : `<div class="rounded-lg border border-dashed border-white/10 px-3 py-3 text-xs text-slate-400 text-center">No model usage recorded yet.</div>`}
+            </div>
+          </div>`;
       }
       function formatDuration(ms = 0) {
         const totalSeconds = Math.max(0, Math.floor(Number(ms || 0) / 1000));
@@ -1312,6 +1349,62 @@
                 : `<div class="rounded-xl border border-dashed border-white/10 p-4 text-center text-sm text-slate-400">No AI model telemetry yet.</div>`}
             </div>
           </div>`;
+      }
+      function renderAiModelsTab() {
+        const el = document.getElementById("tab-ai-models");
+        if (!el) return;
+        const usage = adminAiUsage || {};
+        const user = usage.user || {};
+        const models = Array.isArray(usage.models) ? usage.models : [];
+        const usagePercent = Number(user.usagePercent || 0);
+        const barTone = resolveUsageProgressClasses(usagePercent);
+        const cooldownLabel = Number(user.cooldownMs || 0) > 0
+          ? `${formatDuration(user.cooldownMs)} remaining`
+          : "No cooldown active";
+        el.innerHTML = `
+          <div class="glass border border-white/10 rounded-[1.2rem] p-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p class="text-[11px] uppercase tracking-[0.22em] text-slate-400 font-bold">AI Models Console</p>
+                <p class="text-xs text-slate-500 mt-1">Live registry and usage distribution.</p>
+              </div>
+              <div class="text-xs text-cyan-200 rounded-lg border border-cyan-400/20 bg-cyan-500/10 px-3 py-1.5">Runs 24h: ${Number(usage?.totals?.runs24h || 0)}</div>
+            </div>
+            <div class="mt-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+              <div class="flex items-center justify-between text-xs text-slate-400">
+                <span>${escapeHtml(user.email || "dev@gmail.com")}</span>
+                <span>${user.isUnlimited ? "Unlimited" : `${Number(user.usedToday || 0)}/${Number(user.dailyLimit || 10)}`}</span>
+              </div>
+              <div class="mt-2 h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+                <div class="h-full ${barTone}" style="width:${Math.max(0, Math.min(100, usagePercent))}%;"></div>
+              </div>
+              <div class="mt-2 text-[11px] text-slate-400">Cooldown: ${cooldownLabel}</div>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            ${models.length
+              ? models
+                  .map((model) => {
+                    const runPercent = Number(model.runPercent24h || 0);
+                    const rowTone = resolveUsageProgressClasses(runPercent);
+                    return `<div class="glass border border-white/10 rounded-xl p-3">
+                      <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                          <p class="truncate text-xs font-bold text-white">${escapeHtml(model.modelId || "unknown")}</p>
+                          <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 mt-1">P${Number(model.priority || 0)} • ${String(model.status || "offline").toUpperCase()}</p>
+                        </div>
+                        <span class="text-[10px] font-black text-cyan-200">${runPercent.toFixed(1)}%</span>
+                      </div>
+                      <div class="mt-2 h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+                        <div class="h-full ${rowTone}" style="width:${Math.max(0, Math.min(100, runPercent))}%;"></div>
+                      </div>
+                      <div class="mt-2 text-[10px] text-slate-400">${Number(model.runs24h || 0)} runs in 24h</div>
+                    </div>`;
+                  })
+                  .join("")
+              : `<div class="rounded-xl border border-dashed border-white/10 p-4 text-center text-sm text-slate-400">No AI model telemetry yet.</div>`}
+          </div>
+        `;
       }
 
       function renderPremiumRequests() {
@@ -2686,6 +2779,7 @@
           renderPayouts();
           renderNotifyTab();
           renderAdminMarketplace();
+          renderAiModelsTab();
           connectAdminLiveFeed();
           setLiveStatus(Boolean(adminSocket?.connected));
         } catch (error) {

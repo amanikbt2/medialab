@@ -201,6 +201,15 @@ async function refreshAIModelsRegistryIfNeeded(force = false) {
     sourceModels = await fetchAvailableGroqModels();
   } catch (error) {
     console.warn("Groq models refresh failed, falling back to static registry:", error.message);
+    await createUsageLog({
+      action: "ai-model-refresh-error",
+      summary: `[error] AI model registry refresh failed: ${String(error?.message || "unknown")} - ${new Date().toISOString()} --source(ai-model-registry)`,
+      source: "ai-model-registry",
+      kind: "error",
+      metadata: {
+        endpoint: "https://api.groq.com/openai/v1/models",
+      },
+    });
   }
   if (!sourceModels.length) {
     sourceModels = AI_MODEL_REGISTRY.map((item) => ({
@@ -3795,6 +3804,18 @@ app.post("/api/ai/chat-edit", async (req, res) => {
         break;
       } catch (modelError) {
         lastError = modelError;
+        await createUsageLog({
+          user,
+          action: "ai-model-error",
+          summary: `[error] AI model failed: ${model.modelId} - ${String(modelError?.message || "unknown")} - ${new Date().toISOString()} --source(ai-chat)`,
+          source: "ai-chat",
+          kind: "error",
+          metadata: {
+            modelId: model.modelId,
+            endpoint: "/api/ai/chat-edit",
+            mode,
+          },
+        });
         await AIModel.updateOne(
           { _id: model._id },
           { $set: { status: "offline", lastTested: new Date() } },
@@ -3835,6 +3856,18 @@ app.post("/api/ai/chat-edit", async (req, res) => {
         : Math.max(0, Number(user.aiQuota.dailyLimit || 10) - Number(user.aiQuota.usedToday || 0)),
     });
   } catch (error) {
+    await createUsageLog({
+      user: req.user || null,
+      email: req.user?.email || "",
+      name: req.user?.name || "",
+      action: "ai-chat-edit-error",
+      summary: `[error] AI chat endpoint failed: ${String(error?.message || "unknown")} - ${new Date().toISOString()} --source(ai-chat)`,
+      source: "ai-chat",
+      kind: "error",
+      metadata: {
+        endpoint: "/api/ai/chat-edit",
+      },
+    });
     res.status(500).json({
       success: false,
       message: error.message || "AI edit failed.",
@@ -3936,6 +3969,17 @@ app.post("/api/ai/autofix", async (req, res) => {
         break;
       } catch (error) {
         lastError = error;
+        await createUsageLog({
+          user,
+          action: "ai-model-error",
+          summary: `[error] AI model failed: ${model.modelId} - ${String(error?.message || "unknown")} - ${new Date().toISOString()} --source(ai-autofix)`,
+          source: "ai-autofix",
+          kind: "error",
+          metadata: {
+            modelId: model.modelId,
+            endpoint: "/api/ai/autofix",
+          },
+        });
         await AIModel.updateOne(
           { _id: model._id },
           { $set: { status: "offline", lastTested: new Date() } },
@@ -3970,6 +4014,18 @@ app.post("/api/ai/autofix", async (req, res) => {
         : Math.max(0, Number(user.aiQuota.dailyLimit || 10) - Number(user.aiQuota.usedToday || 0)),
     });
   } catch (error) {
+    await createUsageLog({
+      user: req.user || null,
+      email: req.user?.email || "",
+      name: req.user?.name || "",
+      action: "ai-autofix-error",
+      summary: `[error] AI autofix endpoint failed: ${String(error?.message || "unknown")} - ${new Date().toISOString()} --source(ai-autofix)`,
+      source: "ai-autofix",
+      kind: "error",
+      metadata: {
+        endpoint: "/api/ai/autofix",
+      },
+    });
     res.status(500).json({
       success: false,
       message: error.message || "Magic Auto-Fix failed.",
