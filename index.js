@@ -51,6 +51,17 @@ const app = express();
 const httpServer = createServer(app);
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "spiderman";
 const ADMIN_EMAIL = String(process.env.ADMIN_EMAIL || "dev@gmail.com").trim().toLowerCase();
+const AI_MODEL_REGISTRY = [
+  { modelId: "llama-3.3-70b-versatile", provider: "groq", priority: 1 },
+  { modelId: "deepseek-r1-distill-llama-70b", provider: "groq", priority: 2 },
+  { modelId: "llama-3.1-8b-instant", provider: "groq", priority: 3 },
+  { modelId: "qwen-qwq-32b", provider: "groq", priority: 4 },
+  { modelId: "qwen-2.5-32b-instruct", provider: "groq", priority: 5 },
+  { modelId: "qwen-2.5-coder-32b", provider: "groq", priority: 6 },
+  { modelId: "gemma2-9b-it", provider: "groq", priority: 7 },
+  { modelId: "llama3-70b-8192", provider: "groq", priority: 8 },
+  { modelId: "llama3-8b-8192", provider: "groq", priority: 9 },
+];
 
 app.engine("ejs", (filePath, _options, callback) => {
   fs.readFile(filePath, "utf8", callback);
@@ -93,36 +104,35 @@ function isSameCalendarDay(a = null, b = null) {
   );
 }
 
-async function seedAIModelsIfNeeded() {
-  const count = await AIModel.countDocuments({});
-  if (count > 0) return;
-  await AIModel.insertMany([
-    {
-      modelId: "llama-3.3-70b-versatile",
-      provider: "groq",
-      priority: 1,
-      isActive: true,
-      status: "online",
-      lastTested: new Date(),
-    },
-    {
-      modelId: "deepseek-r1-distill-llama-70b",
-      provider: "groq",
-      priority: 2,
-      isActive: true,
-      status: "online",
-      lastTested: new Date(),
-    },
-    {
-      modelId: "llama-3.1-8b-instant",
-      provider: "groq",
-      priority: 3,
-      isActive: true,
-      status: "online",
-      lastTested: new Date(),
-    },
-  ]);
-  console.log("✅ AI model registry seeded");
+function isUnlimitedAiUser(user = null) {
+  const email = String(user?.email || "").trim().toLowerCase();
+  return Boolean(user?.isPro) || email === ADMIN_EMAIL;
+}
+
+async function ensureAIModelsRegistry() {
+  const before = await AIModel.countDocuments({});
+  await Promise.all(
+    AI_MODEL_REGISTRY.map((model) =>
+      AIModel.updateOne(
+        { modelId: model.modelId },
+        {
+          $setOnInsert: {
+            modelId: model.modelId,
+            provider: model.provider,
+            priority: model.priority,
+            isActive: true,
+            status: "online",
+            lastTested: new Date(),
+          },
+        },
+        { upsert: true },
+      ),
+    ),
+  );
+  const after = await AIModel.countDocuments({});
+  if (after > before) {
+    console.log(`✅ AI model registry synced (${after} models)`);
+  }
 }
 
 function getVirtualDbUri() {
@@ -3522,7 +3532,7 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(async () => {
     console.log("✅ MongoDB Connected");
-    await seedAIModelsIfNeeded();
+    await ensureAIModelsRegistry();
   })
   .catch((err) => console.error("❌ MongoDB error:", err));
 
@@ -3597,9 +3607,10 @@ app.post("/api/ai/chat-edit", async (req, res) => {
     if (!isSameCalendarDay(user.aiQuota.lastUsed, now)) {
       user.aiQuota.usedToday = 0;
     }
+    const hasUnlimitedAi = isUnlimitedAiUser(user);
     const dailyLimit = Number(user.aiQuota.dailyLimit ?? 10);
     const usedToday = Number(user.aiQuota.usedToday ?? 0);
-    if (!user.isPro && usedToday >= dailyLimit) {
+    if (!hasUnlimitedAi && usedToday >= dailyLimit) {
       return res.status(403).json({
         success: false,
         limitReached: true,
@@ -3681,12 +3692,23 @@ app.post("/api/ai/chat-edit", async (req, res) => {
     user.aiQuota.usedToday = Number(user.aiQuota.usedToday || 0) + 1;
     user.aiQuota.lastUsed = now;
     await user.save();
+    await createUsageLog({
+      user,
+      action: "ai-chat-edit",
+      summary: `used AI chat edit via ${modelUsed}`,
+      source: "ai",
+      metadata: {
+        modelUsed,
+        usedToday: Number(user.aiQuota.usedToday || 0),
+        dailyLimit: Number(user.aiQuota.dailyLimit || 10),
+      },
+    });
 
     return res.json({
       success: true,
       updatedCode,
       modelUsed,
-      creditsRemaining: user.isPro
+      creditsRemaining: hasUnlimitedAi
         ? null
         : Math.max(0, Number(user.aiQuota.dailyLimit || 10) - Number(user.aiQuota.usedToday || 0)),
     });
@@ -3727,9 +3749,10 @@ app.post("/api/ai/autofix", async (req, res) => {
     if (today !== lastUsedDay) {
       user.aiQuota.usedToday = 0;
     }
+    const hasUnlimitedAi = isUnlimitedAiUser(user);
     const dailyLimit = Number(user.aiQuota.dailyLimit ?? 10);
     const usedToday = Number(user.aiQuota.usedToday ?? 0);
-    if (!user.isPro && usedToday >= dailyLimit) {
+    if (!hasUnlimitedAi && usedToday >= dailyLimit) {
       return res.status(403).json({
         success: false,
         limitReached: true,
@@ -3773,12 +3796,23 @@ app.post("/api/ai/autofix", async (req, res) => {
     user.aiQuota.usedToday = Number(user.aiQuota.usedToday || 0) + 1;
     user.aiQuota.lastUsed = now;
     await user.save();
+    await createUsageLog({
+      user,
+      action: "ai-autofix",
+      summary: "used Magic Auto-Fix",
+      source: "ai",
+      metadata: {
+        modelUsed: "deepseek-r1-distill-llama-70b",
+        usedToday: Number(user.aiQuota.usedToday || 0),
+        dailyLimit: Number(user.aiQuota.dailyLimit || 10),
+      },
+    });
 
     return res.json({
       success: true,
       updatedCode: sanitizedContent,
       modelUsed: "deepseek-r1-distill-llama-70b",
-      creditsRemaining: user.isPro
+      creditsRemaining: hasUnlimitedAi
         ? null
         : Math.max(0, Number(user.aiQuota.dailyLimit || 10) - Number(user.aiQuota.usedToday || 0)),
     });
@@ -9117,6 +9151,87 @@ app.get("/api/admin/analytics", adminRateLimit, requireAdminApi, async (_req, re
   } catch (error) {
     console.error("Admin analytics fetch failed:", error);
     res.status(500).json({ success: false, message: "Could not load analytics." });
+  }
+});
+
+app.get("/api/admin/ai-usage", adminRateLimit, requireAdminApi, async (_req, res) => {
+  try {
+    const now = new Date();
+    const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const devUser = await User.findOne({ email: ADMIN_EMAIL })
+      .select("email name isPro aiQuota")
+      .lean();
+    const devQuota = devUser?.aiQuota || {};
+    const devDailyLimit = Number(devQuota.dailyLimit ?? 10);
+    const devUsedToday = Number(devQuota.usedToday ?? 0);
+    const devLastUsed = devQuota.lastUsed ? new Date(devQuota.lastUsed) : null;
+    const sameDay =
+      devLastUsed &&
+      devLastUsed.getFullYear() === now.getFullYear() &&
+      devLastUsed.getMonth() === now.getMonth() &&
+      devLastUsed.getDate() === now.getDate();
+    const effectiveUsedToday = sameDay ? devUsedToday : 0;
+    const isUnlimited = Boolean(devUser?.isPro) || String(devUser?.email || "") === ADMIN_EMAIL;
+    const usagePercent = isUnlimited
+      ? 0
+      : Math.max(0, Math.min(100, (effectiveUsedToday / Math.max(1, devDailyLimit)) * 100));
+    const cooldownEndsAt = new Date(now);
+    cooldownEndsAt.setHours(24, 0, 0, 0);
+    const cooldownMs = !isUnlimited && effectiveUsedToday >= devDailyLimit
+      ? Math.max(0, cooldownEndsAt.getTime() - now.getTime())
+      : 0;
+    const logs = await UsageLog.find({
+      action: { $in: ["ai-chat-edit", "ai-autofix"] },
+      createdAt: { $gte: last24h },
+    })
+      .sort({ createdAt: -1 })
+      .select("action createdAt metadata")
+      .lean();
+    const modelUsageMap = new Map();
+    logs.forEach((item) => {
+      const modelId = String(item?.metadata?.modelUsed || "").trim() || "unknown";
+      modelUsageMap.set(modelId, (modelUsageMap.get(modelId) || 0) + 1);
+    });
+    const totalRuns = logs.length;
+    const models = await AIModel.find({})
+      .sort({ priority: 1, modelId: 1 })
+      .select("modelId provider priority isActive status lastTested")
+      .lean();
+    const modelStats = models.map((model) => {
+      const runs = Number(modelUsageMap.get(model.modelId) || 0);
+      const runPercent = totalRuns ? Number(((runs / totalRuns) * 100).toFixed(1)) : 0;
+      return {
+        ...model,
+        runs24h: runs,
+        runPercent24h: runPercent,
+      };
+    });
+    res.json({
+      success: true,
+      usage: {
+        user: {
+          email: devUser?.email || ADMIN_EMAIL,
+          name: devUser?.name || "Developer",
+          isPro: Boolean(devUser?.isPro),
+          isUnlimited,
+          usedToday: effectiveUsedToday,
+          dailyLimit: devDailyLimit,
+          usagePercent: Number(usagePercent.toFixed(1)),
+          cooldownMs,
+          cooldownEndsAt: cooldownMs ? cooldownEndsAt.toISOString() : null,
+        },
+        totals: {
+          runs24h: totalRuns,
+        },
+        models: modelStats,
+      },
+    });
+  } catch (error) {
+    console.error("Admin AI usage fetch failed:", error);
+    res.status(500).json({
+      success: false,
+      message: "Could not load AI usage data.",
+    });
   }
 });
 

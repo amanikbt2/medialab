@@ -449,6 +449,7 @@
       let adminWithdrawals = [];
       let adminPayoutUsers = [];
       let adminNotifications = [];
+      let adminAiUsage = null;
       let adminMarketplace = {
         pendingListings: [],
         approvedListings: [],
@@ -1236,8 +1237,81 @@
               </div>
             </div>
           </div>
+          ${renderAiUsagePanel()}
         `;
         requestAnimationFrame(() => animateAnalyticsCounts());
+      }
+      function formatDuration(ms = 0) {
+        const totalSeconds = Math.max(0, Math.floor(Number(ms || 0) / 1000));
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        return `${hours}h ${minutes}m ${seconds}s`;
+      }
+      function resolveUsageProgressClasses(percent = 0) {
+        const value = Number(percent || 0);
+        if (value < 20) return "bg-amber-400";
+        if (value < 70) return "bg-emerald-400";
+        return "bg-rose-400";
+      }
+      function renderAiUsagePanel() {
+        const usage = adminAiUsage || {};
+        const user = usage.user || {};
+        const models = Array.isArray(usage.models) ? usage.models : [];
+        const usagePercent = Number(user.usagePercent || 0);
+        const barTone = resolveUsageProgressClasses(usagePercent);
+        const cooldownLabel = Number(user.cooldownMs || 0) > 0
+          ? `${formatDuration(user.cooldownMs)} remaining`
+          : "No cooldown active";
+        return `
+          <div class="glass border border-white/10 rounded-[1.5rem] p-5">
+            <div class="flex items-center justify-between gap-3">
+              <div class="text-[11px] uppercase tracking-[0.22em] text-slate-400 font-bold">AI Infrastructure Monitor</div>
+              <div class="text-xs text-slate-500">24h model telemetry</div>
+            </div>
+            <div class="mt-4 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p class="text-sm font-bold text-white">${escapeHtml(user.email || "dev@gmail.com")}</p>
+                  <p class="text-xs text-slate-400">${user.isUnlimited ? "Unlimited AI (developer bypass active)" : `${Number(user.usedToday || 0)}/${Number(user.dailyLimit || 10)} used today`}</p>
+                </div>
+                <span class="rounded-full border border-cyan-400/25 bg-cyan-500/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-cyan-200">Runs 24h: ${Number(usage?.totals?.runs24h || 0)}</span>
+              </div>
+              <div class="mt-4 h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                <div class="h-full ${barTone}" style="width:${Math.max(0, Math.min(100, usagePercent))}%;"></div>
+              </div>
+              <div class="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+                <span>Usage: ${usagePercent.toFixed(1)}%</span>
+                <span>Cooldown: ${cooldownLabel}</span>
+              </div>
+            </div>
+            <div class="mt-4 space-y-2">
+              ${models.length
+                ? models
+                    .map((model) => {
+                      const runPercent = Number(model.runPercent24h || 0);
+                      const rowTone = resolveUsageProgressClasses(runPercent);
+                      return `
+                      <div class="rounded-xl border border-white/8 bg-white/[0.02] p-3">
+                        <div class="flex items-center justify-between gap-3">
+                          <div class="min-w-0">
+                            <p class="truncate text-sm font-bold text-white">${escapeHtml(model.modelId || "unknown")}</p>
+                            <p class="text-[10px] uppercase tracking-[0.16em] text-slate-500">${escapeHtml(model.provider || "groq")} • Priority ${Number(model.priority || 0)} • ${String(model.status || "offline").toUpperCase()}</p>
+                          </div>
+                          <div class="text-right">
+                            <p class="text-xs font-bold text-cyan-200">${Number(model.runs24h || 0)} runs</p>
+                            <p class="text-[10px] text-slate-500">${runPercent.toFixed(1)}%</p>
+                          </div>
+                        </div>
+                        <div class="mt-2 h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+                          <div class="h-full ${rowTone}" style="width:${Math.max(0, Math.min(100, runPercent))}%;"></div>
+                        </div>
+                      </div>`;
+                    })
+                    .join("")
+                : `<div class="rounded-xl border border-dashed border-white/10 p-4 text-center text-sm text-slate-400">No AI model telemetry yet.</div>`}
+            </div>
+          </div>`;
       }
 
       function renderPremiumRequests() {
@@ -2524,7 +2598,7 @@
           const previousMarketplacePurchaseIds = new Set(
             (adminMarketplace?.pendingPurchases || []).map((item) => item.purchaseId),
           );
-          const [feedbackRes, analyticsRes, usageLogRes, premiumRes, downloadsRes, withdrawalsRes, payoutUsersRes, marketplaceRes, notificationsRes] = await Promise.all([
+          const [feedbackRes, analyticsRes, usageLogRes, premiumRes, downloadsRes, withdrawalsRes, payoutUsersRes, marketplaceRes, notificationsRes, aiUsageRes] = await Promise.all([
             fetch("/api/admin/feedbacks", { headers }),
             fetch("/api/admin/analytics", { headers }),
             fetch("/api/admin/usage-logs", { headers }),
@@ -2534,6 +2608,7 @@
             fetch("/api/admin/payout-users", { headers }),
             fetch("/api/admin/marketplace", { headers }),
             fetch("/api/admin/notifications", { headers }),
+            fetch("/api/admin/ai-usage", { headers }),
           ]);
           const feedbackData = await feedbackRes.json();
           const analyticsData = await analyticsRes.json();
@@ -2544,6 +2619,7 @@
           const payoutUsersData = await payoutUsersRes.json();
           const marketplaceData = await marketplaceRes.json();
           const notificationsData = await notificationsRes.json();
+          const aiUsageData = await aiUsageRes.json();
           adminFeedbacks = feedbackData.feedbacks || [];
           adminAnalytics = analyticsData.analytics || {};
           adminUsageLogs = usageLogData.logs || [];
@@ -2552,6 +2628,7 @@
           adminWithdrawals = withdrawalsData.withdrawals || [];
           adminPayoutUsers = payoutUsersData.users || [];
           adminNotifications = notificationsData.notifications || [];
+          adminAiUsage = aiUsageData.usage || null;
           adminMarketplace = marketplaceData.success
             ? {
                 pendingListings: marketplaceData.pendingListings || [],
