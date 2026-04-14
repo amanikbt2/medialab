@@ -6926,6 +6926,7 @@
           ensureBuilderGuides(canvas);
           initCanvasSelection(canvas);
           hydrateCanvasElements();
+          syncStyleTag();
           const editor = document.getElementById("builder-code-editor");
           if (editor) {
             editor.value = String(snapshot.code || "");
@@ -19162,6 +19163,7 @@
       let aiActiveModel = "";
       let aiChatSending = false;
       let aiInfrastructureModels = [];
+      let builderStyleSyncTimer = null;
       let builderProjectFiles = null;
       let activeBuilderFilePath = "index.html";
       let selectedBuilderFilePath = "index.html";
@@ -20622,6 +20624,7 @@
           ensureBuilderGuides(canvas);
           initCanvasSelection(canvas);
           hydrateCanvasElements();
+          syncStyleTag();
           syncBuilderImportedGlobalStyle();
           deselectAll();
         }
@@ -22088,6 +22091,101 @@ console.log("Triggered ${eventName}", { source, event });
       function renderInteractionBadgeHtml() {
         return `<div class="interaction-badge hidden absolute -top-10 right-0 w-7 h-7 rounded-lg border border-amber-400/30 bg-amber-500/15 text-amber-300 items-center justify-center pointer-events-none"><i class="fas fa-bolt text-[10px]"></i></div>`;
       }
+      function generateBuilderElementId() {
+        let id = "";
+        do {
+          id = `ml-el-${Math.random().toString(36).slice(2, 8)}`;
+        } while (document.getElementById(id));
+        return id;
+      }
+      function getBuilderAnimationKeyframesCss() {
+        return `
+@keyframes mlFadePulse { 0%, 100% { opacity: 0.28; transform: translateY(0px) scale(0.98); } 50% { opacity: 1; transform: translateY(-4px) scale(1); } }
+@keyframes mlBlinkSoft { 0%, 48%, 100% { opacity: 1; } 50%, 52% { opacity: 0.18; } }
+@keyframes mlHueShift { 0% { filter: hue-rotate(0deg) saturate(1); } 50% { filter: hue-rotate(90deg) saturate(1.15); } 100% { filter: hue-rotate(180deg) saturate(1); } }
+@keyframes mlFloatBob { 0%, 100% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(0, -14px, 0); } }
+@keyframes mlRotateDrift { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(8deg) scale(1.03); } 100% { transform: rotate(-8deg) scale(1); } }
+@keyframes mlSlideSweep { 0% { transform: translateX(-28px); opacity: 0; } 35% { opacity: 1; } 100% { transform: translateX(28px); opacity: 0.88; } }
+@keyframes mlWidthBreathe { 0%, 100% { transform: scaleX(0.86); } 50% { transform: scaleX(1.08); } }
+@keyframes mlOrbitTilt { 0% { transform: rotate(0deg) translateY(0px) scale(1); } 25% { transform: rotate(4deg) translateY(-6px) scale(1.02); } 50% { transform: rotate(0deg) translateY(-12px) scale(1.04); } 75% { transform: rotate(-4deg) translateY(-6px) scale(1.02); } 100% { transform: rotate(0deg) translateY(0px) scale(1); } }
+@keyframes mlBackgroundGlow { 0%, 100% { filter: brightness(1) saturate(1); } 50% { filter: brightness(1.18) saturate(1.22); } }
+@keyframes mlAuroraFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+@keyframes mlBounceLift { 0%, 100% { transform: translateY(0); } 30% { transform: translateY(-18px); } 55% { transform: translateY(0); } 72% { transform: translateY(-8px); } }
+@keyframes mlMagicHover { 0%, 100% { transform: translateY(0) rotate(0deg); filter: drop-shadow(0 0 0 rgba(34,211,238,0)); } 50% { transform: translateY(-10px) rotate(1.6deg); filter: drop-shadow(0 0 18px rgba(34,211,238,0.35)); } }
+@keyframes mlElasticPop { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.12, 0.9); } 50% { transform: scale(0.96, 1.04); } 72% { transform: scale(1.04, 0.98); } }
+@keyframes mlSwingArc { 0%, 100% { transform: rotate(0deg); transform-origin: top center; } 25% { transform: rotate(6deg); } 75% { transform: rotate(-6deg); } }
+@keyframes mlGhostTrail { 0%, 100% { opacity: 1; filter: blur(0px); } 50% { opacity: 0.42; filter: blur(1.5px); } }`.trim();
+      }
+      function getCanvasInnerSelector(el) {
+        if (!el?.id) return "";
+        return elementHasNestedCanvasChildren(el)
+          ? `#${el.id} > .element-body`
+          : `#${el.id} > .element-body > :first-child`;
+      }
+      function syncStyleTag(options = {}) {
+        const { forExport = false } = options;
+        const canvas = document.getElementById("web-canvas");
+        if (!canvas) return "";
+        const cssRules = [];
+        const animationRules = [];
+        const customRules = [];
+        const targets = Array.from(canvas.querySelectorAll(".canvas-element"));
+        targets.forEach((el) => {
+          if (!el.id) el.id = generateBuilderElementId();
+          const inlineWrapper = String(el.getAttribute("style") || "").trim();
+          if (inlineWrapper) el.dataset.mlWrapperStyle = inlineWrapper;
+          const inner = getElementInnerNode(el);
+          const inlineInner = String(inner?.getAttribute("style") || "").trim();
+          if (inlineInner) el.dataset.mlInnerStyle = inlineInner;
+          const wrapperStyle = String(el.dataset.mlWrapperStyle || "").trim();
+          const innerStyle = String(el.dataset.mlInnerStyle || "").trim();
+          if (wrapperStyle) cssRules.push(`#${el.id} { ${wrapperStyle} }`);
+          const innerSelector = getCanvasInnerSelector(el);
+          if (innerSelector && innerStyle) cssRules.push(`${innerSelector} { ${innerStyle} }`);
+          const styleNode = el.querySelector(':scope > style[data-custom-css-owner="true"]');
+          if (styleNode?.textContent?.trim()) {
+            customRules.push(styleNode.textContent.trim());
+          }
+          const stack = normalizeAnimationStack(JSON.parse(el.dataset.animationStack || "[]"));
+          const animationCss = buildAnimationCssFromStack(stack);
+          const animationClass = `ml-anim-${el.id}`;
+          if (inner) {
+            Array.from(inner.classList)
+              .filter((className) => className.startsWith("ml-anim-"))
+              .forEach((className) => inner.classList.remove(className));
+          }
+          if (inner && animationCss.animationName !== "none") {
+            inner.classList.add(animationClass);
+            animationRules.push(
+              `.${animationClass} { animation-name: ${animationCss.animationName}; animation-duration: ${animationCss.animationDuration}; animation-timing-function: ${animationCss.animationTimingFunction}; animation-delay: ${animationCss.animationDelay}; animation-iteration-count: ${animationCss.animationIterationCount}; animation-direction: ${animationCss.animationDirection}; animation-fill-mode: ${animationCss.animationFillMode}; animation-play-state: ${animationCss.animationPlayState}; }`,
+            );
+          }
+          if (!forExport) {
+            if (el.hasAttribute("style")) el.removeAttribute("style");
+            if (inner?.hasAttribute("style")) inner.removeAttribute("style");
+          }
+        });
+        const cssOutput = [getBuilderAnimationKeyframesCss(), ...cssRules, ...animationRules, ...customRules]
+          .filter(Boolean)
+          .join("\n\n");
+        if (!forExport) {
+          let styleTag = document.getElementById("ml-dynamic-styles");
+          if (!styleTag) {
+            styleTag = document.createElement("style");
+            styleTag.id = "ml-dynamic-styles";
+            document.head.appendChild(styleTag);
+          }
+          styleTag.textContent = cssOutput;
+        }
+        return cssOutput;
+      }
+      function scheduleSyncStyleTag() {
+        if (builderStyleSyncTimer) clearTimeout(builderStyleSyncTimer);
+        builderStyleSyncTimer = setTimeout(() => {
+          builderStyleSyncTimer = null;
+          syncStyleTag();
+        }, 100);
+      }
       function refreshElementInteractionBadge(el) {
         if (!el) return;
         const badge = el.querySelector(".interaction-badge");
@@ -22104,7 +22202,7 @@ console.log("Triggered ${eventName}", { source, event });
         const canvas = document.getElementById("web-canvas");
         ensureBuilderGuides(canvas);
         const wrap = document.createElement("div");
-        wrap.id = attrs.id || `wrapper_${Date.now()}`;
+        wrap.id = attrs?.id || generateBuilderElementId();
         wrap.setAttribute("data-type", type);
         wrap.className =
           "canvas-element absolute group transition-shadow active:cursor-grabbing";
@@ -22153,6 +22251,7 @@ console.log("Triggered ${eventName}", { source, event });
         hydrateCanvasElement(wrap);
         refreshElementInteractionBadge(wrap);
         canvas.appendChild(wrap);
+        scheduleSyncStyleTag();
         handleBuilderTutorialEvent("element-created", {
           type,
           elementId: wrap.id || mergedAttrs.id || "",
@@ -24857,6 +24956,7 @@ console.log("Triggered ${eventName}", { source, event });
           el.className =
             `canvas-element absolute group transition-shadow active:cursor-grabbing ${attrs.className || ""}`.trim();
         }
+        scheduleSyncStyleTag();
       }
       function hydrateCanvasElement(el) {
         el.onpointerdown = (e) => handleObjectInteraction(e, el);
@@ -24916,6 +25016,7 @@ console.log("Triggered ${eventName}", { source, event });
           canvas.classList.toggle("collaboration-view-only", isCollaborationViewOnly());
           ensureBuilderSections({ skipHistory: true });
           syncBuilderImportedGlobalStyle();
+          scheduleSyncStyleTag();
         }
         const editor = document.getElementById("builder-code-editor");
         if (editor) editor.readOnly = isCollaborationViewOnly();
@@ -25033,6 +25134,7 @@ console.log("Triggered ${eventName}", { source, event });
           section.style.pointerEvents = isActive ? "auto" : "none";
           section.classList.toggle("ml-section-active", isActive);
         });
+        scheduleSyncStyleTag();
         renderBuilderViewSwitcher();
         if (!options.skipHistory) saveToHistory();
         return currentActiveSectionId;
@@ -25329,7 +25431,7 @@ console.log("Triggered ${eventName}", { source, event });
           ...bounds.map((item) => item.top + item.height),
         );
         const group = document.createElement("div");
-        group.id = `group_${Date.now()}`;
+        group.id = generateBuilderElementId();
         group.setAttribute("data-type", "div");
         group.className =
           "canvas-element absolute group transition-shadow active:cursor-grabbing";
@@ -26499,19 +26601,13 @@ console.log("Triggered ${eventName}", { source, event });
         const contentNode = primaryNode.cloneNode(true);
         const contentClasses = filterExportClasses(contentNode.classList);
         contentNode.className = [...new Set(contentClasses)].join(" ").trim();
-        const contentStyle = contentNode.getAttribute("style") || "";
-        const wrapperStyle = cleanNode.getAttribute("style") || "";
-        const mergedStyle = splitExportNodeStyles(wrapperStyle, contentStyle);
-        if (mergedStyle) {
-          contentNode.setAttribute("style", mergedStyle);
-        } else {
-          contentNode.removeAttribute("style");
-        }
+        contentNode.removeAttribute("style");
+        contentNode.querySelectorAll("[style]").forEach((node) => node.removeAttribute("style"));
         const sourceId = String(contentNode.id || cleanNode.id || "").trim();
-        if (sourceId && !isAutoGeneratedBuilderId(sourceId)) {
+        if (sourceId) {
           contentNode.id = sourceId;
         } else {
-          contentNode.removeAttribute("id");
+          contentNode.id = generateBuilderElementId();
         }
         if (wrapperClasses.length) {
           contentNode.className = [...new Set([...contentClasses, ...wrapperClasses])]
@@ -26525,8 +26621,8 @@ console.log("Triggered ${eventName}", { source, event });
         return {
           node: contentNode,
           type,
-          wrapperStyle,
-          contentStyle,
+          wrapperStyle: "",
+          contentStyle: "",
           interactions: normalizeElementInteractions(
             JSON.parse(sourceNode.dataset.interactions || "{}"),
           ),
@@ -26604,11 +26700,13 @@ console.log("Triggered ${eventName}", { source, event });
         const canvas = document.getElementById("web-canvas");
         if (!canvas) return null;
         const pageBackground = getCanvasPageStyleState(canvas).background;
+        const dynamicCss = syncStyleTag({ forExport: true });
         const cssBlocks = [
           formatCssRule(
             "body",
             `margin: 0; min-height: 100vh; background: ${pageBackground}; font-family: Inter, system-ui, sans-serif; position: relative; overflow-x: hidden;`,
           ),
+          String(dynamicCss || "").trim(),
         ];
         const exportNodes = [];
         const interactionEntries = [];
@@ -26641,8 +26739,10 @@ console.log("Triggered ${eventName}", { source, event });
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
-    <link rel="stylesheet" href="${baseName}.css" />
-    ${globalImportCss ? `<style>\n${globalImportCss}\n    </style>` : ""}
+    <style>
+${css}
+${globalImportCss ? `\n${globalImportCss}` : ""}
+    </style>
   </head>
   <body>
 ${body}
@@ -26712,22 +26812,7 @@ ${interactionBlock}
           node.remove();
         });
         const pageBackground = getCanvasPageStyleState(canvas).background;
-        const animationKeyframesCss = `
-      @keyframes mlFadePulse { 0%, 100% { opacity: 0.28; transform: translateY(0px) scale(0.98); } 50% { opacity: 1; transform: translateY(-4px) scale(1); } }
-      @keyframes mlBlinkSoft { 0%, 48%, 100% { opacity: 1; } 50%, 52% { opacity: 0.18; } }
-      @keyframes mlHueShift { 0% { filter: hue-rotate(0deg) saturate(1); } 50% { filter: hue-rotate(90deg) saturate(1.15); } 100% { filter: hue-rotate(180deg) saturate(1); } }
-      @keyframes mlFloatBob { 0%, 100% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(0, -14px, 0); } }
-      @keyframes mlRotateDrift { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(8deg) scale(1.03); } 100% { transform: rotate(-8deg) scale(1); } }
-      @keyframes mlSlideSweep { 0% { transform: translateX(-28px); opacity: 0; } 35% { opacity: 1; } 100% { transform: translateX(28px); opacity: 0.88; } }
-      @keyframes mlWidthBreathe { 0%, 100% { transform: scaleX(0.86); } 50% { transform: scaleX(1.08); } }
-      @keyframes mlOrbitTilt { 0% { transform: rotate(0deg) translateY(0px) scale(1); } 25% { transform: rotate(4deg) translateY(-6px) scale(1.02); } 50% { transform: rotate(0deg) translateY(-12px) scale(1.04); } 75% { transform: rotate(-4deg) translateY(-6px) scale(1.02); } 100% { transform: rotate(0deg) translateY(0px) scale(1); } }
-      @keyframes mlBackgroundGlow { 0%, 100% { filter: brightness(1) saturate(1); } 50% { filter: brightness(1.18) saturate(1.22); } }
-      @keyframes mlAuroraFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-      @keyframes mlBounceLift { 0%, 100% { transform: translateY(0); } 30% { transform: translateY(-18px); } 55% { transform: translateY(0); } 72% { transform: translateY(-8px); } }
-      @keyframes mlMagicHover { 0%, 100% { transform: translateY(0) rotate(0deg); filter: drop-shadow(0 0 0 rgba(34,211,238,0)); } 50% { transform: translateY(-10px) rotate(1.6deg); filter: drop-shadow(0 0 18px rgba(34,211,238,0.35)); } }
-      @keyframes mlElasticPop { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.12, 0.9); } 50% { transform: scale(0.96, 1.04); } 72% { transform: scale(1.04, 0.98); } }
-      @keyframes mlSwingArc { 0%, 100% { transform: rotate(0deg); transform-origin: top center; } 25% { transform: rotate(6deg); } 75% { transform: rotate(-6deg); } }
-      @keyframes mlGhostTrail { 0%, 100% { opacity: 1; filter: blur(0px); } 50% { opacity: 0.42; filter: blur(1.5px); } }`;
+        const dynamicCss = syncStyleTag({ forExport: true });
         const width = Math.max(canvas.scrollWidth, canvas.offsetWidth, parseFloat(canvas.style.width || "0") || 0);
         const height = Math.max(canvas.scrollHeight, canvas.offsetHeight, parseFloat(canvas.style.height || "0") || 0);
         const interactionEntries = [];
@@ -26782,7 +26867,7 @@ ${String(builderImportedGlobalCss || "").trim()}
         height: 100%;
         box-sizing: border-box;
       }
-${animationKeyframesCss}
+${dynamicCss}
       #medialab-run-stage {
         position: relative;
         width: ${Math.max(320, Math.round(width))}px;
@@ -27992,11 +28077,13 @@ ${interactionBlock}
             normalizeElementInteractions(currentInspectorState.attributes.interactions),
           );
           refreshElementInteractionBadge(el);
+          scheduleSyncStyleTag();
           saveToHistory();
         }
       }
       function saveToHistory() {
         const canvas = document.getElementById("web-canvas");
+        syncStyleTag();
         persistActiveBuilderFileContent();
         const snapshot = {
           html: canvas?.innerHTML || "",
@@ -28342,15 +28429,16 @@ ${interactionBlock}
       function extractStyles(el) {
         const inner = getElementInnerNode(el);
         const computed = inner ? window.getComputedStyle(inner) : null;
+        const wrapperComputed = el ? window.getComputedStyle(el) : null;
         const computedBackgroundImage = computed?.backgroundImage || "";
         const computedBackgroundSize = computed?.backgroundSize || "cover";
         const parsedGradient = parseGradientStyle(computedBackgroundImage);
         return {
-          width: el.style.width || "260px",
-          height: el.style.height || "100px",
-          top: el.style.top || "150px",
-          left: el.style.left || "150px",
-          zIndex: el.style.zIndex || "10",
+          width: el.style.width || wrapperComputed?.width || "260px",
+          height: el.style.height || wrapperComputed?.height || "100px",
+          top: el.style.top || wrapperComputed?.top || "150px",
+          left: el.style.left || wrapperComputed?.left || "150px",
+          zIndex: el.style.zIndex || wrapperComputed?.zIndex || "10",
           backgroundMode: computedBackgroundImage.includes("linear-gradient")
             ? "gradient"
             : computedBackgroundImage.includes("url(")
@@ -28371,7 +28459,7 @@ ${interactionBlock}
           gradientAngle: computedBackgroundImage.includes("linear-gradient")
             ? parsedGradient.angle
             : "135deg",
-          opacity: el.style.opacity || "1",
+          opacity: el.style.opacity || wrapperComputed?.opacity || "1",
           borderRadius:
             computed?.borderRadius || el.style.borderRadius || "18px",
           color: rgbToHex(computed?.color || el.style.color),
@@ -28391,7 +28479,7 @@ ${interactionBlock}
             computed?.boxShadow || "0 24px 60px rgba(15, 23, 42, 0.16)",
           backdropFilterBlur: "0px",
           rotate: "0deg",
-          mixBlendMode: el.style.mixBlendMode || "normal",
+          mixBlendMode: el.style.mixBlendMode || wrapperComputed?.mixBlendMode || "normal",
           padding: computed?.padding || "16px",
           display: computed?.display || "block",
           flexDirection: computed?.flexDirection || "row",
