@@ -1687,6 +1687,320 @@ class WorkflowBrain {
       },
     };
   }
+
+  /**
+   * Detect if user is asking for a tutorial
+   * Keywords: teach, show, how, guide, explain, tutorial, learn, help
+   */
+  detectTutorialIntent(userInput = "") {
+    const text = String(userInput || "")
+      .toLowerCase()
+      .trim();
+
+    // Strong tutorial intent patterns
+    const strongTutorialPatterns = [
+      /\b(teach|show|demonstrate|guide|instruct)\s+(me|us|how)\b/,
+      /\bhow\s+(?:do|can|to)\s+(i|we|you)\s+(?:use|work|handle|create|build|publish|monetize|sell|withdraw)\b/,
+      /\btutorial\b.*(?:medialab|webbuilder|builder|workflow)/i,
+      /\bshow\s+me\s+how\s+to\b/,
+      /\bteach\s+me\s+(?:how\s+to\s+)?/,
+      /\bget\s+started\s+with\b/,
+      /\bstart\s+guide\s+for\b/,
+    ];
+
+    // Medium tutorial intent patterns
+    const mediumTutorialPatterns = [
+      /\b(help|assist|guide|tutorial|instruction|walkthrough)/,
+      /\b(step\s+by\s*step|learn|study|understand)\b/,
+      /\bhow\s+(does|do|is|can)\b.*(?:work|function|operate)\b/,
+      /\bexplain\s+(?:how|what|where|why)\b/,
+    ];
+
+    // Topics they might want to learn about
+    const learningTopics = [
+      "medialab",
+      "webbuilder",
+      "builder",
+      "canvas",
+      "element",
+      "animation",
+      "design",
+      "publish",
+      "github",
+      "render",
+      "hosting",
+      "monetize",
+      "adsense",
+      "marketplace",
+      "sell",
+      "withdraw",
+      "payment",
+      "collaboration",
+      "export",
+      "import",
+      "template",
+    ];
+
+    // Check strong patterns
+    for (const pattern of strongTutorialPatterns) {
+      if (pattern.test(text)) {
+        return {
+          isIntent: true,
+          confidence: 0.95,
+          type: "strong",
+        };
+      }
+    }
+
+    // Check medium patterns
+    for (const pattern of mediumTutorialPatterns) {
+      if (pattern.test(text)) {
+        return {
+          isIntent: true,
+          confidence: 0.8,
+          type: "medium",
+        };
+      }
+    }
+
+    // Check if mentions learning topic
+    const hasTopic = learningTopics.some((topic) => text.includes(topic));
+    if (hasTopic && /\b(how|what|explain|teach|show|guide|help)\b/.test(text)) {
+      return {
+        isIntent: true,
+        confidence: 0.75,
+        type: "probable",
+      };
+    }
+
+    return {
+      isIntent: false,
+      confidence: 0,
+      type: "none",
+    };
+  }
+
+  /**
+   * Parse tutorial request and extract learning topic
+   * Returns what the user wants to learn about
+   */
+  parseTutorialRequest(userInput = "") {
+    const text = String(userInput || "").toLowerCase();
+    const intentResult = this.detectTutorialIntent(userInput);
+
+    // Extract learning topics
+    const topicMap = {
+      "creating elements": {
+        keywords: [
+          "insert",
+          "add",
+          "create",
+          "element",
+          "button",
+          "box",
+          "text",
+        ],
+        topic: "element-creation",
+      },
+      animations: {
+        keywords: [
+          "animate",
+          "bounce",
+          "glow",
+          "animation",
+          "motion",
+          "effect",
+        ],
+        topic: "animations",
+      },
+      publishing: {
+        keywords: ["publish", "github", "upload", "push", "deploy", "share"],
+        topic: "publishing",
+      },
+      hosting: {
+        keywords: ["render", "host", "deploy", "live", "server", "online"],
+        topic: "hosting",
+      },
+      monetization: {
+        keywords: ["monetize", "adsense", "earn", "money", "ad", "revenue"],
+        topic: "monetization",
+      },
+      marketplace: {
+        keywords: [
+          "marketplace",
+          "sell",
+          "list",
+          "product",
+          "template",
+          "sale",
+        ],
+        topic: "marketplace",
+      },
+      withdrawals: {
+        keywords: ["withdraw", "payment", "payout", "cash", "money", "wallet"],
+        topic: "withdrawals",
+      },
+      collaboration: {
+        keywords: [
+          "collaborate",
+          "team",
+          "share",
+          "invite",
+          "meeting",
+          "co-edit",
+        ],
+        topic: "collaboration",
+      },
+      "builder basics": {
+        keywords: ["use", "builder", "work", "canvas", "design", "layout"],
+        topic: "builder-basics",
+      },
+    };
+
+    // Find matching topic
+    let selectedTopic = "general";
+    let matchedTopicLabel = "MediaLab";
+
+    for (const [label, topicData] of Object.entries(topicMap)) {
+      const hasKeywords = topicData.keywords.some((keyword) =>
+        text.includes(keyword),
+      );
+      if (hasKeywords) {
+        selectedTopic = topicData.topic;
+        matchedTopicLabel = label;
+        break;
+      }
+    }
+
+    return {
+      originalInput: userInput,
+      isTutorialRequest: intentResult.isIntent,
+      tutorialConfidence: intentResult.confidence,
+      tutorialType: intentResult.type,
+      learningTopic: selectedTopic,
+      topicLabel: matchedTopicLabel,
+      requestDetails: {
+        isAskingForSteps:
+          /step\s+by\s+step|walkthrough|guide|instructions/.test(text),
+        isAskingForExplanation:
+          /explain|what|why|how.{0,10}(work|function|operate)/.test(text),
+        isAskingForBestPractices: /best|tip|trick|practice|shortcut/.test(text),
+        isAskingForTroubleshooting: /problem|issue|error|fix|help|trouble/.test(
+          text,
+        ),
+      },
+    };
+  }
+
+  /**
+   * Generate tutorial system prompt for AI
+   * Focused on educational, step-by-step guidance
+   */
+  buildTutorialSystemPrompt(topic = "general") {
+    const prompts = {
+      "element-creation": `You are the MediaLab Creator Assistant - a patient, knowledgeable guide for building web elements.
+When the user wants to create elements (buttons, cards, text, etc.):
+1. Explain what element they're creating and why
+2. Walk through step-by-step: describe the element properties first
+3. Suggest appealing animations or styles (bounce, glow, shadows)
+4. Explain how colors and borders enhance the design
+5. Show how to use simple natural language commands like "insert a red button with bounce"
+
+Be encouraging, clear, and assume the user is learning. Provide specific examples.`,
+
+      animations: `You are the MediaLab Animation Expert - an enthusiastic guide to creating beautiful motion effects.
+When teaching animations:
+1. Explain what effect the animation creates (bounce makes things jump, glow makes them shine)
+2. Show how to describe animations in simple terms
+3. Mention combinations (bouncing + glow for neon effects)
+4. Explain timing, intensity, and when to use which effect
+5. Give examples of where animations work best (buttons, badges, highlights)
+
+Make animations sound fun and visual. Help users imagine the effect.`,
+
+      publishing: `You are the MediaLab Publishing Coach - a clear guide to getting work online.
+When explaining publishing:
+1. Start with why publishing matters (sharing, hosting, monetization)
+2. Explain the GitHub + Render connection step-by-step
+3. Break down: save → publish to GitHub → deploy to Render
+4. Explain what each step does and why it's needed
+5. Show what to expect at each stage
+
+Be reassuring and emphasize that publishing is safe and reversible.`,
+
+      hosting: `You are the MediaLab Hosting Expert - an enthusiastic guide to making projects live.
+When teaching hosting with Render:
+1. Explain what hosting means and why Render helps
+2. Walk through: connect GitHub → connect Render → auto deploy
+3. Explain that projects auto-update when you push changes
+4. Show how to see live URLs and test projects
+5. Mention custom domains and what's possible
+
+Emphasize that hosting is automatic and always available.`,
+
+      monetization: `You are the MediaLab Monetization Advisor - a clear guide to earning from content.
+When explaining earning options:
+1. Explain AdSense: approve site → enable ads → earn per impressions
+2. Explain Marketplace: list projects → buyers purchase → you earn per sale
+3. Show the connection between quality projects and earning
+4. Explain wallet management and withdrawals
+5. Mention best practices (quality content, good descriptions)
+
+Be encouraging about revenue opportunities without overselling.`,
+
+      marketplace: `You are the MediaLab Marketplace Guide - a helpful coach for selling projects.
+When teaching marketplace:
+1. Explain what can be sold (templates, projects, designs)
+2. Walk through listing process: prepare → upload screenshots → set price → list
+3. Explain project descriptions and why they matter
+4. Show how buyers find and preview projects
+5. Explain rating system and how reviews help
+
+Emphasize quality and clear descriptions lead to sales.`,
+
+      withdrawals: `You are the MediaLab Payments Specialist - a clear guide to managing earnings.
+When explaining withdrawals:
+1. Show how earnings accumulate (AdSense, Marketplace, Referrals)
+2. Walk through wallet system and payment methods
+3. Explain withdrawal requirements and minimums
+4. Show how to request payouts (PayPal, M-Pesa, bank transfer)
+5. Mention tracking and payment history
+
+Be clear about requirements and timing.`,
+
+      collaboration: `You are the MediaLab Collaboration Guide - an enthusiastic coach for teamwork.
+When teaching collaboration:
+1. Explain live collaboration benefits (real-time co-editing, instant updates)
+2. Walk through creating collaboration room and inviting users
+3. Show permissions (host vs. collaborator) and when to use each
+4. Explain chat, snapshots, and staying in sync
+5. Show how to end sessions and download final work
+
+Emphasize how collaboration makes creative work faster and more fun.`,
+
+      "builder-basics": `You are the MediaLab Builder Tutor - a patient, encouraging guide to the canvas.
+When teaching builder basics:
+1. Explain the canvas (the space where you design)
+2. Show adding elements, positioning, and basic styling
+3. Explain how to preview and test your work
+4. Show saving as drafts and how auto-save protects work
+5. Explain simple ways to make things look polished
+
+Use simple language and celebrate each step.`,
+
+      general: `You are the MediaLab Learning Guide - a knowledgeable, patient assistant here to help users understand MediaLab.
+When answering tutorial questions:
+1. Assess what the user wants to learn
+2. Explain concepts clearly in simple language
+3. Provide step-by-step guidance when relevant
+4. Give examples and show how to try it themselves
+5. Celebrate their progress and encourage exploration
+
+Be warm, encouraging, and always break things down into manageable steps.`,
+    };
+
+    return prompts[topic] || prompts.general;
+  }
 }
 
 // Export for use in Node/Webpack environments

@@ -4647,6 +4647,13 @@ app.post("/api/ai/chat-edit", async (req, res) => {
     const contextCode = currentCode || storedContextCode;
 
     let modelRecoveryUsed = false;
+    // === TUTORIAL INTENT DETECTION ===
+    // Check if user is asking for a tutorial/learning guidance
+    const tutorialAnalysis = workflowBrain.parseTutorialRequest(prompt);
+    const isTutorialRequest = tutorialAnalysis.isTutorialRequest;
+    const tutorialTopic = tutorialAnalysis.learningTopic;
+    const tutorialLabel = tutorialAnalysis.topicLabel;
+
     let models = await AIModel.find({ isActive: true })
       .sort({ priority: 1, status: -1, modelId: 1 })
       .lean();
@@ -4695,7 +4702,14 @@ app.post("/api/ai/chat-edit", async (req, res) => {
                   role: "system",
                   content:
                     mode === "chat"
-                      ? "You are the MediaLab Online AI Copilot - a COMPLETELY INDEPENDENT external AI system.\n\n**CRITICAL: You are isolated from the Workflow system:**\n- You do NOT use WorkflowBrain algorithms\n- You do NOT process natural language parsing\n- You do NOT access Workflow methods\n- You are 100% autonomous online AI\n- Natural language element creation is handled by /api/workflow/process, not by you\n\nYour role:\n- Provide general coding assistance\n- Answer questions about web development\n- Help with HTML/CSS/JavaScript\n- Be concise, warm, and practical\n- Return plain text only\n\nWhen given code context, ground your answers in that context. Do NOT apply code changes unless the user explicitly asks."
+                      ? isTutorialRequest
+                        ? workflowBrain.buildTutorialSystemPrompt(
+                            tutorialTopic,
+                          ) +
+                          "\n\n[LEARNING FOCUS: " +
+                          tutorialLabel +
+                          "]\n\nRemember: Be patient, encouraging, and break everything down into clear steps. This user wants to LEARN, not just get a quick answer."
+                        : "You are the MediaLab Online AI Copilot - a COMPLETELY INDEPENDENT external AI system.\n\n**CRITICAL: You are isolated from the Workflow system:**\n- You do NOT use WorkflowBrain algorithms\n- You do NOT process natural language parsing\n- You do NOT access Workflow methods\n- You are 100% autonomous online AI\n- Natural language element creation is handled by /api/workflow/process, not by you\n\nYour role:\n- Provide general coding assistance\n- Answer questions about web development\n- Help with HTML/CSS/JavaScript\n- Be concise, warm, and practical\n- Return plain text only\n\nWhen given code context, ground your answers in that context. Do NOT apply code changes unless the user explicitly asks."
                       : mode === "agent"
                         ? agentPhase === "search"
                           ? "You are the MediaLab Online Agent in SEARCH phase - COMPLETELY INDEPENDENT from Workflow.\n\nReturn only one line in this exact format: SEARCH_FILES: path/a.js, path/b.css\n\nCRITICAL: You are isolated from Workflow system:\n- Do NOT reference WorkflowBrain\n- Do NOT use Workflow parsing\n- You are standalone online AI only\n- Do NOT fall back to Workflow algorithms"
@@ -4844,6 +4858,18 @@ app.post("/api/ai/chat-edit", async (req, res) => {
       modelSwitchUsed,
       modelSwitchReason,
       nlPreprocessing: nlPreprocessingResult,
+      tutorialMode: isTutorialRequest
+        ? {
+            enabled: true,
+            topic: tutorialTopic,
+            topicLabel: tutorialLabel,
+            confidence: tutorialAnalysis.tutorialConfidence,
+            type: tutorialAnalysis.tutorialType,
+            details: tutorialAnalysis.requestDetails,
+            message:
+              "📚 Tutorial Mode Active - Learning-focused guidance enabled",
+          }
+        : null,
       creditsRemaining: hasUnlimitedAi
         ? null
         : Math.max(
