@@ -4794,6 +4794,32 @@ function extractHTMLFromResponse(text = "") {
   return "";
 }
 
+// Helper: Sanitize HTML to ensure all elements are visible
+function sanitizeAutoFixHTML(html = "") {
+  let content = String(html || "").trim();
+
+  // Remove any opacity:0 or opacity: 0
+  content = content.replace(/opacity\s*:\s*0(?![^;]*[0-9])/g, "opacity: 1");
+  
+  // Remove visibility:hidden and similar
+  content = content.replace(/visibility\s*:\s*hidden/gi, "visibility: visible");
+  
+  // Remove display:none
+  content = content.replace(/display\s*:\s*none/gi, "display: block");
+  
+  // Remove lines with only display:none in style attribute
+  content = content.replace(/style="[^"]*display\s*:\s*none[^"]*"/gi, (match) => {
+    // Reconstruct without the display:none part
+    const style = match.replace(/display\s*:\s*none\s*;?/gi, "").trim();
+    if (style === 'style=""') return 'style="display: block;"';
+    if (style.endsWith(';')) return style.slice(0, -1) + ';"';
+    return style + ';"';
+  });
+
+  return content;
+}
+
+
 app.post("/api/ai/autofix", async (req, res) => {
   try {
     await refreshAIModelsRegistryIfNeeded(false);
@@ -4884,7 +4910,7 @@ app.post("/api/ai/autofix", async (req, res) => {
                 {
                   role: "system",
                   content:
-                    "You are the MediaLab Canvas Perfectionist. Your ONLY task is to output pixel-perfect HTML.\n\nCRITICAL RULES:\n1. Output NOTHING but valid HTML. No conversation, no explanations, no preamble, no closing text.\n2. Every element: style='position: absolute; left: Npx; top: Npx; width: Npx; height: Npx;' (pixel values only)\n3. Minimum 32px width and height for all elements\n4. No percentages, auto, relative positioning, flex, or grid\n5. Remove contenteditable, data-builder-*, editor artifacts\n6. Keep data-canvas-element, data-element-id, ml-container, ml-content IDs\n7. Fix all z-index conflicts and visibility issues\n8. Never use opacity:0, visibility:hidden, display:none\n9. Start immediately with HTML: no introduction\n10. End immediately after closing tag: no closing remarks\n\nYour response format MUST be ONLY the HTML code, nothing else.",
+                    "You are the MediaLab Canvas Perfectionist. Your ONLY task is to output pixel-perfect, FULLY VISIBLE HTML.\n\nCRITICAL VISIBILITY RULES:\n1. EVERY element MUST be visible. No exceptions.\n2. NEVER use opacity:0, visibility:hidden, display:none - EVER.\n3. NEVER use transparent colors, white text on white, or invisible content.\n4. NEVER collapse, hide, or obscure any element.\n5. All text must be readable with contrasting colors.\n6. All elements must have defined background or border colors if they should be visible.\n\nFORMATTING RULES:\n7. Output ONLY valid HTML. No preamble, explanations, or closing text.\n8. Every element: style='position: absolute; left: Npx; top: Npx; width: Npx; height: Npx;' (pixel values only)\n9. Minimum 32px width/height for all elements\n10. No percentages, auto, relative positioning, flex, or grid\n11. Remove contenteditable, data-builder-*, editor artifacts\n12. Keep data-canvas-element, data-element-id, ml-container, ml-content IDs\n\nSTRUCTURE RULES:\n13. Ensure all div/button/text elements have visible content\n14. All images must have valid src attributes\n15. Fix ALL z-index conflicts - ensure nothing overlaps invisibly\n16. Start immediately with <html or <div: no introduction\n17. End immediately after final closing tag: no remarks\n\nRESPONSE: Output ONLY the HTML code.",
                 },
                 {
                   role: "user",
@@ -4920,7 +4946,9 @@ app.post("/api/ai/autofix", async (req, res) => {
           );
         }
 
-        sanitizedContent = extractedHTML;
+        // Sanitize to ensure all elements are visible
+        const sanitizedHTML = sanitizeAutoFixHTML(extractedHTML);
+        sanitizedContent = sanitizedHTML;
         selectedModel = model.modelId;
         await AIModel.updateOne(
           { _id: model._id },

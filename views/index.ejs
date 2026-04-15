@@ -26063,29 +26063,32 @@ console.log("Triggered ${eventName}", { source, event });
             48,
             Number.parseFloat(normalizedStyles.height || "100") || 100,
           );
-          const scroller = canvasContainer;
           const metrics = getBuilderCanvasMetrics(canvas);
-          const visibleLeft = metrics.scrollLeft;
-          const visibleTop = metrics.scrollTop;
-          const visibleWidth = scroller.clientWidth || 400;
-          const visibleHeight = scroller.clientHeight || 300;
-          const visibleCenterX = visibleLeft + visibleWidth / 2;
-          const visibleCenterY = visibleTop + visibleHeight / 2;
+          const canvasRect = canvas.getBoundingClientRect();
+          const containerRect = canvasContainer.getBoundingClientRect();
+          const visibleCenterX =
+            (containerRect.left + containerRect.width / 2 - canvasRect.left) *
+            metrics.scaleX;
+          const visibleCenterY =
+            (containerRect.top + containerRect.height / 2 - canvasRect.top) *
+            metrics.scaleY;
           if (!hasExplicitLeft) {
             const maxLeft =
-              Math.max(canvas.scrollWidth || visibleWidth, width) - width;
+              Math.max(canvas.scrollWidth || canvas.clientWidth || 0, width) -
+              width;
             const targetLeft = Math.max(
               0,
-              Math.min(maxLeft, Math.round(visibleCenterX - width / 2 + 80)),
+              Math.min(maxLeft, Math.round(visibleCenterX - width / 2)),
             );
             normalizedStyles.left = `${targetLeft}px`;
           }
           if (!hasExplicitTop) {
             const maxTop =
-              Math.max(canvas.scrollHeight || visibleHeight, height) - height;
+              Math.max(canvas.scrollHeight || canvas.clientHeight || 0, height) -
+              height;
             const targetTop = Math.max(
               0,
-              Math.min(maxTop, Math.round(visibleCenterY - height / 2 + 80)),
+              Math.min(maxTop, Math.round(visibleCenterY - height / 2)),
             );
             normalizedStyles.top = `${targetTop}px`;
           }
@@ -33705,13 +33708,12 @@ ${interactionBlock}
       }
       function dockStarterSelection() {
         const canvas = document.getElementById("web-canvas");
+        const container = document.getElementById("canvas-container");
         const target = selectedEl;
-        if (!canvas || !target) return;
+        if (!canvas || !container || !target) return;
         const compact = canvas.clientWidth < 640;
-        const inset = compact ? 12 : 24;
-        const topInset = compact ? 42 : 56;
         const naturalWidth = target.offsetWidth || 0;
-        const maxWidth = Math.max(180, canvas.clientWidth - inset * 2);
+        const maxWidth = Math.max(180, canvas.clientWidth - (compact ? 24 : 48));
         const scale =
           compact && naturalWidth > maxWidth
             ? Math.max(0.68, maxWidth / naturalWidth)
@@ -33724,9 +33726,37 @@ ${interactionBlock}
         target.style.transform =
           `${scale !== 1 ? `scale(${scale})` : ""}${rotatePart}`.trim() ||
           "rotate(0deg)";
-        const scaledWidth = naturalWidth * scale;
-        target.style.left = `${Math.max(inset, canvas.clientWidth - scaledWidth - inset)}px`;
-        target.style.top = `${topInset}px`;
+        const metrics = getBuilderCanvasMetrics(canvas);
+        const canvasRect = canvas.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const targetWidth = Math.max(1, target.offsetWidth || naturalWidth || 1);
+        const targetHeight = Math.max(1, target.offsetHeight || 1);
+        const centerX =
+          (containerRect.left + containerRect.width / 2 - canvasRect.left) *
+          metrics.scaleX;
+        const centerY =
+          (containerRect.top + containerRect.height / 2 - canvasRect.top) *
+          metrics.scaleY;
+        const maxLeft = Math.max(
+          0,
+          Math.max(canvas.scrollWidth || canvas.clientWidth || 0, targetWidth) -
+            targetWidth,
+        );
+        const maxTop = Math.max(
+          0,
+          Math.max(canvas.scrollHeight || canvas.clientHeight || 0, targetHeight) -
+            targetHeight,
+        );
+        const nextLeft = Math.max(
+          0,
+          Math.min(maxLeft, Math.round(centerX - targetWidth / 2)),
+        );
+        const nextTop = Math.max(
+          0,
+          Math.min(maxTop, Math.round(centerY - targetHeight / 2)),
+        );
+        target.style.left = `${nextLeft}px`;
+        target.style.top = `${nextTop}px`;
       }
       function autoGroupStarterElements(startCount) {
         const canvas = document.getElementById("web-canvas");
@@ -33953,14 +33983,16 @@ ${interactionBlock}
 
             // Stabilize width - use offsetWidth if computed is unavailable
             if (isNaN(computedW) || computedW < 30) {
-              wrapper.style.width = Math.max(30, rect.width || wrapper.offsetWidth || 200) + "px";
+              wrapper.style.width =
+                Math.max(30, rect.width || wrapper.offsetWidth || 200) + "px";
             } else if (!wrapper.style.width || wrapper.style.width === "auto") {
               wrapper.style.width = Math.round(computedW) + "px";
             }
 
             // Stabilize height - use offsetHeight if computed is unavailable
             if (isNaN(computedH) || computedH < 30) {
-              wrapper.style.height = Math.max(30, rect.height || wrapper.offsetHeight || 100) + "px";
+              wrapper.style.height =
+                Math.max(30, rect.height || wrapper.offsetHeight || 100) + "px";
             } else if (
               !wrapper.style.height ||
               wrapper.style.height === "auto"
@@ -34078,8 +34110,41 @@ ${interactionBlock}
         }
         return true;
       }
+      function enforceCanvasElementVisibility() {
+        // Ensure all canvas elements are visible after code import/autofix
+        document.querySelectorAll("#web-canvas .canvas-element").forEach((el) => {
+          const style = el.style;
+          
+          // Force visibility properties
+          if (style.opacity === "0" || parseFloat(style.opacity || "1") === 0) {
+            style.opacity = "1";
+          }
+          if (style.visibility === "hidden") {
+            style.visibility = "visible";
+          }
+          if (style.display === "none") {
+            style.display = "block";
+          }
+          
+          // Ensure element body has content or background
+          const body = el.querySelector(".element-body");
+          if (body) {
+            const bodyStyle = window.getComputedStyle(body);
+            const hasBackground = bodyStyle.backgroundColor && bodyStyle.backgroundColor !== "rgba(0, 0, 0, 0)";
+            const hasContent = body.textContent?.trim() || body.innerHTML?.trim();
+            
+            // If element looks empty, add a placeholder background so it's visible
+            if (!hasBackground && !hasContent && !body.querySelector("img")) {
+              body.style.backgroundColor = "rgba(100, 150, 255, 0.1)";
+              body.style.border = "1px dashed rgba(100, 150, 255, 0.3)";
+            }
+          }
+        });
+      }
       function applyCodeModeToCanvas() {
         tryApplyCodeModeToCanvas(false);
+        // Ensure all elements are visible after code is applied
+        setTimeout(() => enforceCanvasElementVisibility(), 100);
         builderCodeMode = false;
         updateBuilderUI();
       }
