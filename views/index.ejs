@@ -1629,6 +1629,70 @@
           filter: blur(1.5px);
         }
       }
+      /* AI Professional Thinking Visualization */
+      @keyframes aiTaskSlideIn {
+        from {
+          opacity: 0;
+          transform: translateX(-20px) translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0) translateY(0);
+        }
+      }
+      @keyframes aiTaskFadeOut {
+        from {
+          opacity: 1;
+          transform: translateX(0) translateY(0) scale(1);
+        }
+        to {
+          opacity: 0;
+          transform: translateX(8px) translateY(-8px) scale(0.95);
+        }
+      }
+      .ai-thinking-task {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-radius: 12px;
+        background: rgba(34, 211, 238, 0.08);
+        border: 1px solid rgba(34, 211, 238, 0.15);
+        color: #67e8f9;
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        animation: aiTaskSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px rgba(2, 6, 23, 0.28);
+      }
+      .ai-thinking-task.complete {
+        animation: aiTaskFadeOut 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+      }
+      .ai-task-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #22d3ee;
+        animation: aiTaskPulse 1.4s ease-in-out infinite;
+        box-shadow: 0 0 8px rgba(34, 211, 238, 0.6);
+      }
+      .ai-task-dot.complete {
+        animation: none;
+        background: #10b981;
+        box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+      }
+      @keyframes aiTaskPulse {
+        0%, 100% {
+          opacity: 0.6;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.2);
+        }
+      }
       .studio-menu-panel {
         position: absolute;
         top: calc(100% + 8px);
@@ -4873,6 +4937,15 @@
       class="hidden fixed left-1/2 -translate-x-1/2 bottom-4 sm:bottom-6 z-[1000010] px-4 py-3 rounded-2xl bg-slate-950/92 border border-cyan-400/20 text-sm font-bold text-cyan-100 shadow-[0_20px_50px_rgba(2,6,23,0.45)] backdrop-blur-xl"
     >
       Code copied to clipboard
+    </div>
+    <!-- AI Professional Thinking Visualization -->
+    <div
+      id="ai-thinking-container"
+      class="hidden fixed top-0 left-0 right-0 z-[1000020] pointer-events-none"
+    >
+      <div class="max-w-2xl mx-auto p-4 sm:p-6">
+        <div id="ai-thinking-tasks" class="space-y-2"></div>
+      </div>
     </div>
     <div
       id="builder-run-modal"
@@ -27999,11 +28072,17 @@ console.log("Triggered ${eventName}", { source, event });
         }
         const startX = e.clientX,
           startY = e.clientY;
+        const canvasRect = canvas.getBoundingClientRect();
         const startRect = el.getBoundingClientRect();
         const startW = Math.max(30, Math.round(startRect.width)),
           startH = Math.max(30, Math.round(startRect.height));
         const startL = el.offsetLeft,
           startT = el.offsetTop;
+
+        // Professional accurate grab offset: where user clicked on the element (viewport coords)
+        const grabPointX = startX - startRect.left;
+        const grabPointY = startY - startRect.top;
+
         // Stabilize drag/resize math by freezing auto/% dimensions to px before move.
         if (!movingSelection && !isResizer) {
           const widthText = String(el.style.width || "")
@@ -28024,11 +28103,16 @@ console.log("Triggered ${eventName}", { source, event });
           }
         }
         const selectionStarts = movingSelection
-          ? selectedElements.map((item) => ({
+          ? selectedElements.map((item) => {
+            const itemRect = item.getBoundingClientRect();
+            return {
               el: item,
               left: item.offsetLeft,
               top: item.offsetTop,
-            }))
+              grabX: startX - itemRect.left,
+              grabY: startY - itemRect.top,
+            };
+          })
           : [];
         const rType = e.target.classList[1];
         const snap = (value) =>
@@ -28039,10 +28123,11 @@ console.log("Triggered ${eventName}", { source, event });
           Math.min(Math.max(value, min), Math.max(min, max));
         let activeLayoutPreview = null;
         const onPointerMove = (ev) => {
-          const dx = ev.clientX - startX,
-            dy = ev.clientY - startY;
           if (isResizer) {
+            // Resize logic unchanged
             clearLayoutDropGuides();
+            const dx = ev.clientX - startX,
+              dy = ev.clientY - startY;
             if (rType.includes("r")) {
               const maxWidth = canvas.clientWidth - startL;
               el.style.width =
@@ -28070,20 +28155,21 @@ console.log("Triggered ${eventName}", { source, event });
                 Math.max(30, startH + (startT - nextTop)) + "px";
             }
           } else {
+            // Professional smooth drag: element follows grab point exactly
+            const curElRect = el.getBoundingClientRect();
+            const nextLeft = snap(ev.clientX - canvasRect.left + (canvas.scrollLeft || 0) - grabPointX);
+            const nextTop = snap(ev.clientY - canvasRect.top + (canvas.scrollTop || 0) - grabPointY);
+            
             if (movingSelection) {
               selectionStarts.forEach((item) => {
-                const nextLeft = clamp(
-                  snap(item.left + dx),
-                  50,
-                  canvas.clientWidth - item.el.offsetWidth,
-                );
-                const nextTop = clamp(
-                  snap(item.top + dy),
-                  0,
-                  canvas.scrollHeight - item.el.offsetHeight,
-                );
-                item.el.style.left = nextLeft + "px";
-                item.el.style.top = nextTop + "px";
+                const itemNextLeft = snap(ev.clientX - canvasRect.left + (canvas.scrollLeft || 0) - item.grabX);
+                const itemNextTop = snap(ev.clientY - canvasRect.top + (canvas.scrollTop || 0) - item.grabY);
+                
+                const clampedLeft = clamp(itemNextLeft, 50, canvas.clientWidth - item.el.offsetWidth);
+                const clampedTop = clamp(itemNextTop, 0, canvas.scrollHeight - item.el.offsetHeight);
+                
+                item.el.style.left = clampedLeft + "px";
+                item.el.style.top = clampedTop + "px";
               });
             } else {
               // Only trigger layout auto-attach when Shift is held to avoid accidental shrink/reflow.
@@ -28106,18 +28192,12 @@ console.log("Triggered ${eventName}", { source, event });
                 activeLayoutPreview = null;
                 clearLayoutDropGuides();
               }
-              const nextLeft = clamp(
-                snap(startL + dx),
-                50,
-                canvas.clientWidth - el.offsetWidth,
-              );
-              const nextTop = clamp(
-                snap(startT + dy),
-                0,
-                canvas.scrollHeight - el.offsetHeight,
-              );
-              el.style.left = nextLeft + "px";
-              el.style.top = nextTop + "px";
+              
+              const clampedLeft = clamp(nextLeft, 50, canvas.clientWidth - el.offsetWidth);
+              const clampedTop = clamp(nextTop, 0, canvas.scrollHeight - el.offsetHeight);
+              
+              el.style.left = clampedLeft + "px";
+              el.style.top = clampedTop + "px";
             }
           }
           showBuilderGuides(el.offsetLeft, el.offsetTop);
@@ -29347,9 +29427,21 @@ console.log("Triggered ${eventName}", { source, event });
         const html = String(sourceHtml || "").trim();
         if (!html) return "";
 
+        // Show AI thinking process
+        const analyzeTask = addAIThinkingTask(".analyzing your code...");
+        const readyTask = addAIThinkingTask(".preparing conversion engine...");
+
         // Use new AI agents system if available
         if (typeof BuilderAIAgents !== "undefined") {
           try {
+            completeAIThinkingTask(analyzeTask, 200);
+            
+            const processingTask = addAIThinkingTask(
+              mode === "visual"
+                ? ".compiling for canvas..."
+                : ".generating production code..."
+            );
+            
             if (mode === "visual") {
               const result = await BuilderAIAgents.convertToVisual(
                 html,
@@ -29360,6 +29452,9 @@ console.log("Triggered ${eventName}", { source, event });
                   prepareForDragDrop: true,
                 },
               );
+              completeAIThinkingTask(processingTask, 150);
+              completeAIThinkingTask(readyTask, 0);
+              clearAllAIThinkingTasks();
               return result.success ? result.html : html;
             } else {
               // mode === "run"
@@ -29373,6 +29468,9 @@ console.log("Triggered ${eventName}", { source, event });
                   validateStructure: true,
                 },
               );
+              completeAIThinkingTask(processingTask, 150);
+              completeAIThinkingTask(readyTask, 0);
+              clearAllAIThinkingTasks();
               return result.success ? result.html : html;
             }
           } catch (error) {
@@ -29380,11 +29478,18 @@ console.log("Triggered ${eventName}", { source, event });
               "BuilderAIAgents conversion failed, falling back to basic conversion",
               error,
             );
+            clearAllAIThinkingTasks();
           }
         }
 
         // Fallback to basic conversion if agents unavailable
-        if (!loggedIn || !currentUser) return html;
+        completeAIThinkingTask(analyzeTask, 200);
+        
+        if (!loggedIn || !currentUser) {
+          clearAllAIThinkingTasks();
+          return html;
+        }
+        
         const prompt =
           mode === "visual"
             ? "You are the MediaLab Visual Compiler. Convert this HTML into canvas-ready builder code that reconstructs clean draggable objects. Preserve intended visual layout, IDs where possible, and stable spacing. Return ONLY valid HTML (no markdown). Ensure output is compatible with ml-container/ml-content parsing."
@@ -29401,9 +29506,12 @@ console.log("Triggered ${eventName}", { source, event });
             }),
           });
           const data = await res.json().catch(() => ({}));
+          completeAIThinkingTask(readyTask, 150);
+          clearAllAIThinkingTasks();
           if (!res.ok || !data.success) return html;
           return String(data.updatedCode || "").trim() || html;
         } catch {
+          clearAllAIThinkingTasks();
           return html;
         }
       }
@@ -32909,6 +33017,8 @@ ${interactionBlock}
         exportCanvasToHTML();
       }
       async function openBuilderRunMode() {
+        const prepTask = addAIThinkingTask(".preparing run preview...");
+        
         const activePath = normalizeBuilderFilePath(
           activeBuilderFilePath ||
             getFirstBuilderHtmlFilePath() ||
@@ -32919,6 +33029,7 @@ ${interactionBlock}
           builderLoadedTemplateSlug === "candycrush" &&
           String(builderTemplateRuntimeDocument || "").trim()
         ) {
+          completeAIThinkingTask(prepTask, 100);
           const cleanedTemplateDoc = await runBuilderCodeConverterAgent(
             builderTemplateRuntimeDocument,
             "run",
@@ -32930,6 +33041,7 @@ ${interactionBlock}
           isBuilderHtmlFile(activePath) &&
           /<html[\s>]/i.test(String(activeDocument || ""))
         ) {
+          completeAIThinkingTask(prepTask, 100);
           const runtimeHtml = buildBuilderRuntimeDocument(
             activePath,
             activeDocument,
@@ -32942,6 +33054,7 @@ ${interactionBlock}
           return;
         }
         if (builderRawImportDocument) {
+          completeAIThinkingTask(prepTask, 100);
           const cleanedImportedDoc = await runBuilderCodeConverterAgent(
             builderRawImportDocument,
             "run",
@@ -32951,13 +33064,15 @@ ${interactionBlock}
         }
         const accurateRunDocument = await buildBuilderAccurateRunDocument();
         if (!String(accurateRunDocument || "").trim()) {
+          completeAIThinkingTask(prepTask, 0);
+          clearAllAIThinkingTasks();
           showBuilderSnackbar(
             "Add content to the canvas before running the site.",
             "error",
           );
           return;
         }
-        showBuilderSnackbar("Preparing accurate run document...", "info");
+        completeAIThinkingTask(prepTask, 100);
         const cleanedRunDocument = await runBuilderCodeConverterAgent(
           accurateRunDocument,
           "run",
@@ -33104,6 +33219,57 @@ ${interactionBlock}
           },
           Math.max(1200, Number(options.duration || 2200)),
         );
+      }
+      // AI Professional Thinking System
+      let aiThinkingTasks = [];
+      function addAIThinkingTask(message) {
+        const taskId = `task-${Date.now()}-${Math.random()}`;
+        const container = document.getElementById("ai-thinking-container");
+        const tasksContainer = document.getElementById("ai-thinking-tasks");
+        
+        if (!container || !tasksContainer) return taskId;
+        
+        const taskEl = document.createElement("div");
+        taskEl.id = taskId;
+        taskEl.className = "ai-thinking-task";
+        taskEl.innerHTML = `<span class="ai-task-dot"></span><span>${message}</span>`;
+        
+        tasksContainer.appendChild(taskEl);
+        container.classList.remove("hidden");
+        
+        aiThinkingTasks.push({ id: taskId, el: taskEl, timestamp: Date.now() });
+        
+        return taskId;
+      }
+      function completeAIThinkingTask(taskId, delay = 400) {
+        setTimeout(() => {
+          const task = aiThinkingTasks.find(t => t.id === taskId);
+          if (!task) return;
+          
+          const dot = task.el.querySelector(".ai-task-dot");
+          if (dot) {
+            dot.classList.add("complete");
+          }
+          task.el.classList.add("complete");
+          
+          setTimeout(() => {
+            task.el.remove();
+            aiThinkingTasks = aiThinkingTasks.filter(t => t.id !== taskId);
+            
+            const tasksContainer = document.getElementById("ai-thinking-tasks");
+            const container = document.getElementById("ai-thinking-container");
+            if (tasksContainer && tasksContainer.children.length === 0 && container) {
+              container.classList.add("hidden");
+            }
+          }, 500);
+        }, delay);
+      }
+      function clearAllAIThinkingTasks() {
+        const container = document.getElementById("ai-thinking-container");
+        const tasksContainer = document.getElementById("ai-thinking-tasks");
+        if (tasksContainer) tasksContainer.innerHTML = "";
+        if (container) container.classList.add("hidden");
+        aiThinkingTasks = [];
       }
       async function copyBuilderCode() {
         const code = buildCodeModeDocument();
