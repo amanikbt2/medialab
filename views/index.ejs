@@ -28176,6 +28176,26 @@ console.log("Triggered ${eventName}", { source, event });
         if (isCollaborationViewOnly()) return;
         if (el.classList.contains("locked")) return;
         if (e.target.isContentEditable) return;
+        const readPx = (node, prop, fallback = 0) => {
+          if (!node) return fallback;
+          const inline = parseFloat(node.style?.[prop] || "");
+          if (Number.isFinite(inline)) return inline;
+          try {
+            const computed = parseFloat(window.getComputedStyle(node)[prop]);
+            if (Number.isFinite(computed)) return computed;
+          } catch {}
+          const offsetFallback =
+            prop === "left"
+              ? node.offsetLeft
+              : prop === "top"
+                ? node.offsetTop
+                : prop === "width"
+                  ? node.offsetWidth
+                  : prop === "height"
+                    ? node.offsetHeight
+                    : fallback;
+          return Number.isFinite(offsetFallback) ? offsetFallback : fallback;
+        };
         if (builderInteractionPickMode && builderInteractionDraft) {
           e.stopPropagation();
           e.preventDefault();
@@ -28260,8 +28280,8 @@ console.log("Triggered ${eventName}", { source, event });
           );
 
         // CRITICAL: Use style-based coordinates, not offsetLeft/Top (can be incorrect after import)
-        const startL = parseFloat(el.style.left) || el.offsetLeft || 0;
-        const startT = parseFloat(el.style.top) || el.offsetTop || 0;
+        const startL = readPx(el, "left", 0);
+        const startT = readPx(el, "top", 0);
 
         // Professional accurate grab offset: where user clicked on the element (viewport coords)
         const grabPointX = (startX - startRect.left) * startMetrics.scaleX;
@@ -28291,8 +28311,8 @@ console.log("Triggered ${eventName}", { source, event });
               const itemRect = item.getBoundingClientRect();
               return {
                 el: item,
-                left: parseFloat(item.style.left) || item.offsetLeft || 0,
-                top: parseFloat(item.style.top) || item.offsetTop || 0,
+                left: readPx(item, "left", 0),
+                top: readPx(item, "top", 0),
                 grabX: (startX - itemRect.left) * startMetrics.scaleX,
                 grabY: (startY - itemRect.top) * startMetrics.scaleY,
               };
@@ -28433,24 +28453,24 @@ console.log("Triggered ${eventName}", { source, event });
           // Apply grid snap on drop (not during drag) for smooth movement.
           if (builderSnapEnabled) {
             if (isResizer) {
-              const w = parseFloat(el.style.width) || el.offsetWidth || startW;
-              const h = parseFloat(el.style.height) || el.offsetHeight || startH;
-              const l = parseFloat(el.style.left) || el.offsetLeft || startL;
-              const t = parseFloat(el.style.top) || el.offsetTop || startT;
+              const w = readPx(el, "width", startW);
+              const h = readPx(el, "height", startH);
+              const l = readPx(el, "left", startL);
+              const t = readPx(el, "top", startT);
               el.style.width = `${Math.max(32, snapFinal(w))}px`;
               el.style.height = `${Math.max(32, snapFinal(h))}px`;
               el.style.left = `${Math.max(0, snapFinal(l))}px`;
               el.style.top = `${Math.max(0, snapFinal(t))}px`;
             } else if (movingSelection) {
               selectedElements.forEach((item) => {
-                const l = parseFloat(item.style.left) || item.offsetLeft || 0;
-                const t = parseFloat(item.style.top) || item.offsetTop || 0;
+                const l = readPx(item, "left", 0);
+                const t = readPx(item, "top", 0);
                 item.style.left = `${Math.max(0, snapFinal(l))}px`;
                 item.style.top = `${Math.max(0, snapFinal(t))}px`;
               });
             } else {
-              const l = parseFloat(el.style.left) || el.offsetLeft || 0;
-              const t = parseFloat(el.style.top) || el.offsetTop || 0;
+              const l = readPx(el, "left", startL);
+              const t = readPx(el, "top", startT);
               el.style.left = `${Math.max(0, snapFinal(l))}px`;
               el.style.top = `${Math.max(0, snapFinal(t))}px`;
             }
@@ -29086,6 +29106,10 @@ console.log("Triggered ${eventName}", { source, event });
         el.onpointerdown = (e) => handleObjectInteraction(e, el);
         el.onclick = (e) => {
           e.stopPropagation();
+        };
+        el.ondblclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
         };
       }
       function hydrateCanvasElements() {
