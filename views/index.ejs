@@ -24581,14 +24581,47 @@
         };
         reader.readAsDataURL(file);
       }
+      function getBuilderCanvasScroller(canvas) {
+        const scroller = document.getElementById("canvas-container");
+        if (scroller && canvas && scroller.contains(canvas)) return scroller;
+        return canvas?.parentElement || canvas || document.documentElement;
+      }
+      function getBuilderCanvasMetrics(canvas) {
+        const rect = canvas?.getBoundingClientRect?.() || {
+          left: 0,
+          top: 0,
+          width: 1,
+          height: 1,
+        };
+        const scaleX = canvas?.offsetWidth
+          ? canvas.offsetWidth / (rect.width || 1)
+          : 1;
+        const scaleY = canvas?.offsetHeight
+          ? canvas.offsetHeight / (rect.height || 1)
+          : 1;
+        const scroller = getBuilderCanvasScroller(canvas);
+        const scrollLeft = scroller?.scrollLeft || 0;
+        const scrollTop = scroller?.scrollTop || 0;
+        return {
+          rect,
+          scaleX: Number.isFinite(scaleX) && scaleX > 0 ? scaleX : 1,
+          scaleY: Number.isFinite(scaleY) && scaleY > 0 ? scaleY : 1,
+          scroller,
+          scrollLeft,
+          scrollTop,
+        };
+      }
       function initCanvasSelection(canvas) {
         canvas.onpointerdown = (e) => {
           if (e.target !== canvas) return;
           if (builderCodeMode) return;
           if (isCollaborationViewOnly()) return;
-          const rect = canvas.getBoundingClientRect();
-          const startX = e.clientX - rect.left + canvas.scrollLeft;
-          const startY = e.clientY - rect.top + canvas.scrollTop;
+          const metrics = getBuilderCanvasMetrics(canvas);
+          const startX =
+            (e.clientX - metrics.rect.left) * metrics.scaleX +
+            metrics.scrollLeft;
+          const startY =
+            (e.clientY - metrics.rect.top) * metrics.scaleY + metrics.scrollTop;
           let moved = false;
           deselectAll();
           if (!selectionBoxEl) return;
@@ -24601,8 +24634,13 @@
           });
           const onMove = (ev) => {
             moved = true;
-            const currentX = ev.clientX - rect.left + canvas.scrollLeft;
-            const currentY = ev.clientY - rect.top + canvas.scrollTop;
+            const nextMetrics = getBuilderCanvasMetrics(canvas);
+            const currentX =
+              (ev.clientX - nextMetrics.rect.left) * nextMetrics.scaleX +
+              nextMetrics.scrollLeft;
+            const currentY =
+              (ev.clientY - nextMetrics.rect.top) * nextMetrics.scaleY +
+              nextMetrics.scrollTop;
             const left = Math.min(startX, currentX);
             const top = Math.min(startY, currentY);
             const width = Math.abs(currentX - startX);
@@ -25038,16 +25076,16 @@
           clearLayoutDropGuides();
           return;
         }
-        const canvasRect = canvas.getBoundingClientRect();
+        const metrics = getBuilderCanvasMetrics(canvas);
         const hostRect = preview.host.getBoundingClientRect();
         if (layoutGuideOverlayEl) {
           layoutGuideOverlayEl.classList.remove("hidden");
           layoutGuideOverlayEl.classList.remove("grid", "flex");
           layoutGuideOverlayEl.classList.add(preview.layoutType);
-          layoutGuideOverlayEl.style.left = `${hostRect.left - canvasRect.left + canvas.scrollLeft}px`;
-          layoutGuideOverlayEl.style.top = `${hostRect.top - canvasRect.top + canvas.scrollTop}px`;
-          layoutGuideOverlayEl.style.width = `${hostRect.width}px`;
-          layoutGuideOverlayEl.style.height = `${hostRect.height}px`;
+          layoutGuideOverlayEl.style.left = `${(hostRect.left - metrics.rect.left) * metrics.scaleX + metrics.scrollLeft}px`;
+          layoutGuideOverlayEl.style.top = `${(hostRect.top - metrics.rect.top) * metrics.scaleY + metrics.scrollTop}px`;
+          layoutGuideOverlayEl.style.width = `${hostRect.width * metrics.scaleX}px`;
+          layoutGuideOverlayEl.style.height = `${hostRect.height * metrics.scaleY}px`;
           if (preview.layoutType === "grid") {
             layoutGuideOverlayEl.style.backgroundSize = `${100 / Math.max(1, preview.columns)}% 100%, 100% ${100 / Math.max(1, preview.rows)}%`;
           } else {
@@ -25056,10 +25094,10 @@
         }
         if (layoutGuideSlotEl && preview.slotRect) {
           layoutGuideSlotEl.classList.remove("hidden");
-          layoutGuideSlotEl.style.left = `${preview.slotRect.left - canvasRect.left + canvas.scrollLeft}px`;
-          layoutGuideSlotEl.style.top = `${preview.slotRect.top - canvasRect.top + canvas.scrollTop}px`;
-          layoutGuideSlotEl.style.width = `${Math.max(2, preview.slotRect.width)}px`;
-          layoutGuideSlotEl.style.height = `${Math.max(2, preview.slotRect.height)}px`;
+          layoutGuideSlotEl.style.left = `${(preview.slotRect.left - metrics.rect.left) * metrics.scaleX + metrics.scrollLeft}px`;
+          layoutGuideSlotEl.style.top = `${(preview.slotRect.top - metrics.rect.top) * metrics.scaleY + metrics.scrollTop}px`;
+          layoutGuideSlotEl.style.width = `${Math.max(2, preview.slotRect.width * metrics.scaleX)}px`;
+          layoutGuideSlotEl.style.height = `${Math.max(2, preview.slotRect.height * metrics.scaleY)}px`;
         }
       }
       function maybeAutoScrollLayoutHost(preview, event) {
@@ -25089,17 +25127,24 @@
         if (layoutParent?.id) {
           el.dataset.lastLayoutParentId = layoutParent.id;
         }
-        const canvasRect = canvas.getBoundingClientRect();
+        const metrics = getBuilderCanvasMetrics(canvas);
         const elementRect = el.getBoundingClientRect();
+        const elementWidth =
+          el.offsetWidth || Math.max(30, Math.round(elementRect.width || 30));
+        const elementHeight =
+          el.offsetHeight ||
+          Math.max(30, Math.round(elementRect.height || 30));
         const nextLeft = clampBuilderValue(
-          elementRect.left - canvasRect.left + canvas.scrollLeft,
+          (elementRect.left - metrics.rect.left) * metrics.scaleX +
+            metrics.scrollLeft,
           0,
-          canvas.clientWidth - Math.max(30, elementRect.width),
+          Math.max(canvas.scrollWidth, canvas.clientWidth) - elementWidth,
         );
         const nextTop = clampBuilderValue(
-          elementRect.top - canvasRect.top + canvas.scrollTop,
+          (elementRect.top - metrics.rect.top) * metrics.scaleY +
+            metrics.scrollTop,
           0,
-          canvas.scrollHeight - Math.max(30, elementRect.height),
+          Math.max(canvas.scrollHeight, canvas.clientHeight) - elementHeight,
         );
         canvas.appendChild(el);
         el.classList.remove("in-layout-flow");
@@ -25108,8 +25153,8 @@
           position: "absolute",
           left: `${nextLeft}px`,
           top: `${nextTop}px`,
-          width: `${Math.max(30, Math.round(elementRect.width))}px`,
-          height: `${Math.max(30, Math.round(elementRect.height))}px`,
+          width: `${Math.max(30, elementWidth)}px`,
+          height: `${Math.max(30, elementHeight)}px`,
           gridColumn: "auto",
           gridRow: "auto",
           justifySelf: "auto",
@@ -25982,17 +26027,20 @@ console.log("Triggered ${eventName}", { source, event });
             48,
             Number.parseFloat(normalizedStyles.height || "100") || 100,
           );
-          const canvasRect = canvas.getBoundingClientRect();
           const containerRect = canvasContainer.getBoundingClientRect();
           const centerX = containerRect.left + containerRect.width / 2;
           const centerY = containerRect.top + containerRect.height / 2;
-          const localX = centerX - canvasRect.left;
-          const localY = centerY - canvasRect.top;
+          const metrics = getBuilderCanvasMetrics(canvas);
+          const localX =
+            (centerX - metrics.rect.left) * metrics.scaleX + metrics.scrollLeft;
+          const localY =
+            (centerY - metrics.rect.top) * metrics.scaleY + metrics.scrollTop;
           if (!hasExplicitLeft) {
             const left = Math.max(
               0,
               Math.min(
-                (canvas.clientWidth || width) - width,
+                (Math.max(canvas.scrollWidth, canvas.clientWidth) || width) -
+                  width,
                 localX - width / 2,
               ),
             );
@@ -28191,18 +28239,26 @@ console.log("Triggered ${eventName}", { source, event });
         }
         const startX = e.clientX,
           startY = e.clientY;
-        const canvasRect = canvas.getBoundingClientRect();
+        const startMetrics = getBuilderCanvasMetrics(canvas);
         const startRect = el.getBoundingClientRect();
-        const startW = Math.max(30, Math.round(startRect.width)),
-          startH = Math.max(30, Math.round(startRect.height));
+        const startW = Math.max(
+            30,
+            Math.round(el.offsetWidth || startRect.width * startMetrics.scaleX),
+          ),
+          startH = Math.max(
+            30,
+            Math.round(
+              el.offsetHeight || startRect.height * startMetrics.scaleY,
+            ),
+          );
 
         // CRITICAL: Use style-based coordinates, not offsetLeft/Top (can be incorrect after import)
         const startL = parseFloat(el.style.left) || el.offsetLeft || 0;
         const startT = parseFloat(el.style.top) || el.offsetTop || 0;
 
         // Professional accurate grab offset: where user clicked on the element (viewport coords)
-        const grabPointX = startX - startRect.left;
-        const grabPointY = startY - startRect.top;
+        const grabPointX = (startX - startRect.left) * startMetrics.scaleX;
+        const grabPointY = (startY - startRect.top) * startMetrics.scaleY;
 
         // Stabilize drag/resize math by freezing auto/% dimensions to px before move.
         if (!movingSelection && !isResizer) {
@@ -28228,10 +28284,10 @@ console.log("Triggered ${eventName}", { source, event });
               const itemRect = item.getBoundingClientRect();
               return {
                 el: item,
-                left: item.offsetLeft,
-                top: item.offsetTop,
-                grabX: startX - itemRect.left,
-                grabY: startY - itemRect.top,
+                left: parseFloat(item.style.left) || item.offsetLeft || 0,
+                top: parseFloat(item.style.top) || item.offsetTop || 0,
+                grabX: (startX - itemRect.left) * startMetrics.scaleX,
+                grabY: (startY - itemRect.top) * startMetrics.scaleY,
               };
             })
           : [];
@@ -28244,21 +28300,28 @@ console.log("Triggered ${eventName}", { source, event });
           Math.min(Math.max(value, min), Math.max(min, max));
         let activeLayoutPreview = null;
         let dragRafId = null;
-        const getCanvasScroll = () => ({
-          top: canvas.scrollTop || 0,
-          left: canvas.scrollLeft || 0,
-          height: Math.max(canvas.scrollHeight, canvas.clientHeight),
-          width: Math.max(canvas.scrollWidth, canvas.clientWidth),
-        });
+        const getCanvasScroll = () => {
+          const metrics = getBuilderCanvasMetrics(canvas);
+          return {
+            metrics,
+            top: metrics.scrollTop || 0,
+            left: metrics.scrollLeft || 0,
+            height: Math.max(canvas.scrollHeight, canvas.clientHeight),
+            width: Math.max(canvas.scrollWidth, canvas.clientWidth),
+          };
+        };
         const onPointerMove = (ev) => {
           if (dragRafId) return;
           dragRafId = requestAnimationFrame(() => {
             dragRafId = null;
             const scroll = getCanvasScroll();
+            const canvasRect = scroll.metrics.rect;
+            const scaleX = scroll.metrics.scaleX;
+            const scaleY = scroll.metrics.scaleY;
             if (isResizer) {
               clearLayoutDropGuides();
-              const dx = Math.round(ev.clientX - startX);
-              const dy = Math.round(ev.clientY - startY);
+              const dx = Math.round((ev.clientX - startX) * scaleX);
+              const dy = Math.round((ev.clientY - startY) * scaleY);
               if (rType.includes("r")) {
                 const maxWidth = scroll.width - startL;
                 el.style.width = clamp(snap(startW + dx), 32, maxWidth) + "px";
@@ -28289,20 +28352,16 @@ console.log("Triggered ${eventName}", { source, event });
                 el.style.height = Math.max(32, startH + deltaTop) + "px";
               }
             } else {
-              const nextLeft = snap(
-                ev.clientX - canvasRect.left + scroll.left - grabPointX,
-              );
-              const nextTop = snap(
-                ev.clientY - canvasRect.top + scroll.top - grabPointY,
-              );
+              const pointerX =
+                (ev.clientX - canvasRect.left) * scaleX + scroll.left;
+              const pointerY =
+                (ev.clientY - canvasRect.top) * scaleY + scroll.top;
+              const nextLeft = snap(pointerX - grabPointX);
+              const nextTop = snap(pointerY - grabPointY);
               if (movingSelection) {
                 selectionStarts.forEach((item) => {
-                  const itemNextLeft = snap(
-                    ev.clientX - canvasRect.left + scroll.left - item.grabX,
-                  );
-                  const itemNextTop = snap(
-                    ev.clientY - canvasRect.top + scroll.top - item.grabY,
-                  );
+                  const itemNextLeft = snap(pointerX - item.grabX);
+                  const itemNextTop = snap(pointerY - item.grabY);
                   const clampedLeft = clamp(
                     itemNextLeft,
                     0,
@@ -29175,7 +29234,7 @@ console.log("Triggered ${eventName}", { source, event });
           sections[0];
         const prevSectionId = currentActiveSectionId;
         currentActiveSectionId = target?.id || sections[0].id;
-        
+
         // CRITICAL: Smooth section transitions with explicit hide/show
         sections.forEach((section) => {
           const isActive = section.id === currentActiveSectionId;
@@ -29199,7 +29258,7 @@ console.log("Triggered ${eventName}", { source, event });
             section.classList.remove("section-active");
           }
         });
-        
+
         // Trigger UI update to refresh switcher buttons
         renderBuilderViewSwitcher();
         scheduleSyncStyleTag();
