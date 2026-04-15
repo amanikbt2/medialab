@@ -26035,7 +26035,7 @@ console.log("Triggered ${eventName}", { source, event });
         wrap.innerHTML = `
         ${handlesHTML}
         <div class="absolute -top-8 left-0 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all z-[60]">
-            <div class="drag-handle w-7 h-7 bg-gradient-to-br from-cyan-500 to-blue-600 text-white rounded-lg border border-white/20 shadow-2xl flex items-center justify-center cursor-grab active:cursor-grabbing pointer-events-auto hover:shadow-cyan-500/50 transition-all"><i class="fas fa-arrows-alt text-[10px]"></i></div>
+            <div class="drag-handle w-7 h-7 bg-gradient-to-br from-cyan-500 to-blue-600 text-white rounded-lg border border-white/20 shadow-2xl flex items-center justify-center cursor-grab active:cursor-grabbing pointer-events-auto hover:shadow-cyan-500/50 transition-all select-none" ondblclick="arguments[0].stopPropagation();"><i class="fas fa-arrows-alt text-[10px]"></i></div>
             <button onclick="openSmartInspector('${type}', this.closest('.canvas-element'))" class="w-7 h-7 bg-gray-950 text-cyan-400 rounded-lg border border-white/10 flex items-center justify-center pointer-events-auto hover:bg-cyan-950 transition-all"><i class="fas fa-sliders-h text-[10px]"></i></button>
             <button onclick="this.closest('.canvas-element').remove(); saveToHistory();" class="w-7 h-7 bg-gray-950 text-red-500 rounded-lg border border-white/10 flex items-center justify-center pointer-events-auto hover:bg-red-950 transition-all"><i class="fas fa-trash-alt text-[10px]"></i></button>
         </div>
@@ -33895,8 +33895,7 @@ ${interactionBlock}
           if (!styleRules.position || styleRules.position !== "absolute") {
             styleRules.position = "absolute";
           }
-          if (!styleRules.left) styleRules.left = "0px";
-          if (!styleRules.top) styleRules.top = "0px";
+          // Don't default left/top to 0px - will be captured from computed values
           if (!styleRules.width) styleRules.width = "auto";
           if (!styleRules.height) styleRules.height = "auto";
 
@@ -33939,48 +33938,50 @@ ${interactionBlock}
           // This prevents displacement in drag/resize operations
           requestAnimationFrame(() => {
             const compStyle = window.getComputedStyle(wrapper);
+            const rect = wrapper.getBoundingClientRect();
 
             // Ensure position is absolute
             if (compStyle.position !== "absolute") {
               wrapper.style.position = "absolute";
             }
 
-            // Get actual dimensions from rendered element
-            const rect = wrapper.getBoundingClientRect();
+            // Get actual dimensions and position from rendered element
             const computedW = parseFloat(compStyle.width);
             const computedH = parseFloat(compStyle.height);
             const computedL = parseFloat(compStyle.left);
             const computedT = parseFloat(compStyle.top);
 
-            // Stabilize width with fallback
+            // Stabilize width - use offsetWidth if computed is unavailable
             if (isNaN(computedW) || computedW < 30) {
-              wrapper.style.width = Math.max(30, rect.width || 200) + "px";
+              wrapper.style.width = Math.max(30, rect.width || wrapper.offsetWidth || 200) + "px";
             } else if (!wrapper.style.width || wrapper.style.width === "auto") {
-              wrapper.style.width = computedW + "px";
+              wrapper.style.width = Math.round(computedW) + "px";
             }
 
-            // Stabilize height with fallback
+            // Stabilize height - use offsetHeight if computed is unavailable
             if (isNaN(computedH) || computedH < 30) {
-              wrapper.style.height = Math.max(30, rect.height || 100) + "px";
+              wrapper.style.height = Math.max(30, rect.height || wrapper.offsetHeight || 100) + "px";
             } else if (
               !wrapper.style.height ||
               wrapper.style.height === "auto"
             ) {
-              wrapper.style.height = computedH + "px";
+              wrapper.style.height = Math.round(computedH) + "px";
             }
 
-            // Stabilize left position
+            // Stabilize left position - CRITICAL: always capture computed/offset
             if (isNaN(computedL)) {
-              wrapper.style.left = "0px";
+              // Use offsetLeft as fallback, not 0px (preserves import position)
+              wrapper.style.left = Math.round(wrapper.offsetLeft || 0) + "px";
             } else if (!wrapper.style.left) {
-              wrapper.style.left = computedL + "px";
+              wrapper.style.left = Math.round(computedL) + "px";
             }
 
-            // Stabilize top position
+            // Stabilize top position - CRITICAL: always capture computed/offset
             if (isNaN(computedT)) {
-              wrapper.style.top = "0px";
+              // Use offsetTop as fallback, not 0px (preserves import position)
+              wrapper.style.top = Math.round(wrapper.offsetTop || 0) + "px";
             } else if (!wrapper.style.top) {
-              wrapper.style.top = computedT + "px";
+              wrapper.style.top = Math.round(computedT) + "px";
             }
           });
         });

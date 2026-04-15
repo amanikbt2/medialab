@@ -4374,7 +4374,7 @@ app.post("/api/ai/chat-edit", async (req, res) => {
                           ? "You are the MediaLab Agent in SEARCH phase. Return only one line in this exact format: SEARCH_FILES: path/a.js, path/b.css. Select the minimum file set needed to implement the request. Use only files present in WorkspaceIndex."
                           : agentPhase === "plan"
                             ? "You are the MediaLab Agent in PLAN phase. Return only a concise proposal in plain text, prefixed with 'Proposal:'. Explain which files you will change and why. No code blocks."
-                            : "You are the MediaLab System Agent in EXECUTION phase.\n\nOutput format:\n1) One short, friendly user-facing line.\n2) One or more hidden machine blocks wrapped exactly as: [ACTION]{...}[/ACTION]. Never expose raw code outside [ACTION].\n\nAllowed actions: UPDATE_FILE, CREATE_FILE, CREATE_FOLDER, UPDATE_CSS, MOVE_ELEMENT, EDIT_CANVAS.\n\nNon-destructive rules:\n- For small edits (insert/move/remove/style/background), DO NOT use UPDATE_FILE. Preserve existing canvas elements and IDs. Prefer:\n  - UPDATE_CSS for background/page-level styles\n  - MOVE_ELEMENT for precise positioning\n  - EDIT_CANVAS with ops[] for inserts/removes/style tweaks\n- Only use UPDATE_FILE when the user explicitly requests a full rewrite/new template/replace-everything.\n\nEDIT_CANVAS schema (must use ops):\n[ACTION]{\"type\":\"EDIT_CANVAS\",\"ops\":[\n {\"op\":\"insert\",\"elementType\":\"div\",\"attrs\":{...},\"styles\":{...},\"innerStyles\":{...},\"html\":\"<div>...</div>\"},\n {\"op\":\"move\",\"selector\":\"#id\",\"x\":120,\"y\":80},\n {\"op\":\"remove\",\"selector\":\"#id\"},\n {\"op\":\"update_styles\",\"selector\":\"#id\",\"wrapperStyles\":{...},\"innerStyles\":{...}},\n {\"op\":\"set_background\",\"background\":\"url(https://...)\"}\n]}[/ACTION]\n\nYou may request more context with REQUEST_FILE: path/to/file."
+                            : 'You are the MediaLab System Agent in EXECUTION phase.\n\nOutput format:\n1) One short, friendly user-facing line.\n2) One or more hidden machine blocks wrapped exactly as: [ACTION]{...}[/ACTION]. Never expose raw code outside [ACTION].\n\nAllowed actions: UPDATE_FILE, CREATE_FILE, CREATE_FOLDER, UPDATE_CSS, MOVE_ELEMENT, EDIT_CANVAS.\n\nNon-destructive rules:\n- For small edits (insert/move/remove/style/background), DO NOT use UPDATE_FILE. Preserve existing canvas elements and IDs. Prefer:\n  - UPDATE_CSS for background/page-level styles\n  - MOVE_ELEMENT for precise positioning\n  - EDIT_CANVAS with ops[] for inserts/removes/style tweaks\n- Only use UPDATE_FILE when the user explicitly requests a full rewrite/new template/replace-everything.\n\nEDIT_CANVAS schema (must use ops):\n[ACTION]{"type":"EDIT_CANVAS","ops":[\n {"op":"insert","elementType":"div","attrs":{...},"styles":{...},"innerStyles":{...},"html":"<div>...</div>"},\n {"op":"move","selector":"#id","x":120,"y":80},\n {"op":"remove","selector":"#id"},\n {"op":"update_styles","selector":"#id","wrapperStyles":{...},"innerStyles":{...}},\n {"op":"set_background","background":"url(https://...)"}\n]}[/ACTION]\n\nYou may request more context with REQUEST_FILE: path/to/file.'
                         : "You are the MediaLab AI Architect. Return ONLY raw HTML and CSS/Tailwind code. No markdown, no backticks. You can refactor code, generate full templates, and apply design updates like online background images via valid image URLs. Always return valid, renderable HTML that works immediately in MediaLab. Preserve existing element IDs whenever possible. Preserve and/or produce 'ml-container' and 'ml-content' class structure so the visual builder can map objects accurately. If user asks to change page/body background, set it with explicit CSS that does not depend on external frameworks (inline body style or <style> body { background: ... }).",
                 },
                 {
@@ -4760,21 +4760,21 @@ app.post("/api/ai/manager", async (req, res) => {
 // Helper: Extract HTML from AI response that might contain conversational text
 function extractHTMLFromResponse(text = "") {
   const content = String(text || "").trim();
-  
+
   // Try to extract from HTML code blocks first (```html ... ```)
   const htmlBlockMatch = content.match(/```html\s*([\s\S]*?)```/i);
   if (htmlBlockMatch?.[1]) {
     const extracted = htmlBlockMatch[1].trim();
     if (extracted.includes("<")) return extracted;
   }
-  
+
   // Try generic code blocks (``` ... ```)
   const codeBlockMatch = content.match(/```\s*([\s\S]*?)```/);
   if (codeBlockMatch?.[1]) {
     const extracted = codeBlockMatch[1].trim();
     if (extracted.includes("<")) return extracted;
   }
-  
+
   // Find first < and take everything from there (line-based to avoid partial tags)
   const firstTagIndex = content.indexOf("<");
   if (firstTagIndex >= 0) {
@@ -4784,12 +4784,12 @@ function extractHTMLFromResponse(text = "") {
       return extracted;
     }
   }
-  
+
   // If content starts with < (likely pure HTML)
   if (content.startsWith("<")) {
     return content;
   }
-  
+
   // Fallback: return empty if no HTML found
   return "";
 }
@@ -4911,7 +4911,7 @@ app.post("/api/ai/autofix", async (req, res) => {
           throw new Error(
             `Auto-Fix returned empty content for ${model.modelId}.`,
           );
-        
+
         // Extract actual HTML from potentially conversational response
         const extractedHTML = extractHTMLFromResponse(candidate);
         if (!extractedHTML) {
@@ -4919,7 +4919,7 @@ app.post("/api/ai/autofix", async (req, res) => {
             `Auto-Fix returned no valid HTML for ${model.modelId}. Got: ${candidate.slice(0, 100)}`,
           );
         }
-        
+
         sanitizedContent = extractedHTML;
         selectedModel = model.modelId;
         await AIModel.updateOne(
