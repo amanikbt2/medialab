@@ -6507,7 +6507,7 @@
       let marketplaceTemplateCaptureLibPromise = null;
       let marketplaceTemplateScreenshotAutoCapturing = false;
       let builderTemplateGridExpanded = false;
-      const LOGIN_REQUIRED_TOOL_IDS = ["console", "data-explorer"];
+      const LOGIN_REQUIRED_TOOL_IDS = ["console", "data-explorer", "database-manager"];
       const PREMIUM_TOOL_IDS = [];
       function normalizeHostedBaseUrl(url = "") {
         return String(url || "")
@@ -6589,6 +6589,12 @@
           title: "Database",
           icon: "fa-database",
           desc: "Connect MongoDB and inspect live collections",
+        },
+        {
+          id: "database-manager",
+          title: "Database Manager",
+          icon: "fa-server",
+          desc: "Create, manage, and sync your database collections",
         },
       ];
       function renderCards() {
@@ -20548,9 +20554,22 @@
         else if (id === "data-explorer") {
           html = `<div></div>`;
         }
-        // =============================================================
-        // 4. TEXT → DOCUMENT
-        // =============================================================
+        else if (id === "database-manager") {
+          html = `
+            <div class="animate-fadeIn h-full">
+              <div class="max-w-6xl mx-auto min-h-full space-y-6 sm:space-y-8 p-6">
+                <div class="text-center py-16">
+                  <i class="fas fa-server text-6xl text-cyan-400 mb-6 block"></i>
+                  <h1 class="text-3xl font-bold text-white mb-3">Database Manager</h1>
+                  <p class="text-gray-400 text-lg mb-8">Create, manage, and sync your database collections</p>
+                  <button onclick="switchTool('data-explorer')" class="bg-cyan-500 hover:bg-cyan-400 text-white px-8 py-3 rounded-xl font-semibold inline-flex items-center gap-2">
+                    <i class="fas fa-database"></i> Open Database
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }
         else if (id === "__removed_text_doc__") {
           html = `
             <div id="word-processor-container" class="word-processor-shell animate-fadeIn">
@@ -26042,41 +26061,32 @@ console.log("Triggered ${eventName}", { source, event });
             48,
             Number.parseFloat(normalizedStyles.height || "100") || 100,
           );
-          const containerRect = canvasContainer.getBoundingClientRect();
-          const centerX = containerRect.left + containerRect.width / 2;
-          const centerY = containerRect.top + containerRect.height / 2;
+          const scroller = canvasContainer;
           const metrics = getBuilderCanvasMetrics(canvas);
-          const localX =
-            (centerX - metrics.rect.left) * metrics.scaleX + metrics.scrollLeft;
-          const localY =
-            (centerY - metrics.rect.top) * metrics.scaleY + metrics.scrollTop;
+          const visibleLeft = metrics.scrollLeft;
+          const visibleTop = metrics.scrollTop;
+          const visibleWidth = scroller.clientWidth || 400;
+          const visibleHeight = scroller.clientHeight || 300;
+          const visibleCenterX = visibleLeft + visibleWidth / 2;
+          const visibleCenterY = visibleTop + visibleHeight / 2;
           if (!hasExplicitLeft) {
-            const left = Math.max(
+            const maxLeft =
+              Math.max(canvas.scrollWidth || visibleWidth, width) - width;
+            const targetLeft = Math.max(
               0,
-              Math.min(
-                (Math.max(canvas.scrollWidth, canvas.clientWidth) || width) -
-                  width,
-                localX - width / 2,
-              ),
+              Math.min(maxLeft, Math.round(visibleCenterX - width / 2)),
             );
-            normalizedStyles.left = `${Math.round(left)}px`;
+            normalizedStyles.left = `${targetLeft}px`;
           }
           if (!hasExplicitTop) {
-            const top = Math.max(
+            const maxTop =
+              Math.max(canvas.scrollHeight || visibleHeight, height) - height;
+            const targetTop = Math.max(
               0,
-              Math.min(
-                (canvas.scrollHeight || height) - height,
-                localY - height / 2,
-              ),
+              Math.min(maxTop, Math.round(visibleCenterY - height / 2)),
             );
-            normalizedStyles.top = `${Math.round(top)}px`;
+            normalizedStyles.top = `${targetTop}px`;
           }
-        }
-        // Hard safety clamp so inserts never spawn at extreme-left/offscreen.
-        const leftRaw = String(normalizedStyles.left || "").trim();
-        const leftValue = Number.parseFloat(leftRaw);
-        if (Number.isFinite(leftValue)) {
-          normalizedStyles.left = `${Math.max(50, Math.round(leftValue))}px`;
         }
         const mergedAttrs = {
           ...getDefaultElementAttributes(type),
@@ -31926,7 +31936,9 @@ ${interactionBlock}
           );
         const messageCountEl = document.getElementById("ai-message-count");
         if (messageCountEl) {
-          const userMessageCount = aiChatMessages.filter((m) => m.role === "user").length;
+          const userMessageCount = aiChatMessages.filter(
+            (m) => m.role === "user",
+          ).length;
           messageCountEl.textContent = userMessageCount;
         }
       }
@@ -31979,14 +31991,18 @@ ${interactionBlock}
         }
       }
       function startNewAiChat() {
-        const confirmed = confirm("Start a new chat? This will clear the current conversation history.");
+        const confirmed = confirm(
+          "Start a new chat? This will clear the current conversation history.",
+        );
         if (confirmed) {
           aiChatMessages = [];
           renderBuilderAiChat();
         }
       }
       function clearAiChatHistory() {
-        const confirmed = confirm("Clear all chat history? This action cannot be undone.");
+        const confirmed = confirm(
+          "Clear all chat history? This action cannot be undone.",
+        );
         if (confirmed) {
           aiChatMessages = [];
           renderBuilderAiChat();
