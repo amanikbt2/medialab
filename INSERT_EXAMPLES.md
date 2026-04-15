@@ -3,6 +3,7 @@
 ## Try These Commands in Your AI Chat
 
 ### Buttons
+
 - `insert a glowing button`
 - `insert a large cyan button with intense glow`
 - `insert a neon pink button with says "Click Me"`
@@ -11,6 +12,7 @@
 - `insert an orange button with bounce animation`
 
 ### Cards & Containers
+
 - `insert a glowing card`
 - `insert a purple card with shadow`
 - `insert a frosted glass card with blur effect`
@@ -19,6 +21,7 @@
 - `insert a rainbow gradient card`
 
 ### Shapes & Balls
+
 - `insert a glowing blue circle`
 - `insert a spinning neon green circle`
 - `insert a pulsing red ball with glow`
@@ -26,12 +29,14 @@
 - `insert a shimmering gold sphere`
 
 ### Text & Headings
+
 - `insert a large heading with shadow`
 - `insert text with glow effect`
 - `insert a bright pink heading`
 - `insert a glowing neon title`
 
 ### Complex Elements
+
 - `insert a glowing cyan button with intense neon glow`
 - `insert a large hero section with gradient background`
 - `insert a card with glowing edges and rainbow gradient`
@@ -39,6 +44,7 @@
 - `insert a button with hover state and smooth transitions`
 
 ### With Specific Styling
+
 - `insert a 2xl button with glow`
 - `insert a tiny input field with border`
 - `insert a button with says "Launch" and bright blue color`
@@ -46,6 +52,7 @@
 - `insert a button with intense purple neon glow`
 
 ### Animations
+
 - `insert a spinning circle`
 - `insert a bouncing button`
 - `insert an element with pulse animation`
@@ -53,6 +60,7 @@
 - `insert a shaking alert box`
 
 ### Effects Combined
+
 - `insert a glowing gradient button with animation`
 - `insert a frosted glass card with blur and shadow`
 - `insert a neon button with intense glow and rounded edges`
@@ -61,6 +69,7 @@
 ## What You Get
 
 Each command will create a fully styled element with:
+
 - ✅ The requested styling (colors, sizes, effects)
 - ✅ Proper positioning on the canvas
 - ✅ Smooth animations if requested
@@ -76,11 +85,13 @@ Each command will create a fully styled element with:
 5. **Use Colors:** red, blue, cyan, pink, purple, green, orange, yellow, etc.
 
 ## Color Names Supported
+
 - Red, Orange, Yellow, Green, Cyan, Blue, Purple, Pink
 - Magenta, Lime, Teal, Navy, Maroon, etc.
 - Or use hex: "#FF00FF"
 
 ## Effect Keywords
+
 - **Glow Effects:** glow, neon, luminous, glint, sparkle, radiant
 - **Gradients:** gradient, colorful, rainbow, multi-color, blend
 - **Shapes:** round, pill, circular, rounded, smooth
@@ -91,13 +102,15 @@ Each command will create a fully styled element with:
 ## Examples That Work
 
 ### ✅ Simple
+
 ```
 insert button
-insert glowing button  
+insert glowing button
 insert cyan button
 ```
 
 ### ✅ Intermediate
+
 ```
 insert large glowing cyan button
 insert card with shadow and glow
@@ -105,6 +118,7 @@ insert spinning blue circle
 ```
 
 ### ✅ Advanced
+
 ```
 insert a 2xl glowing neon cyan button with intense glow and rounded edges
 insert a frosted glass card with blur effect and rainbow gradient

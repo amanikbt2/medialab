@@ -1,26 +1,31 @@
 # AI Insert Agent - Flexible Element Creation Guide
 
 ## Overview
+
 The enhanced AI insert agent now supports creating any element with full control over HTML, CSS, styling, attributes, and animations. No more limitations!
 
 ## What You Can Do Now
 
 ### 1. **Glowing Buttons**
+
 ```
 "insert a glowing cyan button with intense glow and says Submit, size large"
 ```
 
 ### 2. **Custom Styled Elements**
+
 ```
 "insert a purple card with rounded edges, gradient background, and drop shadow"
 ```
 
-### 3. **Animated Elements** 
+### 3. **Animated Elements**
+
 ```
 "insert a spinning neon green circle with pulsing glow animation"
 ```
 
 ### 4. **Complex Layouts via AI**
+
 ```
 "insert a hero section with gradient background, centered title, and call-to-action button"
 ```
@@ -28,7 +33,9 @@ The enhanced AI insert agent now supports creating any element with full control
 ## How It Works
 
 ### For Quick Inserts
+
 Just say natural language like:
+
 - "insert glowing button"
 - "insert large neon pink card with glow"
 - "insert blue rounded container"
@@ -37,6 +44,7 @@ Just say natural language like:
 The system will automatically parse your description and create the element with the right styles.
 
 ### For Complex Custom Inserts (AI Agent)
+
 The AI can use the new `INSERT_ELEMENT_SPEC` action to create arbitrary elements:
 
 ```json
@@ -69,6 +77,7 @@ The AI can use the new `INSERT_ELEMENT_SPEC` action to create arbitrary elements
 ## Advanced Features
 
 ### Supported CSS Properties
+
 - `backgroundColor` / `background`
 - `color` (text color)
 - `borderRadius` (rounded corners)
@@ -79,6 +88,7 @@ The AI can use the new `INSERT_ELEMENT_SPEC` action to create arbitrary elements
 - Any other CSS property name in camelCase
 
 ### Supported Attributes
+
 - `onclick` - click handler
 - `data-*` - data attributes
 - `aria-*` - accessibility attributes
@@ -87,52 +97,65 @@ The AI can use the new `INSERT_ELEMENT_SPEC` action to create arbitrary elements
 - Any standard HTML attribute
 
 ### Effect Keywords
+
 The parser recognizes these natural language descriptions:
 
 **Glow Effects:**
+
 - "glow", "luminous", "radiant", "neon", "shiny", "glint", "sparkle"
 
 **Gradients:**
+
 - "gradient", "multi-color", "colorful", "rainbow", "blend", "fade"
 
 **Shapes:**
+
 - "round", "rounded", "circular", "pill", "smooth", "curve"
 
 **Decorations:**
+
 - "border", "outline", "stroke", "edge", "frame"
 
 **Glass/Transparency:**
+
 - "blur", "frosted", "glass", "transparent", "see-through"
 
 **Animations:**
+
 - "animate", "spin", "rotate", "bounce", "pulse", "float", "wave", "vibrate", "shake", "scale"
 
 **Sizes:**
+
 - Tiny, Mini, Small, Compact, Medium, Large, XL, Huge, Big, 2XL, 3XL
 
 ## Example Commands
 
 ### Glowing Cyan Button with Text
+
 ```
 insert a large glowing cyan button with intense neon glow and says "Launch App", size 2xl
 ```
 
 ### Rainbow Gradient Card
+
 ```
 insert a colorful gradient card with rounded edges and shadow, medium size, with rainbow blend
 ```
 
 ### Spinning Loading Spinner
+
 ```
 insert a spinning blue circle with pulsing glow animation
 ```
 
 ### Frosted Glass Container
+
 ```
 insert a frosted glass container with blur effect and smooth rounded edges
 ```
 
 ### Multi-colored Animated Ball
+
 ```
 insert a large bouncing circle with multi-color gradient and glowing edges
 ```
@@ -140,11 +163,13 @@ insert a large bouncing circle with multi-color gradient and glowing edges
 ## Technical Implementation
 
 ### Action Block Format
+
 ```
 [ACTION]{INSERT_ELEMENT_SPEC}JSON_PAYLOAD[/ACTION]
 ```
 
 ### JSON Schema
+
 ```json
 {
   "type": "INSERT_ELEMENT_SPEC",
@@ -185,6 +210,7 @@ insert a hero section with a gradient background from blue to purple, centered h
 ```
 
 The AI will intelligently break this down into:
+
 - Background gradient
 - Heading text
 - Call-to-action button with glow
@@ -196,13 +222,13 @@ All positioned correctly on the canvas!
 
 ## Quick Reference: What Changed
 
-| Before | Now |
-|--------|-----|
-| Limited element types | Any HTML possible |
-| Basic styling | Full CSS control |
-| No animations | Animation support |
-| Predefined colors | Any color + effects |
-| No custom attributes | Full attribute support |
-| Manual positioning | Flexible positioning |
+| Before                | Now                    |
+| --------------------- | ---------------------- |
+| Limited element types | Any HTML possible      |
+| Basic styling         | Full CSS control       |
+| No animations         | Animation support      |
+| Predefined colors     | Any color + effects    |
+| No custom attributes  | Full attribute support |
+| Manual positioning    | Flexible positioning   |
 
 Enjoy creating with maximum flexibility! 🚀

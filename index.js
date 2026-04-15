@@ -4231,22 +4231,6 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-app.get("/api/ai/models", async (req, res) => {
-  try {
-    await refreshAIModelsRegistryIfNeeded(false);
-    const models = await AIModel.find({})
-      .sort({ priority: 1, modelId: 1 })
-      .select("modelId provider priority isActive status lastTested")
-      .lean();
-    res.json({ success: true, models });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message || "Could not load AI model registry.",
-    });
-  }
-});
-
 app.post("/api/ai/chat-edit", async (req, res) => {
   try {
     await refreshAIModelsRegistryIfNeeded(false);
@@ -4826,6 +4810,342 @@ function sanitizeAutoFixHTML(html = "") {
 
   return content;
 }
+
+// BEST AI MODEL ENDPOINT - Auto-selects best available model (Xtra AI)
+// Tests all models in parallel and returns the best performing one
+app.post("/api/ai/best-model", async (req, res) => {
+  try {
+    if (!req.isAuthenticated?.() || !req.user?._id) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Login required." });
+    }
+
+    const userInput = String(req.body?.userInput || "").trim();
+    const currentCode = String(req.body?.currentCanvasCode || "").trim();
+
+    // Handle warmup requests (pre-cache best model selection)
+    if (userInput === "warmup") {
+      await refreshAIModelsRegistryIfNeeded(false);
+      return res.json({
+        success: true,
+        message: "Xtra AI cache warmed",
+        mode: "warmup",
+      });
+    }
+
+    if (!userInput) {
+      return res
+        .status(400)
+        .json({ success: false, message: "User input is required." });
+    }
+
+    await refreshAIModelsRegistryIfNeeded(false);
+
+    let models = await AIModel.find({ isActive: true, status: "online" })
+      .sort({ priority: 1, modelId: 1 })
+      .lean();
+
+    models = buildEligibleAiModels(models);
+
+    if (!models.length) {
+      return res.status(503).json({
+        success: false,
+        message: "No external AI models available. Fallback to internal.",
+      });
+    }
+
+    // Test all models in parallel to find the best one
+    const testPromises = models.map(async (model) => {
+      try {
+        const modelId = String(model?.modelId || "").trim();
+        const apiKey = process.env.GROQ_API_KEY;
+
+        if (!apiKey) return { model, success: false, responseTime: Infinity };
+
+        const startTime = Date.now();
+        const response = await nodeFetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: modelId,
+              messages: [
+                {
+                  role: "system",
+                  content: "You are MediaLab AI assistant.",
+                },
+                {
+                  role: "user",
+                  content: `Respond briefly: ${userInput.slice(0, 100)}`,
+                },
+              ],
+              temperature: 0.7,
+              max_tokens: 100,
+            }),
+            timeout: 8000,
+          },
+        );
+
+        const responseTime = Date.now() - startTime;
+        const data = await response.json();
+
+        if (response.ok && data?.choices?.[0]?.message?.content) {
+          return {
+            model,
+            success: true,
+            responseTime,
+            content: data.choices[0].message.content,
+          };
+        }
+
+        return { model, success: false, responseTime: Infinity };
+      } catch (error) {
+        return { model, success: false, responseTime: Infinity };
+      }
+    });
+
+    const results = await Promise.all(testPromises);
+
+    // Filter successful responses and sort by response time
+    const successful = results
+      .filter((r) => r.success)
+      .sort((a, b) => a.responseTime - b.responseTime);
+
+    if (!successful.length) {
+      return res.status(503).json({
+        success: false,
+        message: "All external models failed. Using internal AI.",
+      });
+    }
+
+    const bestModel = successful[0];
+    const modelId = bestModel.model.modelId;
+
+    // Save best model selection to database for future use
+    try {
+      await AIModel.updateOne(
+        { modelId },
+        {
+          $set: {
+            lastTested: new Date(),
+            status: "online",
+          },
+        },
+      );
+    } catch {}
+
+    // Use the best model to generate full response
+    const fullResponse = await nodeFetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: modelId,
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are MediaLab AI - a visual builder assistant. Help user with canvas modifications, element insertion, and styling.",
+            },
+            {
+              role: "user",
+              content: `Canvas:\n${currentCode.slice(0, 1000)}\n\nRequest: ${userInput}`,
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 500,
+        }),
+        timeout: 30000,
+      },
+    ).then((r) => r.json());
+
+    if (!fullResponse?.choices?.[0]?.message?.content) {
+      // Fall back to next best model
+      if (successful.length > 1) {
+        const nextBest = successful[1];
+        const nextResponse = await nodeFetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: nextBest.model.modelId,
+              messages: [
+                {
+                  role: "system",
+                  content:
+                    "You are MediaLab AI - a visual builder assistant. Help with canvas modifications.",
+                },
+                {
+                  role: "user",
+                  content: `Canvas:\n${currentCode.slice(0, 1000)}\n\nRequest: ${userInput}`,
+                },
+              ],
+              temperature: 0.7,
+              max_tokens: 500,
+            }),
+            timeout: 30000,
+          },
+        ).then((r) => r.json());
+
+        return res.json({
+          success: true,
+          content: nextResponse?.choices?.[0]?.message?.content || "",
+          modelUsed: nextBest.model.modelId,
+          provider: nextBest.model.provider,
+          attempt: "secondary",
+        });
+      }
+
+      return res.status(503).json({
+        success: false,
+        message: "Best model response generation failed.",
+      });
+    }
+
+    return res.json({
+      success: true,
+      content: fullResponse.choices[0].message.content,
+      modelUsed: modelId,
+      provider: bestModel.model.provider,
+      responseTime: bestModel.responseTime,
+    });
+  } catch (error) {
+    console.error("Best model endpoint error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// XTRA AI ENDPOINT - Auto-selects best available model by testing all in parallel
+app.post("/api/ai/best-model", async (req, res) => {
+  try {
+    if (!req.isAuthenticated?.() || !req.user?._id) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Login required." });
+    }
+
+    const userInput = String(req.body?.userInput || "").trim();
+    const currentCode = String(req.body?.currentCanvasCode || "").trim();
+    const requestedModelId = String(req.body?.modelId || "").trim();
+
+    if (!userInput) {
+      return res
+        .status(400)
+        .json({ success: false, message: "User input is required." });
+    }
+
+    // Use existing AI model infrastructure but specifically route to external models
+    await refreshAIModelsRegistryIfNeeded(false);
+
+    let models = await AIModel.find({ isActive: true })
+      .sort({ priority: 1, status: -1, modelId: 1 })
+      .lean();
+    models = buildEligibleAiModels(models);
+
+    if (!models.length) {
+      return res.status(503).json({
+        success: false,
+        message: "No external AI models available. Fallback to internal.",
+      });
+    }
+
+    // If a specific model was requested, prioritize it
+    if (requestedModelId) {
+      const requestedModel = models.find(
+        (m) => String(m?.modelId || "") === requestedModelId,
+      );
+      if (requestedModel) {
+        models = [
+          requestedModel,
+          ...models.filter(
+            (m) => String(m?.modelId || "") !== requestedModelId,
+          ),
+        ];
+      }
+    }
+
+    // Try to use first available model from existing infrastructure
+    for (const model of models) {
+      try {
+        const modelId = String(model?.modelId || "").trim();
+        const provider = String(model?.provider || "").trim();
+        const apiKeyField = String(model?.apiKeyField || "").trim();
+        const apiKey = process.env[apiKeyField] || GROQ_API_KEY;
+
+        if (!apiKey) {
+          console.warn(`No API key found for model ${modelId}, skipping...`);
+          continue;
+        }
+
+        // Call existing external model infrastructure
+        const modelResponse = await nodeFetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: modelId,
+              messages: [
+                {
+                  role: "system",
+                  content:
+                    "You are MediaLab AI - a visual builder assistant. Help user with canvas modifications, element insertion, and styling.",
+                },
+                {
+                  role: "user",
+                  content: `Canvas:\n${currentCode.slice(0, 1000)}\n\nRequest: ${userInput}`,
+                },
+              ],
+              temperature: 0.7,
+              max_tokens: 500,
+            }),
+            timeout: 30000,
+          },
+        ).then((r) => r.json());
+
+        if (!modelResponse?.choices?.[0]?.message?.content) {
+          continue; // Try next model
+        }
+
+        const content = modelResponse.choices[0].message.content.trim();
+
+        return res.json({
+          success: true,
+          content: content,
+          modelUsed: modelId,
+          provider: provider,
+        });
+      } catch (modelError) {
+        console.error(`Model ${model.modelId} failed:`, modelError.message);
+        continue; // Try next model
+      }
+    }
+
+    return res.status(503).json({
+      success: false,
+      message: "All external models failed. Fallback to internal Workflow AI.",
+    });
+  } catch (error) {
+    console.error("External AI endpoint error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 app.post("/api/ai/autofix", async (req, res) => {
   try {

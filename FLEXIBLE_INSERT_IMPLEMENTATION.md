@@ -7,13 +7,16 @@ You now have a **flexible AI insert agent** that can create any element with ful
 ### ✅ New Capabilities
 
 #### 1. **Enhanced Natural Language Parsing**
+
 The system now understands complex descriptions like:
+
 - `"insert a glowing cyan button with text 'Submit'"`
 - `"insert a large neon pink card with intense glow and rounded edges"`
 - `"insert a spinning blue circle with pulsing animation"`
 - `"insert a frosted glass container with blur effect"`
 
 #### 2. **New INSERT_ELEMENT_SPEC Action Block**
+
 AI can now use the new `INSERT_ELEMENT_SPEC` action to create arbitrary elements:
 
 ```json
@@ -39,6 +42,7 @@ AI can now use the new `INSERT_ELEMENT_SPEC` action to create arbitrary elements
 #### 3. **Supported Effects & Features**
 
 **Visual Effects:**
+
 - ✅ Glowing/neon effects (with intensity control)
 - ✅ Gradients (multi-color, rainbow, blend)
 - ✅ Rounded corners & pills
@@ -48,6 +52,7 @@ AI can now use the new `INSERT_ELEMENT_SPEC` action to create arbitrary elements
 - ✅ Transparent/translucent elements
 
 **Animations:**
+
 - ✅ Spin/rotate
 - ✅ Bounce
 - ✅ Pulse/glow
@@ -57,21 +62,24 @@ AI can now use the new `INSERT_ELEMENT_SPEC` action to create arbitrary elements
 - ✅ Custom keyframes
 
 **Sizing:**
+
 - ✅ Tiny, Mini, Small, Compact, Medium, Large, XL, Huge, 2XL, 3XL
 - ✅ Custom pixel sizes
 - ✅ Dynamic sizing from descriptions
 
 **Styling:**
+
 - ✅ Any CSS property (camelCase)
 - ✅ Custom colors (named, hex, rgb)
 - ✅ Font styling (weight, size, family)
-- ✅ Custom attributes (onclick, data-*, aria-*, etc.)
+- ✅ Custom attributes (onclick, data-_, aria-_, etc.)
 - ✅ CSS classes
 - ✅ Element IDs
 
 #### 4. **How It Works**
 
 **Quick Insert (Deterministic):**
+
 ```
 User: "insert glowing cyan button"
 ↓
@@ -83,6 +91,7 @@ Element is created and added to canvas immediately
 ```
 
 **Complex Insert (AI-Powered):**
+
 ```
 User: "insert a hero section with gradient, heading, and glowing button"
 ↓
@@ -100,6 +109,7 @@ Multiple elements can be inserted in one command
 ## Code Changes
 
 ### New Functions
+
 1. **`applyInsertElementSpec(specJson)`** - Processes and applies INSERT_ELEMENT_SPEC actions
    - Location: `views/index.ejs` (line ~32770)
    - Parses HTML, CSS, styles, attributes, animations
@@ -116,6 +126,7 @@ Multiple elements can be inserted in one command
    - Shows INSERT_ELEMENT_SPEC format with examples
 
 ### Modified Functions
+
 1. **`executeAIActions()`** - Added INSERT_ELEMENT_SPEC handler
    - Detects INSERT_ELEMENT_SPEC action blocks
    - Calls applyInsertElementSpec() for processing
@@ -126,6 +137,7 @@ Multiple elements can be inserted in one command
    - Better fallback handling
 
 ## Files Added
+
 - **`INSERT_ELEMENT_SPEC_GUIDE.md`** - Comprehensive user guide with examples
 
 ## Example Commands
@@ -144,11 +156,13 @@ insert three glowing buttons arranged horizontally
 ## Technical Details
 
 ### Action Block Format
+
 ```
 [ACTION]{INSERT_ELEMENT_SPEC}JSON_PAYLOAD[/ACTION]
 ```
 
 ### JSON Schema
+
 ```json
 {
   "type": "INSERT_ELEMENT_SPEC",
@@ -200,7 +214,7 @@ The insert command is now **truly flexible and powerful**! 🚀
 - [ ] AI INSERT_ELEMENT_SPEC responses are parsed correctly
 - [ ] Elements appear on canvas with correct styles
 - [ ] CSS animations work properly
-- [ ] Attributes (onclick, data-*) are applied
+- [ ] Attributes (onclick, data-\*) are applied
 - [ ] Multiple inserts in one command work
 - [ ] Canvas sync works after insertion
 - [ ] Effects (glow, gradient, blur) render correctly
