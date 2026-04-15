@@ -6507,7 +6507,11 @@
       let marketplaceTemplateCaptureLibPromise = null;
       let marketplaceTemplateScreenshotAutoCapturing = false;
       let builderTemplateGridExpanded = false;
-      const LOGIN_REQUIRED_TOOL_IDS = ["console", "data-explorer", "database-manager"];
+      const LOGIN_REQUIRED_TOOL_IDS = [
+        "console",
+        "data-explorer",
+        "database-manager",
+      ];
       const PREMIUM_TOOL_IDS = [];
       function normalizeHostedBaseUrl(url = "") {
         return String(url || "")
@@ -20553,8 +20557,7 @@
         // =============================================================
         else if (id === "data-explorer") {
           html = `<div></div>`;
-        }
-        else if (id === "database-manager") {
+        } else if (id === "database-manager") {
           html = `
             <div class="animate-fadeIn h-full">
               <div class="max-w-6xl mx-auto min-h-full space-y-6 sm:space-y-8 p-6">
@@ -20569,8 +20572,7 @@
               </div>
             </div>
           `;
-        }
-        else if (id === "__removed_text_doc__") {
+        } else if (id === "__removed_text_doc__") {
           html = `
             <div id="word-processor-container" class="word-processor-shell animate-fadeIn">
                 <div id="word-processor-welcome" class="studio-launch-overlay">
@@ -26074,7 +26076,7 @@ console.log("Triggered ${eventName}", { source, event });
               Math.max(canvas.scrollWidth || visibleWidth, width) - width;
             const targetLeft = Math.max(
               0,
-              Math.min(maxLeft, Math.round(visibleCenterX - width / 2)),
+              Math.min(maxLeft, Math.round(visibleCenterX - width / 2 + 80)),
             );
             normalizedStyles.left = `${targetLeft}px`;
           }
@@ -26083,7 +26085,7 @@ console.log("Triggered ${eventName}", { source, event });
               Math.max(canvas.scrollHeight || visibleHeight, height) - height;
             const targetTop = Math.max(
               0,
-              Math.min(maxTop, Math.round(visibleCenterY - height / 2)),
+              Math.min(maxTop, Math.round(visibleCenterY - height / 2 + 80)),
             );
             normalizedStyles.top = `${targetTop}px`;
           }

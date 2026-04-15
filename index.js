@@ -4757,6 +4757,43 @@ app.post("/api/ai/manager", async (req, res) => {
   }
 });
 
+// Helper: Extract HTML from AI response that might contain conversational text
+function extractHTMLFromResponse(text = "") {
+  const content = String(text || "").trim();
+  
+  // Try to extract from HTML code blocks first (```html ... ```)
+  const htmlBlockMatch = content.match(/```html\s*([\s\S]*?)```/i);
+  if (htmlBlockMatch?.[1]) {
+    const extracted = htmlBlockMatch[1].trim();
+    if (extracted.includes("<")) return extracted;
+  }
+  
+  // Try generic code blocks (``` ... ```)
+  const codeBlockMatch = content.match(/```\s*([\s\S]*?)```/);
+  if (codeBlockMatch?.[1]) {
+    const extracted = codeBlockMatch[1].trim();
+    if (extracted.includes("<")) return extracted;
+  }
+  
+  // Find first < and take everything from there (line-based to avoid partial tags)
+  const firstTagIndex = content.indexOf("<");
+  if (firstTagIndex >= 0) {
+    const extracted = content.substring(firstTagIndex).trim();
+    // Verify it looks like HTML
+    if (/<[a-zA-Z][^>]*>/i.test(extracted)) {
+      return extracted;
+    }
+  }
+  
+  // If content starts with < (likely pure HTML)
+  if (content.startsWith("<")) {
+    return content;
+  }
+  
+  // Fallback: return empty if no HTML found
+  return "";
+}
+
 app.post("/api/ai/autofix", async (req, res) => {
   try {
     await refreshAIModelsRegistryIfNeeded(false);
@@ -4847,11 +4884,11 @@ app.post("/api/ai/autofix", async (req, res) => {
                 {
                   role: "system",
                   content:
-                    "You are the MediaLab Canvas Perfectionist - expert at forming flawless canvas objects. Your mission:\n\n1. PIXEL-PERFECT POSITIONING: Every canvas element MUST have inline style='position: absolute; left: Npx; top: Npx; width: Npx; height: Npx; '. NEVER use percentages, auto, or relative positioning.\n2. MINIMUM DIMENSIONS: All elements minimum 32px width and 32px height for professional handle attachment and dragging.\n3. DRAG/RESIZE READY: Elements must be independently positioned, not in flex/grid containers. Use absolute positioning only. No layout reflow.\n4. ELEMENT INTEGRITY: Each element self-contained with explicit dimensions. No inherited sizing or content reflow.\n5. VISUAL PERFECTION: Fix all z-index conflicts, overlapping issues. Ensure proper visual hierarchy and stacking.\n6. VISIBILITY GUARANTEE: Do NOT output invisible elements unless explicitly asked. Never use opacity:0, visibility:hidden, display:none, transparent text on transparent background.\n7. CODE PURITY: Remove all editor artifacts, contenteditable attributes, data-builder-* attributes. Only keep data-canvas-element and data-element-id.\n8. ID PRESERVATION: Keep all 'ml-container' and 'ml-content' IDs and important data-* attributes for builder integration.\n9. PERFORMANCE: Minified CSS, inline critical styles, no external dependencies.\n\nReturn ONLY valid HTML with pixel-perfect inline styles. No markdown, no code blocks, no backticks. Pure production-ready canvas HTML.",
+                    "You are the MediaLab Canvas Perfectionist. Your ONLY task is to output pixel-perfect HTML.\n\nCRITICAL RULES:\n1. Output NOTHING but valid HTML. No conversation, no explanations, no preamble, no closing text.\n2. Every element: style='position: absolute; left: Npx; top: Npx; width: Npx; height: Npx;' (pixel values only)\n3. Minimum 32px width and height for all elements\n4. No percentages, auto, relative positioning, flex, or grid\n5. Remove contenteditable, data-builder-*, editor artifacts\n6. Keep data-canvas-element, data-element-id, ml-container, ml-content IDs\n7. Fix all z-index conflicts and visibility issues\n8. Never use opacity:0, visibility:hidden, display:none\n9. Start immediately with HTML: no introduction\n10. End immediately after closing tag: no closing remarks\n\nYour response format MUST be ONLY the HTML code, nothing else.",
                 },
                 {
                   role: "user",
-                  content: `Professional auto-fix this canvas code for production. Make it responsive, pixel-perfect, and modern:\n\n${currentCode}`,
+                  content: `ONLY output the fixed HTML. No text before or after:\n\n${currentCode}`,
                 },
               ],
             }),
@@ -4874,7 +4911,16 @@ app.post("/api/ai/autofix", async (req, res) => {
           throw new Error(
             `Auto-Fix returned empty content for ${model.modelId}.`,
           );
-        sanitizedContent = candidate;
+        
+        // Extract actual HTML from potentially conversational response
+        const extractedHTML = extractHTMLFromResponse(candidate);
+        if (!extractedHTML) {
+          throw new Error(
+            `Auto-Fix returned no valid HTML for ${model.modelId}. Got: ${candidate.slice(0, 100)}`,
+          );
+        }
+        
+        sanitizedContent = extractedHTML;
         selectedModel = model.modelId;
         await AIModel.updateOne(
           { _id: model._id },
