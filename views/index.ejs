@@ -1766,6 +1766,16 @@
         background: rgba(2, 6, 23, 0.76);
         backdrop-filter: blur(12px);
       }
+      .section-hidden {
+        display: none !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+      }
+      .section-active {
+        display: block !important;
+        pointer-events: auto !important;
+        visibility: visible !important;
+      }
       .builder-view-switcher-chip {
         border: 1px solid rgba(148, 163, 184, 0.28);
         border-radius: 999px;
@@ -28185,8 +28195,10 @@ console.log("Triggered ${eventName}", { source, event });
         const startRect = el.getBoundingClientRect();
         const startW = Math.max(30, Math.round(startRect.width)),
           startH = Math.max(30, Math.round(startRect.height));
-        const startL = el.offsetLeft,
-          startT = el.offsetTop;
+
+        // CRITICAL: Use style-based coordinates, not offsetLeft/Top (can be incorrect after import)
+        const startL = parseFloat(el.style.left) || el.offsetLeft || 0;
+        const startT = parseFloat(el.style.top) || el.offsetTop || 0;
 
         // Professional accurate grab offset: where user clicked on the element (viewport coords)
         const grabPointX = startX - startRect.left;
@@ -29036,7 +29048,12 @@ console.log("Triggered ${eventName}", { source, event });
             "collaboration-view-only",
             isCollaborationViewOnly(),
           );
+          // CRITICAL: Ensure sections are initialized and visible
           ensureBuilderSections({ skipHistory: true });
+          // Force render the section switcher after section setup
+          requestAnimationFrame(() => {
+            renderBuilderViewSwitcher();
+          });
           syncBuilderImportedGlobalStyle();
           scheduleSyncStyleTag();
         }
@@ -29158,22 +29175,32 @@ console.log("Triggered ${eventName}", { source, event });
           sections[0];
         const prevSectionId = currentActiveSectionId;
         currentActiveSectionId = target?.id || sections[0].id;
+        
+        // CRITICAL: Smooth section transitions with explicit hide/show
         sections.forEach((section) => {
           const isActive = section.id === currentActiveSectionId;
           if (isActive) {
+            // SHOW active section
             section.style.display = "block";
             section.style.opacity = "1";
             section.style.visibility = "visible";
             section.style.pointerEvents = "auto";
             section.style.zIndex = "100";
+            section.classList.add("section-active");
+            section.classList.remove("section-hidden");
           } else {
+            // HIDE inactive sections
             section.style.display = "none";
             section.style.opacity = "0";
             section.style.visibility = "hidden";
             section.style.pointerEvents = "none";
             section.style.zIndex = "0";
+            section.classList.add("section-hidden");
+            section.classList.remove("section-active");
           }
         });
+        
+        // Trigger UI update to refresh switcher buttons
         renderBuilderViewSwitcher();
         scheduleSyncStyleTag();
         if (!options.skipHistory) saveToHistory();
@@ -29358,6 +29385,33 @@ console.log("Triggered ${eventName}", { source, event });
           .forEach((entry, index) => {
             entry.el.style.zIndex = String(index + 1);
           });
+      }
+      function normalizeCanvasElementPositions() {
+        // CRITICAL: Ensure all canvas elements have explicit position styles
+        // This fixes displacement issues from code compilation
+        const elements = getCanvasTopLevelElements();
+        elements.forEach((el) => {
+          el.style.position = "absolute";
+
+          // Ensure left/top are set as numbers in px
+          const left = parseFloat(el.style.left);
+          const top = parseFloat(el.style.top);
+          const width = parseFloat(el.style.width);
+          const height = parseFloat(el.style.height);
+
+          if (isNaN(left) || el.style.left === "") {
+            el.style.left = (el.offsetLeft || 0) + "px";
+          }
+          if (isNaN(top) || el.style.top === "") {
+            el.style.top = (el.offsetTop || 0) + "px";
+          }
+          if (isNaN(width) || el.style.width === "") {
+            el.style.width = (el.offsetWidth || 100) + "px";
+          }
+          if (isNaN(height) || el.style.height === "") {
+            el.style.height = (el.offsetHeight || 100) + "px";
+          }
+        });
       }
       function shiftSelectedLayer(direction) {
         const targets = getSelectedBuilderTargets();
@@ -32879,9 +32933,7 @@ ${interactionBlock}
             }
             throw new Error(data.message || "Magic Auto-Fix failed.");
           }
-          aiActiveModel = String(
-            data.modelUsed || "openai/gpt-oss-120b",
-          );
+          aiActiveModel = String(data.modelUsed || "openai/gpt-oss-120b");
           if (data.modelRecoveryUsed) aiModelRecoveryInFlight = true;
           if (data.modelSwitchUsed && data.modelSwitchReason === "rate_limit") {
             aiModelSwitchingInFlight = true;
@@ -33166,6 +33218,7 @@ ${interactionBlock}
         ensureBuilderGuides(canvas);
         initCanvasSelection(canvas);
         const totalNodes = Math.max(1, Array.isArray(nodes) ? nodes.length : 0);
+        const canvasRect = canvas.getBoundingClientRect();
         nodes.forEach((node, index) => {
           if (!(node instanceof HTMLElement)) return;
           reportProgress?.(
@@ -33178,14 +33231,40 @@ ${interactionBlock}
           wrapper.setAttribute("data-type", type);
           wrapper.className =
             "canvas-element absolute group transition-shadow active:cursor-grabbing";
+
+          // CRITICAL: Extract exact positioning from imported node
           const importedStyleParts = node.classList?.contains("ml-container")
             ? {
                 wrapperStyle: node.getAttribute("style") || "",
                 contentStyle: "",
               }
             : splitImportedElementStyles(node.getAttribute("style") || "");
+
+          // Ensure position properties are absolute and properly formatted
           const wrapperStyle = importedStyleParts.wrapperStyle || "";
-          wrapper.setAttribute("style", wrapperStyle);
+          const styleRules = {};
+
+          // Parse existing style
+          wrapperStyle.split(";").forEach((rule) => {
+            const [key, value] = rule.split(":").map((s) => s.trim());
+            if (key && value) styleRules[key] = value;
+          });
+
+          // Force absolute positioning with fallbacks
+          if (!styleRules.position || styleRules.position !== "absolute") {
+            styleRules.position = "absolute";
+          }
+          if (!styleRules.left) styleRules.left = "0px";
+          if (!styleRules.top) styleRules.top = "0px";
+          if (!styleRules.width) styleRules.width = "auto";
+          if (!styleRules.height) styleRules.height = "auto";
+
+          // Rebuild inline style with normalized values
+          const normalizedStyle = Object.entries(styleRules)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join("; ");
+
+          wrapper.setAttribute("style", normalizedStyle);
           wrapper.innerHTML = `${buildEditorHandles(type)}<div class="element-body w-full h-full overflow-visible"></div>`;
           const body = wrapper.querySelector(".element-body");
           const importedContent = (
@@ -33210,8 +33289,58 @@ ${interactionBlock}
             .querySelectorAll("[contenteditable]")
             .forEach((editable) => editable.removeAttribute("contenteditable"));
           canvas.appendChild(wrapper);
+
+          // CRITICAL FIX: Verify and stabilize all position/size properties
+          // This prevents displacement in drag/resize operations
+          requestAnimationFrame(() => {
+            const compStyle = window.getComputedStyle(wrapper);
+
+            // Ensure position is absolute
+            if (compStyle.position !== "absolute") {
+              wrapper.style.position = "absolute";
+            }
+
+            // Get actual dimensions from rendered element
+            const rect = wrapper.getBoundingClientRect();
+            const computedW = parseFloat(compStyle.width);
+            const computedH = parseFloat(compStyle.height);
+            const computedL = parseFloat(compStyle.left);
+            const computedT = parseFloat(compStyle.top);
+
+            // Stabilize width with fallback
+            if (isNaN(computedW) || computedW < 30) {
+              wrapper.style.width = Math.max(30, rect.width || 200) + "px";
+            } else if (!wrapper.style.width || wrapper.style.width === "auto") {
+              wrapper.style.width = computedW + "px";
+            }
+
+            // Stabilize height with fallback
+            if (isNaN(computedH) || computedH < 30) {
+              wrapper.style.height = Math.max(30, rect.height || 100) + "px";
+            } else if (
+              !wrapper.style.height ||
+              wrapper.style.height === "auto"
+            ) {
+              wrapper.style.height = computedH + "px";
+            }
+
+            // Stabilize left position
+            if (isNaN(computedL)) {
+              wrapper.style.left = "0px";
+            } else if (!wrapper.style.left) {
+              wrapper.style.left = computedL + "px";
+            }
+
+            // Stabilize top position
+            if (isNaN(computedT)) {
+              wrapper.style.top = "0px";
+            } else if (!wrapper.style.top) {
+              wrapper.style.top = computedT + "px";
+            }
+          });
         });
         normalizeCanvasLayerOrder();
+        normalizeCanvasElementPositions();
         hydrateCanvasElements();
         deselectAll();
         updateBuilderUI();
