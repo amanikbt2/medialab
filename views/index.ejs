@@ -20051,8 +20051,6 @@
                     <div id="builder-panel-insert" class="builder-popover hidden">
                         <div class="builder-popover-grid">
                             <button id="insert-elements-trigger" onclick="toggleElementPicker(event); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-plus-circle text-cyan-400"></i><span>Elements<small>Open element library</small></span></button>
-                            <button onclick="insertStarterBlock('hero'); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-wand-magic-sparkles text-cyan-400"></i><span>Hero Block<small>Premium landing hero</small></span></button>
-                            <button onclick="insertStarterBlock('feature'); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-layer-group text-cyan-400"></i><span>Feature Row<small>Three-card section</small></span></button>
                         </div>
                     </div>
                     <div id="builder-panel-file" class="builder-popover hidden">
@@ -20098,14 +20096,8 @@
                         <div class="builder-popover-grid">
                             <button id="builder-template-candycrush" onclick="handleCandyCrushTemplateSelection(); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-candy-cane text-pink-400"></i><span>Candy Crush Game<small>Playable free game template</small></span></button>
                             <button id="builder-template-login" onclick="insertStarterBlock('login'); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-right-to-bracket text-cyan-400"></i><span>Login Form<small>Auth page starter</small></span></button>
-                            <button onclick="loadBuilderSiteTemplate('portfolio'); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-user-astronaut text-cyan-400"></i><span>Portfolio Site<small>Personal brand website</small></span></button>
-                            <button onclick="loadBuilderSiteTemplate('arcade'); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-gamepad text-cyan-400"></i><span>Game Launch<small>Arcade landing page</small></span></button>
-                            <button onclick="loadBuilderSiteTemplate('studio'); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-bezier-curve text-cyan-400"></i><span>Creative Studio<small>Agency homepage starter</small></span></button>
-                            <button onclick="insertStarterBlock('hero'); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-panorama text-cyan-400"></i><span>Landing Hero<small>Marketing homepage</small></span></button>
-                            <button onclick="insertStarterBlock('feature'); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-th-large text-cyan-400"></i><span>Features Section<small>Service showcase</small></span></button>
                             <button onclick="insertStarterBlock('contact'); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-envelope text-cyan-400"></i><span>Contact Form<small>Lead capture layout</small></span></button>
                             <button onclick="insertStarterBlock('pricing'); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-tags text-cyan-400"></i><span>Pricing Cards<small>Product pricing section</small></span></button>
-                            <button onclick="insertStarterBlock('dashboard'); hideBuilderPanels();" class="builder-cmd"><i class="fas fa-chart-line text-cyan-400"></i><span>Dashboard Hero<small>SaaS product starter</small></span></button>
                             <div id="builder-community-template-list" class="contents"></div>
                         </div>
                     </div>
@@ -22551,7 +22543,7 @@
       };
       let builderInteractionDraft = null;
       let builderInteractionPickMode = false;
-      let currentActiveSectionId = "section_main";
+      let currentActiveSectionId = "";
       let builderImportedGlobalCss = "";
       let builderLastSavedFingerprint = "";
       let aiChatMessages = [];
@@ -29334,6 +29326,7 @@ console.log("Triggered ${eventName}", { source, event });
           quickRunButton.title = "Run site";
         }
         if (canvas) {
+          repairAccidentalSectionState();
           canvas.classList.toggle("builder-grid", builderSnapEnabled);
           refreshCanvasBackground();
           applyBuilderViewportToCanvas();
@@ -29341,12 +29334,7 @@ console.log("Triggered ${eventName}", { source, event });
             "collaboration-view-only",
             isCollaborationViewOnly(),
           );
-          // CRITICAL: Ensure sections are initialized and visible
-          ensureBuilderSections({ skipHistory: true });
-          // Force render the section switcher after section setup
-          requestAnimationFrame(() => {
-            renderBuilderViewSwitcher();
-          });
+          renderBuilderViewSwitcher();
           syncBuilderImportedGlobalStyle();
           scheduleSyncStyleTag();
         }
@@ -29414,10 +29402,48 @@ console.log("Triggered ${eventName}", { source, event });
           child.classList?.contains("canvas-element"),
         );
       }
+      function getTopLevelCanvasElementForTarget(target) {
+        if (!(target instanceof HTMLElement)) return null;
+        const canvas = document.getElementById("web-canvas");
+        if (!canvas) return null;
+        let node = target.classList?.contains("canvas-element")
+          ? target
+          : target.closest(".canvas-element");
+        while (
+          node &&
+          node.parentElement &&
+          node.parentElement !== canvas &&
+          node.parentElement.closest?.(".canvas-element")
+        ) {
+          node = node.parentElement.closest(".canvas-element");
+        }
+        if (!node || node.parentElement !== canvas) return null;
+        return node;
+      }
       function getCanvasSectionElements() {
         return getCanvasTopLevelElements().filter(
-          (el) => String(el.dataset?.mlRole || "") === "section",
+          (el) =>
+            String(el.dataset?.mlRole || "") === "section" &&
+            String(el.id || "").toLowerCase().startsWith("section_"),
         );
+      }
+      function repairAccidentalSectionState() {
+        const elements = getCanvasTopLevelElements();
+        elements.forEach((el) => {
+          const isMarkedSection = String(el.dataset?.mlRole || "") === "section";
+          const hasSectionId = String(el.id || "")
+            .toLowerCase()
+            .startsWith("section_");
+          if (!isMarkedSection || hasSectionId) return;
+          delete el.dataset.mlRole;
+          delete el.dataset.sectionName;
+          if (el.style.display === "none") el.style.display = "block";
+          if (el.style.visibility === "hidden") el.style.visibility = "visible";
+          if ((parseFloat(el.style.opacity || "1") || 1) <= 0.06) {
+            el.style.opacity = "1";
+          }
+          if (el.style.pointerEvents === "none") el.style.pointerEvents = "auto";
+        });
       }
       function getBuilderSectionDisplayName(sectionEl) {
         if (!sectionEl) return "Section";
@@ -29500,88 +29526,13 @@ console.log("Triggered ${eventName}", { source, event });
         return currentActiveSectionId;
       }
       function ensureBuilderSections(options = {}) {
-        const canvas = document.getElementById("web-canvas");
-        if (!canvas) return;
-        let sections = getCanvasSectionElements();
-        if (!sections.length) {
-          const promoteCandidates = getCanvasTopLevelElements().filter(
-            (el) =>
-              String(el.getAttribute("data-type") || "").toLowerCase() ===
-              "div",
-          );
-          promoteCandidates.forEach((el, index) => {
-            el.dataset.mlRole = "section";
-            if (!el.dataset.sectionName) {
-              el.dataset.sectionName =
-                index === 0 ? "Main" : `Section ${index + 1}`;
-            }
-          });
-          sections = getCanvasSectionElements();
-          if (!sections.length) {
-            const main = createBuilderSectionElement("section_main", "Main");
-            canvas.appendChild(main);
-            sections = [main];
-          }
-        }
-        sections.forEach((section, index) => {
-          if (!section.id)
-            section.id = index === 0 ? "section_main" : `section_${index + 1}`;
-          section.dataset.mlRole = "section";
-          if (!section.dataset.sectionName) {
-            section.dataset.sectionName =
-              section.id === "section_main" ? "Main" : `Section ${index + 1}`;
-          }
-        });
-        if (
-          !sections.some((section) => section.id === currentActiveSectionId)
-        ) {
-          currentActiveSectionId =
-            sections.find((section) => section.id === "section_main")?.id ||
-            sections[0].id;
-        }
-        setActiveBuilderSection(currentActiveSectionId, {
-          skipHistory: true,
-          ...options,
-        });
+        renderBuilderViewSwitcher();
       }
       function renderBuilderViewSwitcher() {
         const shell = document.getElementById("builder-view-switcher");
         if (!shell) return;
-        const sections = getCanvasSectionElements();
-        if (!sections.length) {
-          shell.classList.add("hidden");
-          shell.innerHTML = "";
-          return;
-        }
-        shell.classList.remove("hidden");
-        let html =
-          '<span class="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 px-1">Sections</span>';
-        sections.forEach((section) => {
-          const isActive = section.id === currentActiveSectionId;
-          const label = escapeHtmlText(getBuilderSectionDisplayName(section));
-          const sectionId = escapeInlineJsString(section.id);
-          const activeClass = isActive ? " is-active" : "";
-          html +=
-            '<button type="button" onclick="setActiveBuilderSection(\'' +
-            sectionId +
-            '\', { skipHistory: true })" class="builder-view-switcher-chip' +
-            activeClass +
-            '"><span>' +
-            label +
-            "</span>";
-          if (isActive) {
-            html +=
-              '<div class="flex gap-1"><button class="builder-view-switcher-btn" onclick="event.stopPropagation(); renameBuilderSection(\'' +
-              sectionId +
-              '\');"><i class="fas fa-edit"></i></button><button class="builder-view-switcher-btn" onclick="event.stopPropagation(); deleteBuilderSection(\'' +
-              sectionId +
-              '\');"><i class="fas fa-trash"></i></button></div>';
-          }
-          html += "</button>";
-        });
-        html +=
-          '<button type="button" class="builder-view-switcher-chip" onclick="createNewBuilderSectionFromUI()" style="gap: 0.2rem; padding: 0.38rem 0.5rem;"><i class="fas fa-plus" style="font-size: 9px;"></i>New</button>';
-        shell.innerHTML = html;
+        shell.classList.add("hidden");
+        shell.innerHTML = "";
       }
       function renameBuilderSection(sectionId) {
         const section = document.getElementById(sectionId);
@@ -29734,41 +29685,52 @@ console.log("Triggered ${eventName}", { source, event });
         });
       }
       function shiftSelectedLayer(direction) {
-        const targets = getSelectedBuilderTargets();
+        repairAccidentalSectionState();
+        const targets = Array.from(
+          new Set(
+            getSelectedBuilderTargets()
+              .map((el) => getTopLevelCanvasElementForTarget(el))
+              .filter(Boolean),
+          ),
+        );
         if (!targets.length) return;
         const targetSet = new Set(targets);
         const allElements = getCanvasTopLevelElements();
         if (!allElements.length) return;
         normalizeCanvasLayerOrder();
-        const selectedLayers = targets.map((el) => getElementLayerValue(el));
-        const minLayer = Math.min(...selectedLayers);
-        const maxLayer = Math.max(...selectedLayers);
-        const siblingLayers = allElements
-          .filter((el) => !targetSet.has(el))
-          .map((el) => getElementLayerValue(el))
-          .sort((a, b) => a - b);
-        let delta = 0;
-        if (direction === "forward") {
-          const nextLayer = siblingLayers.find((value) => value > maxLayer);
-          delta = nextLayer ? nextLayer - maxLayer : 1;
+        const ordered = allElements
+          .map((el, index) => ({
+            el,
+            zIndex: getElementLayerValue(el),
+            index,
+          }))
+          .sort((a, b) => a.zIndex - b.zIndex || a.index - b.index)
+          .map((entry) => entry.el);
+        const step = direction === "backward" ? -1 : 1;
+        let didMove = false;
+        if (step > 0) {
+          for (let i = ordered.length - 2; i >= 0; i -= 1) {
+            if (!targetSet.has(ordered[i]) || targetSet.has(ordered[i + 1])) {
+              continue;
+            }
+            [ordered[i], ordered[i + 1]] = [ordered[i + 1], ordered[i]];
+            didMove = true;
+          }
         } else {
-          const previousLayers = siblingLayers.filter(
-            (value) => value < minLayer,
-          );
-          const previousLayer = previousLayers.length
-            ? previousLayers[previousLayers.length - 1]
-            : null;
-          delta =
-            previousLayer !== null ? previousLayer - minLayer : 1 - minLayer;
+          for (let i = 1; i < ordered.length; i += 1) {
+            if (!targetSet.has(ordered[i]) || targetSet.has(ordered[i - 1])) {
+              continue;
+            }
+            [ordered[i], ordered[i - 1]] = [ordered[i - 1], ordered[i]];
+            didMove = true;
+          }
         }
-        if (delta === 0) return;
-        targets.forEach((el) => {
-          const nextLayer = Math.max(1, getElementLayerValue(el) + delta);
-          el.style.zIndex = String(nextLayer);
+        if (!didMove) return;
+        ordered.forEach((el, index) => {
+          el.style.zIndex = String(index + 1);
         });
-        normalizeCanvasLayerOrder();
         syncSelectedElementState();
-        saveToHistory();
+        saveToHistory({ skipUiRefresh: true });
       }
       function toggleSelectedLock() {
         const targets =
@@ -34740,6 +34702,9 @@ ${interactionBlock}
           previewShell
             .querySelectorAll(".resizer")
             .forEach((node) => node.remove());
+          previewShell
+            .querySelectorAll(".builder-selection-chip")
+            .forEach((node) => node.remove());
           const toolbar = previewShell.querySelector(".absolute.-top-10");
           if (toolbar) toolbar.remove();
           previewShell.dataset.preview = "true";
@@ -34887,8 +34852,9 @@ ${interactionBlock}
           saveToHistory();
         }
       }
-      function saveToHistory() {
+      function saveToHistory(options = {}) {
         const canvas = document.getElementById("web-canvas");
+        const skipUiRefresh = Boolean(options?.skipUiRefresh);
         syncStyleTag();
         persistActiveBuilderFileContent();
         const snapshot = {
@@ -34907,7 +34873,7 @@ ${interactionBlock}
         historyStack.push(snapshot);
         historyIndex++;
         if (builderCodeMode) refreshBuilderCodeMode();
-        updateBuilderUI();
+        if (!skipUiRefresh) updateBuilderUI();
         scheduleCollaborationContentSync("history", 120);
       }
       function changeInspectorPage(dir) {
