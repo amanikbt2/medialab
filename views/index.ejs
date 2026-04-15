@@ -1667,7 +1667,8 @@
         box-shadow: 0 8px 32px rgba(2, 6, 23, 0.28);
       }
       .ai-thinking-task.complete {
-        animation: aiTaskFadeOut 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        animation: aiTaskFadeOut 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)
+          forwards;
       }
       .ai-task-dot {
         display: inline-block;
@@ -1684,7 +1685,8 @@
         box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
       }
       @keyframes aiTaskPulse {
-        0%, 100% {
+        0%,
+        100% {
           opacity: 0.6;
           transform: scale(1);
         }
@@ -1785,7 +1787,9 @@
         border-color: rgba(34, 211, 238, 0.55);
         background: rgba(6, 182, 212, 0.25);
         color: #67e8f9;
-        box-shadow: 0 0 20px rgba(34, 211, 238, 0.25), inset 0 0 1px rgba(34, 211, 238, 0.5);
+        box-shadow:
+          0 0 20px rgba(34, 211, 238, 0.25),
+          inset 0 0 1px rgba(34, 211, 238, 0.5);
       }
       .builder-view-switcher-btn {
         width: 18px;
@@ -1814,7 +1818,9 @@
       .builder-section-view {
         position: absolute;
         inset: 0;
-        transition: opacity 0.3s ease, visibility 0.3s ease;
+        transition:
+          opacity 0.3s ease,
+          visibility 0.3s ease;
         opacity: 0;
         visibility: hidden;
         pointer-events: none;
@@ -1826,8 +1832,14 @@
         animation: builderSectionFadeIn 0.3s ease;
       }
       @keyframes builderSectionFadeIn {
-        from { opacity: 0; filter: brightness(0.95); }
-        to { opacity: 1; filter: brightness(1); }
+        from {
+          opacity: 0;
+          filter: brightness(0.95);
+        }
+        to {
+          opacity: 1;
+          filter: brightness(1);
+        }
       }
       .ai-chat-popup {
         position: fixed;
@@ -28153,15 +28165,15 @@ console.log("Triggered ${eventName}", { source, event });
         }
         const selectionStarts = movingSelection
           ? selectedElements.map((item) => {
-            const itemRect = item.getBoundingClientRect();
-            return {
-              el: item,
-              left: item.offsetLeft,
-              top: item.offsetTop,
-              grabX: startX - itemRect.left,
-              grabY: startY - itemRect.top,
-            };
-          })
+              const itemRect = item.getBoundingClientRect();
+              return {
+                el: item,
+                left: item.offsetLeft,
+                top: item.offsetTop,
+                grabX: startX - itemRect.left,
+                grabY: startY - itemRect.top,
+              };
+            })
           : [];
         const rType = e.target.classList[1];
         const snap = (value) =>
@@ -28206,17 +28218,45 @@ console.log("Triggered ${eventName}", { source, event });
           } else {
             // Professional smooth drag: element follows grab point exactly
             const curElRect = el.getBoundingClientRect();
-            const nextLeft = snap(ev.clientX - canvasRect.left + (canvas.scrollLeft || 0) - grabPointX);
-            const nextTop = snap(ev.clientY - canvasRect.top + (canvas.scrollTop || 0) - grabPointY);
-            
+            const nextLeft = snap(
+              ev.clientX -
+                canvasRect.left +
+                (canvas.scrollLeft || 0) -
+                grabPointX,
+            );
+            const nextTop = snap(
+              ev.clientY -
+                canvasRect.top +
+                (canvas.scrollTop || 0) -
+                grabPointY,
+            );
+
             if (movingSelection) {
               selectionStarts.forEach((item) => {
-                const itemNextLeft = snap(ev.clientX - canvasRect.left + (canvas.scrollLeft || 0) - item.grabX);
-                const itemNextTop = snap(ev.clientY - canvasRect.top + (canvas.scrollTop || 0) - item.grabY);
-                
-                const clampedLeft = clamp(itemNextLeft, 50, canvas.clientWidth - item.el.offsetWidth);
-                const clampedTop = clamp(itemNextTop, 0, canvas.scrollHeight - item.el.offsetHeight);
-                
+                const itemNextLeft = snap(
+                  ev.clientX -
+                    canvasRect.left +
+                    (canvas.scrollLeft || 0) -
+                    item.grabX,
+                );
+                const itemNextTop = snap(
+                  ev.clientY -
+                    canvasRect.top +
+                    (canvas.scrollTop || 0) -
+                    item.grabY,
+                );
+
+                const clampedLeft = clamp(
+                  itemNextLeft,
+                  50,
+                  canvas.clientWidth - item.el.offsetWidth,
+                );
+                const clampedTop = clamp(
+                  itemNextTop,
+                  0,
+                  canvas.scrollHeight - item.el.offsetHeight,
+                );
+
                 item.el.style.left = clampedLeft + "px";
                 item.el.style.top = clampedTop + "px";
               });
@@ -28241,10 +28281,18 @@ console.log("Triggered ${eventName}", { source, event });
                 activeLayoutPreview = null;
                 clearLayoutDropGuides();
               }
-              
-              const clampedLeft = clamp(nextLeft, 50, canvas.clientWidth - el.offsetWidth);
-              const clampedTop = clamp(nextTop, 0, canvas.scrollHeight - el.offsetHeight);
-              
+
+              const clampedLeft = clamp(
+                nextLeft,
+                50,
+                canvas.clientWidth - el.offsetWidth,
+              );
+              const clampedTop = clamp(
+                nextTop,
+                0,
+                canvas.scrollHeight - el.offsetHeight,
+              );
+
               el.style.left = clampedLeft + "px";
               el.style.top = clampedTop + "px";
             }
@@ -29136,26 +29184,40 @@ console.log("Triggered ${eventName}", { source, event });
           return;
         }
         shell.classList.remove("hidden");
-        let html = '<span class="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 px-1">Sections</span>';
+        let html =
+          '<span class="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 px-1">Sections</span>';
         sections.forEach((section) => {
           const isActive = section.id === currentActiveSectionId;
           const label = escapeHtmlText(getBuilderSectionDisplayName(section));
           const sectionId = escapeInlineJsString(section.id);
-          const activeClass = isActive ? ' is-active' : '';
-          html += '<button type="button" onclick="setActiveBuilderSection(\'' + sectionId + '\', { skipHistory: true })" class="builder-view-switcher-chip' + activeClass + '"><span>' + label + '</span>';
+          const activeClass = isActive ? " is-active" : "";
+          html +=
+            '<button type="button" onclick="setActiveBuilderSection(\'' +
+            sectionId +
+            '\', { skipHistory: true })" class="builder-view-switcher-chip' +
+            activeClass +
+            '"><span>' +
+            label +
+            "</span>";
           if (isActive) {
-            html += '<div class="flex gap-1"><button class="builder-view-switcher-btn" onclick="event.stopPropagation(); renameBuilderSection(\'' + sectionId + '\');"><i class="fas fa-edit"></i></button><button class="builder-view-switcher-btn" onclick="event.stopPropagation(); deleteBuilderSection(\'' + sectionId + '\');"><i class="fas fa-trash"></i></button></div>';
+            html +=
+              '<div class="flex gap-1"><button class="builder-view-switcher-btn" onclick="event.stopPropagation(); renameBuilderSection(\'' +
+              sectionId +
+              '\');"><i class="fas fa-edit"></i></button><button class="builder-view-switcher-btn" onclick="event.stopPropagation(); deleteBuilderSection(\'' +
+              sectionId +
+              '\');"><i class="fas fa-trash"></i></button></div>';
           }
-          html += '</button>';
+          html += "</button>";
         });
-        html += '<button type="button" class="builder-view-switcher-chip" onclick="createNewBuilderSectionFromUI()" style="gap: 0.2rem; padding: 0.38rem 0.5rem;"><i class="fas fa-plus" style="font-size: 9px;"></i>New</button>';
+        html +=
+          '<button type="button" class="builder-view-switcher-chip" onclick="createNewBuilderSectionFromUI()" style="gap: 0.2rem; padding: 0.38rem 0.5rem;"><i class="fas fa-plus" style="font-size: 9px;"></i>New</button>';
         shell.innerHTML = html;
       }
       function renameBuilderSection(sectionId) {
         const section = document.getElementById(sectionId);
         if (!section) return;
         const oldName = getBuilderSectionDisplayName(section);
-        const newName = prompt('Rename section:', oldName);
+        const newName = prompt("Rename section:", oldName);
         if (!newName || newName === oldName) return;
         section.dataset.sectionName = newName;
         renderBuilderViewSwitcher();
@@ -29164,28 +29226,30 @@ console.log("Triggered ${eventName}", { source, event });
       function deleteBuilderSection(sectionId) {
         const sections = getCanvasSectionElements();
         if (sections.length <= 1) {
-          showBuilderSnackbar('You must have at least one section.', 'error');
+          showBuilderSnackbar("You must have at least one section.", "error");
           return;
         }
         const section = document.getElementById(sectionId);
         if (!section) return;
         const sectionName = getBuilderSectionDisplayName(section);
-        if (!confirm('Delete ' + sectionName + ' section and all its content?')) return;
+        if (!confirm("Delete " + sectionName + " section and all its content?"))
+          return;
         const wasActive = section.id === currentActiveSectionId;
         section.remove();
         if (wasActive) {
           const remaining = getCanvasSectionElements();
-          if (remaining.length) setActiveBuilderSection(remaining[0].id, { skipHistory: true });
+          if (remaining.length)
+            setActiveBuilderSection(remaining[0].id, { skipHistory: true });
         }
         renderBuilderViewSwitcher();
         saveToHistory();
-        showBuilderSnackbar('Section deleted: ' + sectionName, 'success');
+        showBuilderSnackbar("Section deleted: " + sectionName, "success");
       }
       function createNewBuilderSectionFromUI() {
-        const name = prompt('New section name:', 'New Section');
+        const name = prompt("New section name:", "New Section");
         if (!name) return;
         createBuilderSection(name, { skipHistory: false });
-        showBuilderSnackbar('Section created: ' + name, 'success');
+        showBuilderSnackbar("Section created: " + name, "success");
       }
       function createBuilderSection(sectionName = "Section", options = {}) {
         const canvas = document.getElementById("web-canvas");
@@ -29535,13 +29599,13 @@ console.log("Triggered ${eventName}", { source, event });
         if (typeof BuilderAIAgents !== "undefined") {
           try {
             completeAIThinkingTask(analyzeTask, 200);
-            
+
             const processingTask = addAIThinkingTask(
               mode === "visual"
                 ? ".compiling for canvas..."
-                : ".generating production code..."
+                : ".generating production code...",
             );
-            
+
             if (mode === "visual") {
               const result = await BuilderAIAgents.convertToVisual(
                 html,
@@ -29584,12 +29648,12 @@ console.log("Triggered ${eventName}", { source, event });
 
         // Fallback to basic conversion if agents unavailable
         completeAIThinkingTask(analyzeTask, 200);
-        
+
         if (!loggedIn || !currentUser) {
           clearAllAIThinkingTasks();
           return html;
         }
-        
+
         const prompt =
           mode === "visual"
             ? "You are the MediaLab Visual Compiler. Convert this HTML into canvas-ready builder code that reconstructs clean draggable objects. Preserve intended visual layout, IDs where possible, and stable spacing. Return ONLY valid HTML (no markdown). Ensure output is compatible with ml-container/ml-content parsing."
@@ -32601,34 +32665,49 @@ ${interactionBlock}
         renderBuilderAiChat();
         try {
           setAiAgentStage("thinking");
-          const agentReply = await runBuilderAiAgent(prompt, currentCode);
-          setAiAgentStage("parsing");
-          const actions = executeAIActions(agentReply, prompt);
-          const visibleReply = stripAgentActionBlocks(agentReply);
-          if (actions.length) {
-            setAiAgentStage("applying");
-            aiChatMessages.push({
-              role: "assistant",
-              text:
-                visibleReply ||
-                `Applied ${actions.length} action(s) using ${aiActiveModel || "active model"}.`,
-            });
-          } else {
-            aiChatMessages.push({
-              role: "assistant",
-              text:
-                visibleReply ||
-                "Ready. Tell me what you want to build or fix next.",
-            });
+          const managerResponse = await fetch("/api/ai/manager", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userInput: prompt, currentCanvasCode: currentCode })
+          }).then(r => r.json()).catch(() => ({ success: false }));
+          if (!managerResponse?.success) {
+            throw new Error("Manager AI failed to analyze input");
           }
-          setAiAgentStage("implementing");
-          const syncResult = await forceImplementAiCanvasSync({
-            allowNormalizer: true,
-          });
-          if (syncResult?.normalized) {
+          const decision = managerResponse.decision;
+          if (decision === "Action") {
+            setAiAgentStage("parsing");
+            const agentReply = await runBuilderAiAgent(prompt, currentCode);
+            setAiAgentStage("parsing");
+            const actions = executeAIActions(agentReply, prompt);
+            const visibleReply = stripAgentActionBlocks(agentReply);
+            if (actions.length) {
+              setAiAgentStage("applying");
+              aiChatMessages.push({
+                role: "assistant",
+                text: visibleReply || "Applying changes...",
+              });
+            } else {
+              aiChatMessages.push({
+                role: "assistant",
+                text: visibleReply || "Ready. Tell me what you want to build or fix next.",
+              });
+            }
+            setAiAgentStage("implementing");
+            const syncResult = await forceImplementAiCanvasSync({ allowNormalizer: true });
+            if (syncResult?.normalized) {
+              aiChatMessages.push({
+                role: "assistant",
+                text: "Canvas updated. Elements are ready for editing.",
+              });
+            }
+          } else {
+            setAiAgentStage("responding");
+            const chatResponse = await runBuilderAiAgent(prompt, "");
+            const visibleResponse = stripAgentActionBlocks(chatResponse);
             aiChatMessages.push({
               role: "assistant",
-              text: "Canvas normalization pass complete. Elements are now mapped for editing.",
+              text: visibleResponse || "I'm here to help! What would you like to do?",
             });
           }
           setAiAgentStage("done");
@@ -33118,7 +33197,7 @@ ${interactionBlock}
       }
       async function openBuilderRunMode() {
         const prepTask = addAIThinkingTask(".preparing run preview...");
-        
+
         const activePath = normalizeBuilderFilePath(
           activeBuilderFilePath ||
             getFirstBuilderHtmlFilePath() ||
@@ -33326,39 +33405,43 @@ ${interactionBlock}
         const taskId = `task-${Date.now()}-${Math.random()}`;
         const container = document.getElementById("ai-thinking-container");
         const tasksContainer = document.getElementById("ai-thinking-tasks");
-        
+
         if (!container || !tasksContainer) return taskId;
-        
+
         const taskEl = document.createElement("div");
         taskEl.id = taskId;
         taskEl.className = "ai-thinking-task";
         taskEl.innerHTML = `<span class="ai-task-dot"></span><span>${message}</span>`;
-        
+
         tasksContainer.appendChild(taskEl);
         container.classList.remove("hidden");
-        
+
         aiThinkingTasks.push({ id: taskId, el: taskEl, timestamp: Date.now() });
-        
+
         return taskId;
       }
       function completeAIThinkingTask(taskId, delay = 400) {
         setTimeout(() => {
-          const task = aiThinkingTasks.find(t => t.id === taskId);
+          const task = aiThinkingTasks.find((t) => t.id === taskId);
           if (!task) return;
-          
+
           const dot = task.el.querySelector(".ai-task-dot");
           if (dot) {
             dot.classList.add("complete");
           }
           task.el.classList.add("complete");
-          
+
           setTimeout(() => {
             task.el.remove();
-            aiThinkingTasks = aiThinkingTasks.filter(t => t.id !== taskId);
-            
+            aiThinkingTasks = aiThinkingTasks.filter((t) => t.id !== taskId);
+
             const tasksContainer = document.getElementById("ai-thinking-tasks");
             const container = document.getElementById("ai-thinking-container");
-            if (tasksContainer && tasksContainer.children.length === 0 && container) {
+            if (
+              tasksContainer &&
+              tasksContainer.children.length === 0 &&
+              container
+            ) {
               container.classList.add("hidden");
             }
           }, 500);

@@ -4046,6 +4046,96 @@ app.post("/api/ai/workspace-fetch", async (req, res) => {
   }
 });
 
+app.post("/api/ai/manager", async (req, res) => {
+  try {
+    if (!req.isAuthenticated?.() || !req.user?._id) {
+      return res.status(401).json({ success: false, message: "Login required." });
+    }
+
+    const userInput = String(req.body?.userInput || "").trim().toLowerCase();
+    const currentCanvasCode = String(req.body?.currentCanvasCode || "").trim();
+
+    if (!userInput) {
+      return res.status(400).json({ success: false, message: "User input is required." });
+    }
+
+    // Manager AI Agent - determines intent type
+    const actionKeywords = [
+      "change", "set", "add", "modify", "update", "remove", "delete", "create", "make",
+      "fix", "apply", "style", "edit", "background", "color", "font", "size", "position",
+      "layout", "align", "border", "shadow", "gradient", "image", "button", "input",
+      "text", "hover", "animation", "transform", "opacity", "width", "height", "padding",
+      "margin", "display", "flex", "grid", "rotate", "scale", "transition", "build",
+      "replace", "swap", "insert", "reorder", "align", "center", "move", "copy",
+      "duplicate", "layer", "section", "component", "template", "design", "format"
+    ];
+
+    const negativeKeywords = [
+      "hello", "hi", "hey", "how are you", "thanks", "thank you", "okay", "ok",
+      "sure", "yes", "no", "maybe", "perhaps", "question", "ask", "tell me", "what is",
+      "explain", "describe", "help", "guide", "tutorial", "example"
+    ];
+
+    const elementPatterns = [
+      /button|input|text|image|box|container|card|header|footer|nav|menu|sidebar|modal|dialog|toast|modal/i,
+      /bg|background|color|fill|stroke|border|shadow|gradient|opacity|filter|blur/i,
+      /size|width|height|padding|margin|gap|spacing|align|justify|flex|grid/i,
+      /font|text|size|weight|style|decoration|uppercase|lowercase|capitalize/i,
+      /position|top|left|right|bottom|absolute|relative|fixed|sticky|z-index/i,
+      /animation|transition|duration|timing|keyframe|hover|active|focus|disabled/i,
+      /click|submit|reset|scroll|swipe|drag|drop|select|focus|blur/i
+    ];
+
+    // Scoring system
+    let actionScore = 0;
+    const inputWords = userInput.split(/\s+/);
+
+    // Check action keywords
+    const hasActionKeyword = actionKeywords.some(kw => userInput.includes(kw));
+    if (hasActionKeyword) actionScore += 40;
+
+    // Check for element/property references
+    const hasElementPattern = elementPatterns.some(pattern => pattern.test(userInput));
+    if (hasElementPattern) actionScore += 30;
+
+    // Check for negative indicators
+    const hasNegativeKeyword = negativeKeywords.some(kw => userInput.includes(kw));
+    if (hasNegativeKeyword) actionScore -= 50;
+
+    // Check for specific UI change indicators
+    if (/\b(?:to|into|as|like|similar to|matching)\b/i.test(userInput)) actionScore += 15;
+
+    // Check if input mentions URLs, colors, measurements
+    if (/(http|https|url|#[0-9a-f]{6}|rgb|px|em|rem|%|url\()/i.test(userInput)) actionScore += 20;
+
+    // Check for imperative/command tone
+    if (/(^|\s)(?:please\s)?(?:can you|could you|would you|make|set|change|create|add|remove)\b/i.test(userInput)) {
+      actionScore += 25;
+    }
+
+    // Finalize determination
+    const isAction = actionScore >= 50;
+    const confidence = Math.max(0, Math.min(100, 50 + actionScore));
+
+    return res.json({
+      success: true,
+      decision: isAction ? "Action" : "Response",
+      confidence,
+      actionScore,
+      userInput,
+      reasoning: isAction
+        ? "Input appears to be a code/design change command"
+        : "Input appears to be a general chat query"
+    });
+  } catch (error) {
+    console.error("Manager AI error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Manager AI analysis failed."
+    });
+  }
+});
+
 app.post("/api/ai/autofix", async (req, res) => {
   try {
     await refreshAIModelsRegistryIfNeeded(false);
