@@ -1770,15 +1770,64 @@
         padding: 0.38rem 0.72rem;
         transition: all 0.2s ease;
       }
+      .builder-view-switcher-chip {
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
       .builder-view-switcher-chip:hover {
         border-color: rgba(34, 211, 238, 0.45);
         color: #cffafe;
+        background: rgba(15, 23, 42, 0.85);
       }
       .builder-view-switcher-chip.is-active {
         border-color: rgba(34, 211, 238, 0.55);
-        background: rgba(6, 182, 212, 0.2);
+        background: rgba(6, 182, 212, 0.25);
         color: #67e8f9;
-        box-shadow: 0 0 20px rgba(34, 211, 238, 0.2);
+        box-shadow: 0 0 20px rgba(34, 211, 238, 0.25), inset 0 0 1px rgba(34, 211, 238, 0.5);
+      }
+      .builder-view-switcher-btn {
+        width: 18px;
+        height: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        background: rgba(255, 255, 255, 0.08);
+        color: #cbd5e1;
+        border-radius: 0.3rem;
+        font-size: 8px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .builder-view-switcher-chip:hover .builder-view-switcher-btn {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .builder-view-switcher-btn:hover {
+        background: rgba(34, 211, 238, 0.3);
+        color: #67e8f9;
+      }
+      .builder-section-view {
+        position: absolute;
+        inset: 0;
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      .builder-section-view.is-active {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        animation: builderSectionFadeIn 0.3s ease;
+      }
+      @keyframes builderSectionFadeIn {
+        from { opacity: 0; filter: brightness(0.95); }
+        to { opacity: 1; filter: brightness(1); }
       }
       .ai-chat-popup {
         position: fixed;
@@ -29011,15 +29060,24 @@ console.log("Triggered ${eventName}", { source, event });
           sections.find((section) => section.id === sectionId) ||
           sections.find((section) => section.id === currentActiveSectionId) ||
           sections[0];
+        const prevSectionId = currentActiveSectionId;
         currentActiveSectionId = target?.id || sections[0].id;
         sections.forEach((section) => {
           const isActive = section.id === currentActiveSectionId;
-          section.style.display = isActive ? "block" : "none";
-          section.style.pointerEvents = isActive ? "auto" : "none";
-          section.classList.toggle("ml-section-active", isActive);
+          if (isActive) {
+            section.style.opacity = "1";
+            section.style.visibility = "visible";
+            section.style.pointerEvents = "auto";
+            section.style.zIndex = "100";
+          } else {
+            section.style.opacity = "0";
+            section.style.visibility = "hidden";
+            section.style.pointerEvents = "none";
+            section.style.zIndex = "0";
+          }
         });
-        scheduleSyncStyleTag();
         renderBuilderViewSwitcher();
+        scheduleSyncStyleTag();
         if (!options.skipHistory) saveToHistory();
         return currentActiveSectionId;
       }
@@ -29078,14 +29136,56 @@ console.log("Triggered ${eventName}", { source, event });
           return;
         }
         shell.classList.remove("hidden");
-        const chips = sections
-          .map((section) => {
-            const isActive = section.id === currentActiveSectionId;
-            const label = escapeHtmlText(getBuilderSectionDisplayName(section));
-            return `<button type="button" onclick="setActiveBuilderSection('${escapeInlineJsString(section.id)}', { skipHistory: true })" class="builder-view-switcher-chip ${isActive ? "is-active" : ""}">${label}</button>`;
-          })
-          .join("");
-        shell.innerHTML = `<span class="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 px-1">Views</span>${chips}`;
+        let html = '<span class="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 px-1">Sections</span>';
+        sections.forEach((section) => {
+          const isActive = section.id === currentActiveSectionId;
+          const label = escapeHtmlText(getBuilderSectionDisplayName(section));
+          const sectionId = escapeInlineJsString(section.id);
+          const activeClass = isActive ? ' is-active' : '';
+          html += '<button type="button" onclick="setActiveBuilderSection(\'' + sectionId + '\', { skipHistory: true })" class="builder-view-switcher-chip' + activeClass + '"><span>' + label + '</span>';
+          if (isActive) {
+            html += '<div class="flex gap-1"><button class="builder-view-switcher-btn" onclick="event.stopPropagation(); renameBuilderSection(\'' + sectionId + '\');"><i class="fas fa-edit"></i></button><button class="builder-view-switcher-btn" onclick="event.stopPropagation(); deleteBuilderSection(\'' + sectionId + '\');"><i class="fas fa-trash"></i></button></div>';
+          }
+          html += '</button>';
+        });
+        html += '<button type="button" class="builder-view-switcher-chip" onclick="createNewBuilderSectionFromUI()" style="gap: 0.2rem; padding: 0.38rem 0.5rem;"><i class="fas fa-plus" style="font-size: 9px;"></i>New</button>';
+        shell.innerHTML = html;
+      }
+      function renameBuilderSection(sectionId) {
+        const section = document.getElementById(sectionId);
+        if (!section) return;
+        const oldName = getBuilderSectionDisplayName(section);
+        const newName = prompt('Rename section:', oldName);
+        if (!newName || newName === oldName) return;
+        section.dataset.sectionName = newName;
+        renderBuilderViewSwitcher();
+        saveToHistory();
+      }
+      function deleteBuilderSection(sectionId) {
+        const sections = getCanvasSectionElements();
+        if (sections.length <= 1) {
+          showBuilderSnackbar('You must have at least one section.', 'error');
+          return;
+        }
+        const section = document.getElementById(sectionId);
+        if (!section) return;
+        const sectionName = getBuilderSectionDisplayName(section);
+        if (!confirm('Delete ' + sectionName + ' section and all its content?')) return;
+        const wasActive = section.id === currentActiveSectionId;
+        section.remove();
+        if (wasActive) {
+          const remaining = getCanvasSectionElements();
+          if (remaining.length) setActiveBuilderSection(remaining[0].id, { skipHistory: true });
+        }
+        renderBuilderViewSwitcher();
+        saveToHistory();
+        showBuilderSnackbar('Section deleted: ' + sectionName, 'success');
+      }
+      function createNewBuilderSectionFromUI() {
+        const name = prompt('New section name:', 'New Section');
+        if (!name) return;
+        createBuilderSection(name, { skipHistory: false });
+        showBuilderSnackbar('Section created: ' + name, 'success');
       }
       function createBuilderSection(sectionName = "Section", options = {}) {
         const canvas = document.getElementById("web-canvas");
