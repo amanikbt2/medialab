@@ -28289,6 +28289,17 @@ console.log("Triggered ${eventName}", { source, event });
           if (!String(child.style.height || "").trim())
             child.style.height = "100%";
         };
+        const normalizeWrapperDragTransform = (wrapper) => {
+          if (!(wrapper instanceof HTMLElement)) return;
+          const transformText = String(wrapper.style.transform || "").trim();
+          if (!transformText) return;
+          const rotateMatch = transformText.match(/rotate\([^)]+\)/);
+          const rotatePart = rotateMatch ? rotateMatch[0] : "rotate(0deg)";
+          // Keep wrapper drag math stable: translate/scale/skew cause visible drift
+          // between wrapper handles and rendered content during pointer drag.
+          wrapper.style.transformOrigin = "top left";
+          wrapper.style.transform = rotatePart;
+        };
         if (builderInteractionPickMode && builderInteractionDraft) {
           e.stopPropagation();
           e.preventDefault();
@@ -28365,9 +28376,13 @@ console.log("Triggered ${eventName}", { source, event });
           detachElementFromLayoutFlow(el, canvas);
         }
         if (!isResizer) {
+          normalizeWrapperDragTransform(el);
           normalizeWrapperVisualOffset(el);
           if (movingSelection) {
-            selectedElements.forEach((item) => normalizeWrapperVisualOffset(item));
+            selectedElements.forEach((item) => {
+              normalizeWrapperDragTransform(item);
+              normalizeWrapperVisualOffset(item);
+            });
           }
         }
         const startX = e.clientX,
@@ -28389,9 +28404,15 @@ console.log("Triggered ${eventName}", { source, event });
         const startL = readPx(el, "left", 0);
         const startT = readPx(el, "top", 0);
 
-        // Professional accurate grab offset: where user clicked on the element (viewport coords)
-        const grabPointX = (startX - startRect.left) * startMetrics.scaleX;
-        const grabPointY = (startY - startRect.top) * startMetrics.scaleY;
+        // Stable canvas-space grab offset (prevents wrapper/content drift and jump).
+        const startPointerCanvasX =
+          (startX - startMetrics.rect.left) * startMetrics.scaleX +
+          startMetrics.scrollLeft;
+        const startPointerCanvasY =
+          (startY - startMetrics.rect.top) * startMetrics.scaleY +
+          startMetrics.scrollTop;
+        const grabPointX = startPointerCanvasX - startL;
+        const grabPointY = startPointerCanvasY - startT;
 
         // Stabilize drag/resize math by freezing auto/% dimensions to px before move.
         if (!movingSelection && !isResizer) {
@@ -28414,13 +28435,12 @@ console.log("Triggered ${eventName}", { source, event });
         }
         const selectionStarts = movingSelection
           ? selectedElements.map((item) => {
-              const itemRect = item.getBoundingClientRect();
               return {
                 el: item,
                 left: readPx(item, "left", 0),
                 top: readPx(item, "top", 0),
-                grabX: (startX - itemRect.left) * startMetrics.scaleX,
-                grabY: (startY - itemRect.top) * startMetrics.scaleY,
+                grabX: startPointerCanvasX - readPx(item, "left", 0),
+                grabY: startPointerCanvasY - readPx(item, "top", 0),
               };
             })
           : [];
