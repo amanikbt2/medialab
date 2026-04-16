@@ -35449,60 +35449,12 @@
           return;
         }
 
-        // SMART INSERT COMMAND PROCESSOR
-        // Try to detect and normalize insert commands first (handles misspellings, casual English)
-        const smartInsertResult = await processSmartInsertCommand(prompt);
-        if (smartInsertResult?.success) {
-          // Insert command was successfully normalized and executed
-          aiChatMessages.push({ role: "user", text: prompt });
-          aiChatMessages.push({
-            role: "assistant",
-            text: smartInsertResult.message || "Element inserted successfully.",
-          });
-          setAiAgentStage("done");
-          renderBuilderAiChat();
-          if (input) input.value = "";
-          if (sendBtn) {
-            sendBtn.disabled = false;
-            sendBtn.textContent = "Send";
-          }
-          aiChatSending = false;
-          return;
-        }
-
-        // If smart insert detected it but needs AI, use normalized version
-        let processedPrompt = prompt;
-        if (smartInsertResult?.requiresAI) {
-          processedPrompt = smartInsertResult.normalized;
-          aiChatMessages.push({
-            role: "user",
-            text: `${prompt} (normalized from: "${smartInsertResult.normalized}")`,
-          });
-        } else {
-          aiChatMessages.push({ role: "user", text: prompt });
-        }
-
-        // Fallback: try original deterministic command
-        const deterministicResult =
-          runDeterministicBuilderCommand(processedPrompt);
-        if (deterministicResult?.applied) {
-          aiChatMessages.push({
-            role: "assistant",
-            text: deterministicResult.message || "Command applied on canvas.",
-          });
-          setAiAgentStage("done");
-          renderBuilderAiChat();
-          if (input) input.value = "";
-          if (sendBtn) {
-            sendBtn.disabled = false;
-            sendBtn.textContent = "Send";
-          }
-          aiChatSending = false;
-          return;
-        }
-
+        // SEND ALL REQUESTS TO ONLINE API
+        // No local interception - let Groq API analyze intent and correct errors
         const currentCode = buildLatestAiCodeSnapshot();
         await syncAiContextSilently();
+        
+        aiChatMessages.push({ role: "user", text: prompt });
         aiChatSending = true;
         aiModelRecoveryInFlight = false;
         aiModelSwitchingInFlight = false;
@@ -35527,8 +35479,10 @@
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  userInput: processedPrompt,
+                  userInput: prompt,
                   currentCanvasCode: currentCode,
+                  analyzeIntent: true,
+                  correctErrors: true,
                 }),
               })
                 .then((r) => r.json())
@@ -35555,8 +35509,10 @@
                   credentials: "include",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
-                    userInput: processedPrompt,
+                    userInput: prompt,
                     currentCanvasCode: currentCode,
+                    analyzeIntent: true,
+                    correctErrors: true,
                   }),
                 })
                   .then((r) => r.json())
@@ -35567,14 +35523,16 @@
               managerResponse = { success: false };
             }
           } else {
-            // Use Internal Workflow AI (default)
+            // Use Internal Workflow AI (default) - with intent analysis
             managerResponse = await fetch("/api/ai/manager", {
               method: "POST",
               credentials: "include",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                userInput: processedPrompt,
+                userInput: prompt,
                 currentCanvasCode: currentCode,
+                analyzeIntent: true,
+                correctErrors: true,
               }),
             })
               .then((r) => r.json())
@@ -35587,6 +35545,7 @@
           const decision = managerResponse.decision;
           if (decision === "Action") {
             setAiAgentStage("parsing");
+            // Use original prompt - API has already analyzed and corrected it
             const agentReply = await runBuilderAiAgent(prompt, currentCode);
             setAiAgentStage("parsing");
             let actionResult = executeAIActions(agentReply, prompt);

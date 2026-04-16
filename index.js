@@ -5368,16 +5368,89 @@ app.post("/api/ai/manager", async (req, res) => {
         .json({ success: false, message: "Login required." });
     }
 
-    const userInput = String(req.body?.userInput || "")
-      .trim()
-      .toLowerCase();
+    const userInput = String(req.body?.userInput || "").trim();
     const currentCanvasCode = String(req.body?.currentCanvasCode || "").trim();
+    const analyzeIntent = req.body?.analyzeIntent === true;
+    const correctErrors = req.body?.correctErrors === true;
 
     if (!userInput) {
       return res
         .status(400)
         .json({ success: false, message: "User input is required." });
     }
+
+    // IF ANALYZE_INTENT FLAG: Use Groq API to understand and correct user input
+    let analyzedInput = userInput;
+    let analysisResult = null;
+
+    if (analyzeIntent && correctErrors && GROQ_API_KEY) {
+      try {
+        // Use Groq API to analyze intent and correct errors
+        const intentPrompt = `You are an expert UI/UX command parser. Analyze the user's input and determine:
+1. What they actually want to build/modify
+2. Fix any spelling errors or ambiguous language
+3. Predict the intended element if they describe it creatively
+
+User input: "${userInput}"
+
+RESPOND in JSON format only:
+{
+  "intent": "insert|modify|remove|change|question|other",
+  "correctedInput": "the corrected/normalized version of their request",
+  "elementType": "button|input|text|image|etc or null",
+  "confidence": 0-100,
+  "interpretation": "brief explanation of what they likely meant"
+}`;
+
+        const groqResponse = await nodeFetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${GROQ_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: "mixtral-8x7b-32768",
+              temperature: 0.3,
+              max_tokens: 300,
+              messages: [{ role: "user", content: intentPrompt }],
+            }),
+          },
+        );
+
+        if (groqResponse.ok) {
+          const groqPayload = await groqResponse.json();
+          const analysisText = String(
+            groqPayload?.choices?.[0]?.message?.content || "",
+          ).trim();
+
+          // Try to parse JSON from response
+          try {
+            analysisResult = JSON.parse(analysisText);
+            analyzedInput = analysisResult.correctedInput || userInput;
+            console.log("[AI Manager] Intent Analysis:", {
+              original: userInput,
+              corrected: analyzedInput,
+              confidence: analysisResult.confidence,
+            });
+          } catch (parseErr) {
+            // If JSON parsing fails, use original input
+            console.log(
+              "[AI Manager] Could not parse Groq response:",
+              analysisText,
+            );
+          }
+        }
+      } catch (apiErr) {
+        console.error("[AI Manager] Groq API error:", apiErr.message);
+        // Fall through - continue with original input
+      }
+    }
+
+    const userInputLower = String(analyzedInput || userInput)
+      .trim()
+      .toLowerCase();
 
     // Manager AI Agent - determines intent type
     const actionKeywords = [
@@ -5483,41 +5556,53 @@ app.post("/api/ai/manager", async (req, res) => {
 
     // Scoring system
     let actionScore = 0;
-    const inputWords = userInput.split(/\s+/);
+    const inputWords = userInputLower.split(/\s+/);
 
     // Check action keywords
     const hasActionKeyword = actionKeywords.some((kw) =>
-      userInput.includes(kw),
+      userInputLower.includes(kw),
     );
     if (hasActionKeyword) actionScore += 40;
 
     // Check for element/property references
     const hasElementPattern = elementPatterns.some((pattern) =>
-      pattern.test(userInput),
+      pattern.test(userInputLower),
     );
     if (hasElementPattern) actionScore += 30;
 
     // Check for negative indicators
     const hasNegativeKeyword = negativeKeywords.some((kw) =>
-      userInput.includes(kw),
+      userInputLower.includes(kw),
     );
     if (hasNegativeKeyword) actionScore -= 50;
 
     // Check for specific UI change indicators
-    if (/\b(?:to|into|as|like|similar to|matching)\b/i.test(userInput))
+    if (/\b(?:to|into|as|like|similar to|matching)\b/i.test(userInputLower))
       actionScore += 15;
 
     // Check if input mentions URLs, colors, measurements
-    if (/(http|https|url|#[0-9a-f]{6}|rgb|px|em|rem|%|url\()/i.test(userInput))
+    if (
+      /(http|https|url|#[0-9a-f]{6}|rgb|px|em|rem|%|url\()/i.test(
+        userInputLower,
+      )
+    )
       actionScore += 20;
 
     // Check for imperative/command tone
     if (
       /(^|\s)(?:please\s)?(?:can you|could you|would you|make|set|change|create|add|remove)\b/i.test(
-        userInput,
+        userInputLower,
       )
     ) {
       actionScore += 25;
+    }
+
+    // If intent was analyzed with high confidence, boost score
+    if (
+      analysisResult?.intent === "insert" &&
+      analysisResult?.confidence > 70
+    ) {
+      actionScore += 20;
     }
 
     // Finalize determination
@@ -5529,7 +5614,9 @@ app.post("/api/ai/manager", async (req, res) => {
       decision: isAction ? "Action" : "Response",
       confidence,
       actionScore,
-      userInput,
+      userInput: analyzedInput, // Return analyzed/corrected input
+      originalInput: userInput,
+      analysisResult, // Include intent analysis
       reasoning: isAction
         ? "Input appears to be a code/design change command"
         : "Input appears to be a general chat query",
