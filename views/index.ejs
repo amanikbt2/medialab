@@ -32982,28 +32982,38 @@
           wrapper.className =
             `canvas-element ml-inserted-element absolute group transition-shadow active:cursor-grabbing ${className}`.trim();
 
-          // Build resizer handles
+          // Build resizer handles - MUST allow pointer events
           const handles = ["tl", "tr", "bl", "br", "mt", "mb", "ml", "mr"];
           let handlesHTML = handles
             .map(
               (h) =>
-                `<div class="resizer ${h} absolute w-2 h-2 bg-cyan-500 border border-white rounded-full opacity-0 group-hover:opacity-100 z-50"></div>`,
+                `<div class="resizer ${h} absolute w-2 h-2 bg-cyan-500 border border-white rounded-full opacity-0 group-hover:opacity-100 z-50" style="pointer-events: auto; cursor: pointer;"></div>`,
             )
             .join("");
 
-          // Build drag controls
-          const dragControlsHTML = `<div class="absolute -top-8 left-0 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all z-[60]">
-              <div class="drag-handle w-7 h-7 bg-gradient-to-br from-cyan-500 to-blue-600 text-white rounded-lg border border-white/20 shadow-2xl flex items-center justify-center cursor-grab active:cursor-grabbing pointer-events-auto hover:shadow-cyan-500/50 transition-all select-none"><i class="fas fa-arrows-alt text-[10px]"></i></div>
-              <button onclick="openSmartInspector('div', this.closest('.canvas-element'))" class="w-7 h-7 bg-gray-950 text-cyan-400 rounded-lg border border-white/10 flex items-center justify-center pointer-events-auto hover:bg-cyan-950 transition-all"><i class="fas fa-sliders-h text-[10px]"></i></button>
-              <button onclick="this.closest('.canvas-element').remove(); saveToHistory();" class="w-7 h-7 bg-gray-950 text-red-500 rounded-lg border border-white/10 flex items-center justify-center pointer-events-auto hover:bg-red-950 transition-all"><i class="fas fa-trash-alt text-[10px]"></i></button>
+          // Build drag controls - MUST have pointer-events-auto to work above element-body
+          const dragControlsHTML = `<div class="absolute -top-8 left-0 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all z-[60]" style="pointer-events: auto;">
+              <div class="drag-handle w-7 h-7 bg-gradient-to-br from-cyan-500 to-blue-600 text-white rounded-lg border border-white/20 shadow-2xl flex items-center justify-center cursor-grab active:cursor-grabbing pointer-events-auto hover:shadow-cyan-500/50 transition-all select-none" style="pointer-events: auto;"><i class="fas fa-arrows-alt text-[10px]"></i></div>
+              <button onclick="openSmartInspector('div', this.closest('.canvas-element'))" class="w-7 h-7 bg-gray-950 text-cyan-400 rounded-lg border border-white/10 flex items-center justify-center pointer-events-auto hover:bg-cyan-950 transition-all" style="pointer-events: auto;"><i class="fas fa-sliders-h text-[10px]"></i></button>
+              <button onclick="this.closest('.canvas-element').remove(); saveToHistory();" class="w-7 h-7 bg-gray-950 text-red-500 rounded-lg border border-white/10 flex items-center justify-center pointer-events-auto hover:bg-red-950 transition-all" style="pointer-events: auto;"><i class="fas fa-trash-alt text-[10px]"></i></button>
             </div>`;
 
           // Populate wrapper structure
           wrapper.innerHTML = `${handlesHTML}${dragControlsHTML}${renderInteractionBadgeHtml()}<div class="element-body w-full h-full overflow-visible"></div>`;
 
           // Compute wrapper positioning
-          const posLeft = x !== null && x !== undefined ? (typeof x === "number" ? `${x}px` : String(x)) : "100px";
-          const posTop = y !== null && y !== undefined ? (typeof y === "number" ? `${y}px` : String(y)) : "100px";
+          const posLeft =
+            x !== null && x !== undefined
+              ? typeof x === "number"
+                ? `${x}px`
+                : String(x)
+              : "100px";
+          const posTop =
+            y !== null && y !== undefined
+              ? typeof y === "number"
+                ? `${y}px`
+                : String(y)
+              : "100px";
 
           // Set wrapper styles ONLY for positioning (like addObject)
           Object.assign(wrapper.style, {
@@ -33034,7 +33044,7 @@
           // Get the element body - THIS is where visual styles go
           const body = wrapper.querySelector(".element-body");
           if (body) {
-            // Body takes 100% of wrapper
+            // Body takes 100% of wrapper and allows pointer events to pass through to handles
             body.style.width = "100%";
             body.style.height = "100%";
             body.style.position = "relative";
@@ -33042,6 +33052,7 @@
             body.style.display = "flex";
             body.style.alignItems = "center";
             body.style.justifyContent = "center";
+            body.style.pointerEvents = "none"; // CRITICAL: Let drag/resize handles work!
 
             // Apply visual styles from spec.style to body
             if (typeof style === "object" && style !== null) {
