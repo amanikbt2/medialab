@@ -32961,6 +32961,8 @@
         try {
           const spec =
             typeof specJson === "string" ? JSON.parse(specJson) : specJson;
+          console.log("[DEBUG] applyInsertElementSpec called with spec:", spec);
+
           const {
             html = "",
             css = "",
@@ -32986,7 +32988,7 @@
           // 8-Point Resizer Matrix - Create programmatically for reliability
           const handles = ["tl", "tr", "bl", "br", "mt", "mb", "ml", "mr"];
           const handlesFragment = document.createDocumentFragment();
-          
+
           handles.forEach((h) => {
             const handle = document.createElement("div");
             handle.className = `resizer ${h} absolute w-2 h-2 bg-cyan-500 border border-white rounded-full opacity-0 group-hover:opacity-100 z-50`;
@@ -32996,7 +32998,8 @@
 
           // Create drag controls programmatically
           const dragDiv = document.createElement("div");
-          dragDiv.className = "absolute -top-8 left-0 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all z-[60]";
+          dragDiv.className =
+            "absolute -top-8 left-0 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all z-[60]";
           dragDiv.style.pointerEvents = "auto";
           dragDiv.innerHTML = `
             <div class="drag-handle w-7 h-7 bg-gradient-to-br from-cyan-500 to-blue-600 text-white rounded-lg border border-white/20 shadow-2xl flex items-center justify-center cursor-grab active:cursor-grabbing pointer-events-auto hover:shadow-cyan-500/50 transition-all select-none" style="pointer-events: auto;"><i class="fas fa-arrows-alt text-[10px]"></i></div>
@@ -33124,6 +33127,39 @@
           const canvas = document.getElementById("web-canvas");
           if (canvas) {
             canvas.appendChild(wrapper);
+            console.log(
+              "[DEBUG] Wrapper added to canvas. Classes:",
+              wrapper.className,
+            );
+            console.log(
+              "[DEBUG] Wrapper handles count:",
+              wrapper.querySelectorAll(".resizer").length,
+            );
+            console.log("[DEBUG] Wrapper element:", wrapper);
+            console.log(
+              "[DEBUG] Wrapper computed style overflow:",
+              getComputedStyle(wrapper).overflow,
+            );
+            console.log(
+              "[DEBUG] Wrapper computed style pointerEvents:",
+              getComputedStyle(wrapper).pointerEvents,
+            );
+
+            const firstHandle = wrapper.querySelector(".resizer.tl");
+            if (firstHandle) {
+              console.log("[DEBUG] First handle found. Computed styles:", {
+                position: getComputedStyle(firstHandle).position,
+                top: getComputedStyle(firstHandle).top,
+                left: getComputedStyle(firstHandle).left,
+                opacity: getComputedStyle(firstHandle).opacity,
+                display: getComputedStyle(firstHandle).display,
+                visibility: getComputedStyle(firstHandle).visibility,
+                zIndex: getComputedStyle(firstHandle).zIndex,
+              });
+            } else {
+              console.log("[DEBUG] WARNING: First handle NOT found!");
+            }
+
             hydrateCanvasElement(wrapper);
             saveToHistory();
             selectElement(wrapper);
