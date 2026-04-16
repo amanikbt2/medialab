@@ -31434,7 +31434,7 @@
         const cleanNode = sourceNode.cloneNode(true);
         cleanNode
           .querySelectorAll(
-            ".resizer, .absolute.-top-10, .builder-selection-chip, .builder-controls",
+            ".resizer, .absolute.-top-10, .builder-selection-chip, .builder-controls, .builder-layout-scroll-btn",
           )
           .forEach((ui) => ui.remove());
         cleanNode
@@ -33235,6 +33235,8 @@
               console.log("[ARROW DEBUG] Raw HTML from spec:", cleanHtml.substring(0, 500));
               
               // Remove carousel/navigation buttons and arrow icons only
+              // Remove builder layout scroll buttons
+              cleanHtml = cleanHtml.replace(/<button[^>]*builder-layout-scroll-btn[^>]*>[\s\S]*?<\/button>/gi, '');
               // Remove buttons with prev/next classes
               cleanHtml = cleanHtml.replace(/<button[^>]*(?:prev|next)[^>]*>[\s\S]*?<\/button>/gi, '');
               // Remove div with carousel-related classes
@@ -37239,6 +37241,9 @@
             .forEach((node) => node.remove());
           previewShell
             .querySelectorAll(".builder-controls")
+            .forEach((node) => node.remove());
+          previewShell
+            .querySelectorAll(".builder-layout-scroll-btn")
             .forEach((node) => node.remove());
           const toolbar = previewShell.querySelector(".absolute.-top-10");
           if (toolbar) toolbar.remove();
