@@ -1759,6 +1759,12 @@ app.use(express.static(publicDir));
 app.get("*", (req, res) => {
   const requestPath = String(req.path || "/").replace(/^\\/+/, "");
   const safePath = requestPath.replace(/\\\\/g, "/");
+  
+  // Skip non-HTML paths (JS, CSS, images, etc) - let express.static handle them
+  if (/\.(js|css|json|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/i.test(safePath)) {
+    return res.status(404).json({ error: "Not found" });
+  }
+  
   const directFile = path.join(publicDir, safePath);
   const htmlFile = safePath.endsWith(".html") ? directFile : path.join(publicDir, safePath + ".html");
   const folderIndex = path.join(publicDir, safePath, "index.html");
