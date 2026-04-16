@@ -4388,7 +4388,124 @@ app.post("/api/workflow/process", async (req, res) => {
       });
     }
 
-    // === WORKFLOW-ONLY MODEL SELECTION ===
+    // ========== STAGE 1: XTRA AI CLEANING ==========
+    // CRITICAL: Clean messy user input FIRST with Xtra AI (Online Groq)
+    // BEFORE sending to Workflow algorithm
+    console.log("[WORKFLOW] Stage 1: Cleaning messy input with Xtra AI...");
+    let cleanedPrompt = prompt;
+    let xtraAiCleaned = false;
+    try {
+      let onlineModels = await AIModel.find({ isActive: true })
+        .sort({ priority: 1, status: -1, modelId: 1 })
+        .lean();
+      onlineModels = buildOnlineOnlyModels(onlineModels);
+
+      if (!onlineModels.length) {
+        await refreshAIModelsRegistryIfNeeded(true);
+        onlineModels = await AIModel.find({ isActive: true })
+          .sort({ priority: 1, status: -1, modelId: 1 })
+          .lean();
+        onlineModels = buildOnlineOnlyModels(onlineModels);
+      }
+
+      // Try to clean with Xtra AI
+      if (onlineModels.length > 0) {
+        const xtraAiModel = onlineModels[0];
+        const xtraSystemPrompt = `You are MediaLab Xtra AI Builder - a STRICT web element command converter.
+
+**PURPOSE**: Convert ONLY messy web UI/design requests into clean builder commands.
+**NOT FOR**: General questions, non-builder requests, factual questions, trivia, or conversations.
+
+IF THE INPUT IS NOT A WEB UI/DESIGN REQUEST, RESPOND WITH: "cannot-process"
+
+Web UI/design keywords (process these):
+- "give me", "create", "make", "build", "add", "insert" + element names
+- Style words: "red", "button", "div", "blue", "border", "margin", "padding", "shadow", etc.
+
+**EXAMPLE CONVERSIONS**:
+1. Input: "give me a div with text contert hello world and left margin like 50px and its yellow, the outline is 100px nd green"
+   Output: insert div color:yellow; margin-left:50px; border:100px solid green; padding:16px;
+
+2. Input: "Who is the president of Kenya?"
+   Output: cannot-process
+
+Command Format: insert <tag> <property:value; property:value;>;
+- Properties use CSS dash-case
+- Each property ends with semicolon
+- No explanations or markdown
+
+STRICT RULES:
+1. ONLY return builder commands for UI/design requests
+2. For non-builder: respond ONLY with "cannot-process"
+3. Fix spelling and interpret visual intent from messy input
+4. Return 1-3 commands maximum`;
+
+        const cleaningResponse = await nodeFetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${GROQ_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: xtraAiModel.modelId,
+              temperature: 0.3,
+              max_tokens: 500,
+              messages: [
+                { role: "system", content: xtraSystemPrompt },
+                { role: "user", content: prompt },
+              ],
+            }),
+          },
+        );
+
+        if (cleaningResponse.ok) {
+          const cleaningPayload = await cleaningResponse.json();
+          const cleanedContent = String(
+            cleaningPayload?.choices?.[0]?.message?.content || "",
+          ).trim();
+
+          if (
+            cleanedContent &&
+            !cleanedContent.toLowerCase().includes("cannot-process")
+          ) {
+            cleanedPrompt = cleanedContent;
+            xtraAiCleaned = true;
+            console.log(
+              "[WORKFLOW] Stage 1: ✅ Xtra AI cleaned input successfully",
+            );
+          } else if (
+            cleanedContent &&
+            cleanedContent.toLowerCase().includes("cannot-process")
+          ) {
+            console.log("[WORKFLOW] Stage 1: ⚠️ Non-builder request rejected");
+            return res.status(400).json({
+              success: false,
+              message:
+                "This request is not a web builder/UI design command. Please ask for UI elements like buttons, divs, cards, etc.",
+              input: prompt,
+              isBuilderRequest: false,
+            });
+          }
+        }
+      }
+    } catch (cleaningError) {
+      console.warn(
+        "[WORKFLOW] Stage 1 warning - could not clean with Xtra AI:",
+        cleaningError.message,
+      );
+      // Fall through - use original prompt if cleaning fails
+    }
+
+    console.log(
+      `[WORKFLOW] Stage 1 complete. Input ${xtraAiCleaned ? "cleaned" : "unchanged"}.`,
+    );
+    console.log(
+      `[WORKFLOW] Prompt to process: ${cleanedPrompt.substring(0, 80)}...`,
+    );
+
+    // ========== STAGE 2: WORKFLOW PROCESSING ==========
     // CRITICAL: Use ONLY workflow models, NEVER fall back to online AI
     let models = await AIModel.find({ isActive: true })
       .sort({ priority: 1, status: -1, modelId: 1 })
@@ -4457,7 +4574,7 @@ You are a standalone autonomous system.`,
                 },
                 {
                   role: "user",
-                  content: prompt,
+                  content: cleanedPrompt,
                 },
               ],
             }),
@@ -4525,12 +4642,13 @@ You are a standalone autonomous system.`,
 
     await createUsageLog({
       user,
-      action: "workflow-process",
-      summary: `Workflow processing via ${modelUsed}`,
+      action: "workflow-process-two-stage",
+      summary: `Two-stage workflow: Xtra AI cleaned → Workflow processed via ${modelUsed}`,
       source: "workflow",
       metadata: {
         modelUsed,
         mode,
+        xtraAiCleaned,
         usedToday: Number(user.aiQuota.usedToday || 0),
         dailyLimit: Number(user.aiQuota.dailyLimit || 10),
       },
@@ -4541,7 +4659,9 @@ You are a standalone autonomous system.`,
       workflowResult,
       modelUsed,
       mode: "workflow",
-      system: "WORKFLOW_ONLY",
+      system: "WORKFLOW_WITH_XTRA_CLEANING",
+      xtraAiCleaned,
+      twoStageProcess: true,
       creditsRemaining: hasUnlimitedAi
         ? null
         : Math.max(
@@ -4743,11 +4863,7 @@ STRICT RULES:
         }
 
         // Check if Groq rejected the request as non-builder
-        if (
-          groqResponse
-            .toLowerCase()
-            .includes("cannot-process")
-        ) {
+        if (groqResponse.toLowerCase().includes("cannot-process")) {
           return res.status(400).json({
             success: false,
             message:
