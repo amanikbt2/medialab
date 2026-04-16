@@ -32983,6 +32983,9 @@
           wrapper.setAttribute("data-type", "div"); // CRITICAL: Add data-type like addObject
           wrapper.className =
             "canvas-element absolute group transition-shadow active:cursor-grabbing";
+          if (className) {
+            wrapper.className = `${wrapper.className} ${String(className)}`.trim();
+          }
 
           // 8-Point Resizer Matrix - Create programmatically for reliability
           const handles = ["tl", "tr", "bl", "br", "mt", "mb", "ml", "mr"];
@@ -33130,7 +33133,8 @@
           elementBody.style.width = "100%";
           elementBody.style.height = "100%";
           elementBody.style.overflow = "visible";
-          elementBody.style.pointerEvents = "none";
+          elementBody.style.pointerEvents = "auto";
+          elementBody.style.position = "relative";
 
           // Create badge
           const badgeHtml = renderInteractionBadgeHtml();
@@ -33194,58 +33198,109 @@
           //     <div class="element-body w-full h-full overflow-visible"></div>
           // `;
 
-          // Compute wrapper positioning
-          const posLeft =
-            x !== null && x !== undefined
-              ? typeof x === "number"
-                ? `${x}px`
-                : String(x)
-              : "100px";
-          const posTop =
-            y !== null && y !== undefined
-              ? typeof y === "number"
-                ? `${y}px`
-                : String(y)
-              : "100px";
+          const hasOwn = (obj, key) =>
+            Object.prototype.hasOwnProperty.call(obj || {}, key);
+          const normalizeCssValue = (value, fallback) => {
+            if (value === null || value === undefined) return fallback;
+            if (typeof value === "number" && Number.isFinite(value))
+              return `${value}px`;
+            const text = String(value).trim();
+            if (!text) return fallback;
+            // Bare numbers should be px.
+            if (/^-?\d+(?:\.\d+)?$/.test(text)) return `${text}px`;
+            return text;
+          };
+          const normalizeStyleObject = (inputStyle) => {
+            if (!inputStyle || typeof inputStyle !== "object") return {};
+            const out = {};
+            Object.entries(inputStyle).forEach(([rawKey, rawValue]) => {
+              const key = String(rawKey || "").trim();
+              if (!key) return;
+              const camelKey = key.includes("-")
+                ? key.replace(/-([a-z])/g, (_, c) => String(c).toUpperCase())
+                : key;
+              out[camelKey] = rawValue;
+            });
+            return out;
+          };
+          const normalizedStyle = normalizeStyleObject(style);
 
-          // Set wrapper styles ONLY for positioning (like addObject)
-          Object.assign(wrapper.style, {
-            position: "absolute",
-            width: width || "260px",
-            height: height || "100px",
-            left: posLeft,
-            top: posTop,
-            zIndex: "1",
-            opacity: "1",
-            visibility: "visible",
-            overflow: "visible",
-            pointerEvents: "auto",
+          // Split style keys: wrapper positioning/size vs body visuals.
+          const wrapperStyleKeys = new Set([
+            "position",
+            "left",
+            "top",
+            "right",
+            "bottom",
+            "width",
+            "height",
+            "zIndex",
+            "opacity",
+            "visibility",
+            "overflow",
+            "pointerEvents",
+            "transform",
+            "transformOrigin",
+          ]);
+          const wrapperStyle = {};
+          const bodyStyle = {};
+          Object.entries(normalizedStyle).forEach(([key, value]) => {
+            if (wrapperStyleKeys.has(key)) wrapperStyle[key] = value;
+            else bodyStyle[key] = value;
           });
 
-          // Set style attribute as string for persistence and export
-          const styleString = [
-            `position: absolute`,
-            `left: ${posLeft}`,
-            `top: ${posTop}`,
-            `width: ${width || "260px"}`,
-            `height: ${height || "100px"}`,
-            `z-index: 1`,
-            `opacity: 1`,
-            `visibility: visible`,
-            `overflow: visible`,
-            `pointer-events: auto`,
-          ]
-            .filter(Boolean)
-            .join("; ");
-          wrapper.setAttribute("style", styleString);
+          // Compute wrapper positioning (prefer explicit x/y or style.left/top).
+          const posLeft = normalizeCssValue(
+            hasOwn(spec, "x") ? x : wrapperStyle.left,
+            "100px",
+          );
+          const posTop = normalizeCssValue(
+            hasOwn(spec, "y") ? y : wrapperStyle.top,
+            "100px",
+          );
+
+          // Compute wrapper dimensions (prefer explicit width/height or style.width/height).
+          const resolvedWidth = normalizeCssValue(
+            hasOwn(spec, "width") ? width : wrapperStyle.width,
+            "260px",
+          );
+          const resolvedHeight = normalizeCssValue(
+            hasOwn(spec, "height") ? height : wrapperStyle.height,
+            "100px",
+          );
+
+          // Set wrapper styles like addObject (ensure wrapper owns position/size).
+          Object.assign(wrapper.style, {
+            position: wrapperStyle.position || "absolute",
+            width: resolvedWidth,
+            height: resolvedHeight,
+            left: posLeft,
+            top: posTop,
+            zIndex: wrapperStyle.zIndex ?? "1",
+            opacity: wrapperStyle.opacity ?? "1",
+            visibility: wrapperStyle.visibility ?? "visible",
+            overflow: wrapperStyle.overflow ?? "visible",
+            pointerEvents: wrapperStyle.pointerEvents ?? "auto",
+          });
+          if (wrapperStyle.transform) wrapper.style.transform = wrapperStyle.transform;
+          if (wrapperStyle.transformOrigin)
+            wrapper.style.transformOrigin = wrapperStyle.transformOrigin;
 
           // Get the element body (already created above)
           const body = elementBody;
           if (body) {
-            // Apply visual styles from spec.style to body
-            if (typeof style === "object" && style !== null) {
-              Object.assign(body.style, style);
+            // Apply visual styles (exclude wrapper positioning/size keys).
+            if (Object.keys(bodyStyle).length) {
+              Object.assign(body.style, bodyStyle);
             }
+            // Always keep the body filling the wrapper (resizing changes wrapper).
+            body.style.width = "100%";
+            body.style.height = "100%";
+            body.style.left = "";
+            body.style.top = "";
+            body.style.right = "";
+            body.style.bottom = "";
+            body.style.position = body.style.position || "relative";
 
             // Populate content
             if (html) {
@@ -33286,14 +33341,39 @@
             } else {
               body.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#999; font-size:14px;">Content</div>`;
             }
+
+            // Normalize inserted content so it scales with the wrapper.
+            const normalizeFill = (node) => {
+              if (!node || node.nodeType !== 1) return;
+              // Ensure the inserted root fills the wrapper.
+              node.style.width = "100%";
+              node.style.height = "100%";
+              node.style.boxSizing = "border-box";
+              if (node.tagName === "SVG") {
+                node.setAttribute("width", "100%");
+                node.setAttribute("height", "100%");
+                node.style.display = "block";
+              }
+            };
+            if (body.children.length === 1) {
+              normalizeFill(body.firstElementChild);
+            }
+            body.querySelectorAll(".smart-element").forEach((node) => {
+              normalizeFill(node);
+            });
           }
 
           // Apply data attributes
           if (typeof attributes === "object" && attributes !== null) {
             Object.entries(attributes).forEach(([key, value]) => {
-              if (key !== "style") {
-                wrapper.setAttribute(key, String(value));
+              const attrKey = String(key || "").trim();
+              if (!attrKey) return;
+              if (attrKey === "style" || attrKey === "id") return;
+              if (attrKey === "class" || attrKey === "className") {
+                wrapper.className = `${wrapper.className} ${String(value || "")}`.trim();
+                return;
               }
+              wrapper.setAttribute(attrKey, String(value));
             });
           }
 
