@@ -28452,9 +28452,6 @@
         e.stopPropagation();
         e.preventDefault();
         const isResizer = e.target.classList.contains("resizer");
-        if (isResizer) {
-          console.log(`[DEBUG] handleObjectInteraction: RESIZER DETECTED, target.className=${e.target.className}, classList[1]=${e.target.classList[1]}`);
-        }
         const isDragHandle = e.target.closest(".drag-handle");
         // Ignore drag-handle double-clicks entirely to avoid accidental
         // second-click drag math applying stale coordinates.
@@ -29382,10 +29379,7 @@
         scheduleSyncStyleTag();
       }
       function hydrateCanvasElement(el) {
-        el.onpointerdown = (e) => {
-          console.log(`[DEBUG] WRAPPER POINTERDOWN: target=${e.target.className}, isResizer=${e.target.classList.contains("resizer")}`);
-          handleObjectInteraction(e, el);
-        };
+        el.onpointerdown = (e) => handleObjectInteraction(e, el);
         el.onclick = (e) => {
           e.stopPropagation();
         };
@@ -32967,7 +32961,6 @@
         try {
           const spec =
             typeof specJson === "string" ? JSON.parse(specJson) : specJson;
-          console.log("[DEBUG] applyInsertElementSpec called with spec:", spec);
 
           const {
             html = "",
@@ -33164,12 +33157,8 @@
 
           // Attach resize/drag handler to all handles
           const allHandles = wrapper.querySelectorAll(".resizer");
-          console.log(`[DEBUG] Found ${allHandles.length} resize handles`);
-          allHandles.forEach((handle, idx) => {
-            const handleType = Array.from(handle.classList).find(c => c !== "resizer");
-            console.log(`[DEBUG] Handle ${idx}: type=${handleType}, classList=${handle.className}, pointer-events=${handle.style.pointerEvents}`);
+          allHandles.forEach((handle) => {
             handle.addEventListener("pointerdown", (e) => {
-              console.log(`[DEBUG] HANDLE POINTERDOWN: type=${handleType}, target=${e.target.className}, classList[1]=${e.target.classList[1]}`);
               handleObjectInteraction(e, wrapper);
             });
           });
@@ -33288,39 +33277,6 @@
           const canvas = document.getElementById("web-canvas");
           if (canvas) {
             canvas.appendChild(wrapper);
-            console.log(
-              "[DEBUG] Wrapper added to canvas. Classes:",
-              wrapper.className,
-            );
-            console.log(
-              "[DEBUG] Wrapper handles count:",
-              wrapper.querySelectorAll(".resizer").length,
-            );
-            console.log("[DEBUG] Wrapper element:", wrapper);
-            console.log(
-              "[DEBUG] Wrapper computed style overflow:",
-              getComputedStyle(wrapper).overflow,
-            );
-            console.log(
-              "[DEBUG] Wrapper computed style pointerEvents:",
-              getComputedStyle(wrapper).pointerEvents,
-            );
-
-            const firstHandle = wrapper.querySelector(".resizer.tl");
-            if (firstHandle) {
-              console.log("[DEBUG] First handle found. Computed styles:", {
-                position: getComputedStyle(firstHandle).position,
-                top: getComputedStyle(firstHandle).top,
-                left: getComputedStyle(firstHandle).left,
-                opacity: getComputedStyle(firstHandle).opacity,
-                display: getComputedStyle(firstHandle).display,
-                visibility: getComputedStyle(firstHandle).visibility,
-                zIndex: getComputedStyle(firstHandle).zIndex,
-              });
-            } else {
-              console.log("[DEBUG] WARNING: First handle NOT found!");
-            }
-
             hydrateCanvasElement(wrapper);
             saveToHistory();
             selectElement(wrapper);
