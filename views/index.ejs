@@ -33258,11 +33258,15 @@
             if (html) {
               let cleanHtml = String(html).trim();
               
-              // Remove carousel/navigation buttons and arrows
-              cleanHtml = cleanHtml
-                .replace(/<button[^>]*class="[^"]*(?:prev|next|carousel|nav)[^"]*"[^>]*>[\s\S]*?<\/button>/gi, '')
-                .replace(/<div[^>]*class="[^"]*(?:carousel-nav|nav-button|arrow-button)[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-                .replace(/<[^>]*(?:fa-chevron|fa-arrow|fa-angle)[^>]*>/gi, '');
+              // Remove carousel/navigation buttons and arrow icons only
+              // Remove buttons with prev/next classes
+              cleanHtml = cleanHtml.replace(/<button[^>]*(?:prev|next)[^>]*>[\s\S]*?<\/button>/gi, '');
+              // Remove div with carousel-related classes
+              cleanHtml = cleanHtml.replace(/<div[^>]*class="[^"]*(?:carousel-nav|nav-button)[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
+              // Remove ONLY chevron and angle icons, not arrows-alt
+              cleanHtml = cleanHtml.replace(/<i[^>]*(?:fa-chevron|fa-angle)[^>]*><\/i>/gi, '');
+              // Remove left/right arrow icons specifically
+              cleanHtml = cleanHtml.replace(/<i[^>]*fa-(?:arrow-left|arrow-right|chevron-left|chevron-right)[^>]*><\/i>/gi, '');
               
               body.innerHTML = cleanHtml;
             } else if (text) {
