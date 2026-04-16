@@ -32976,13 +32976,13 @@
             id = "",
           } = spec;
 
-          // Create container wrapper as proper canvas element
+          // Create wrapper - just a positioning container
           const wrapper = document.createElement("div");
           wrapper.id = id || `ml-inserted-${Date.now()}`;
           wrapper.className =
             `canvas-element ml-inserted-element absolute group transition-shadow active:cursor-grabbing ${className}`.trim();
 
-          // Build resizer handles like addObject does
+          // Build resizer handles
           const handles = ["tl", "tr", "bl", "br", "mt", "mb", "ml", "mr"];
           let handlesHTML = handles
             .map(
@@ -32992,67 +32992,49 @@
             .join("");
 
           // Build drag controls
-          const dragControlsHTML = `
-            <div class="absolute -top-8 left-0 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all z-[60]">
+          const dragControlsHTML = `<div class="absolute -top-8 left-0 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all z-[60]">
               <div class="drag-handle w-7 h-7 bg-gradient-to-br from-cyan-500 to-blue-600 text-white rounded-lg border border-white/20 shadow-2xl flex items-center justify-center cursor-grab active:cursor-grabbing pointer-events-auto hover:shadow-cyan-500/50 transition-all select-none"><i class="fas fa-arrows-alt text-[10px]"></i></div>
               <button onclick="openSmartInspector('div', this.closest('.canvas-element'))" class="w-7 h-7 bg-gray-950 text-cyan-400 rounded-lg border border-white/10 flex items-center justify-center pointer-events-auto hover:bg-cyan-950 transition-all"><i class="fas fa-sliders-h text-[10px]"></i></button>
               <button onclick="this.closest('.canvas-element').remove(); saveToHistory();" class="w-7 h-7 bg-gray-950 text-red-500 rounded-lg border border-white/10 flex items-center justify-center pointer-events-auto hover:bg-red-950 transition-all"><i class="fas fa-trash-alt text-[10px]"></i></button>
-            </div>
-          `;
+            </div>`;
 
-          // Create element body
-          wrapper.innerHTML = `
-            ${handlesHTML}
-            ${dragControlsHTML}
-            ${renderInteractionBadgeHtml()}
-            <div class="element-body w-full h-full overflow-visible"></div>
-          `;
+          // Populate wrapper structure
+          wrapper.innerHTML = `${handlesHTML}${dragControlsHTML}${renderInteractionBadgeHtml()}<div class="element-body w-full h-full overflow-visible"></div>`;
 
-          // Apply positioning
-          const styles = {
-            position: "absolute",
+          // Compute wrapper positioning
+          const posLeft = x !== null && x !== undefined ? (typeof x === "number" ? `${x}px` : String(x)) : "100px";
+          const posTop = y !== null && y !== undefined ? (typeof y === "number" ? `${y}px` : String(y)) : "100px";
+
+          // Set wrapper styles ONLY for positioning (like addObject)
+          Object.assign(wrapper.style, {
             width,
             height,
-            background: "linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(34, 211, 238, 0.1))",
-            border: "1px solid rgba(34, 211, 238, 0.3)",
-            borderRadius: "8px",
-            ...(typeof style === "object" ? style : {}),
-          };
+            left: posLeft,
+            top: posTop,
+            zIndex: "1",
+            opacity: "1",
+            visibility: "visible",
+          });
 
-          if (x !== null && x !== undefined) {
-            styles.left = typeof x === "number" ? `${x}px` : String(x);
-          } else {
-            styles.left = "100px"; // Default position
-          }
-
-          if (y !== null && y !== undefined) {
-            styles.top = typeof y === "number" ? `${y}px` : String(y);
-          } else {
-            styles.top = "100px"; // Default position
-          }
-
-          Object.assign(wrapper.style, styles);
-
-          // Set style attribute as string (like addObject does) for persistence
+          // Set style attribute as string for persistence and export
           const styleString = [
             `position: absolute`,
-            `left: ${styles.left || "100px"}`,
-            `top: ${styles.top || "100px"}`,
+            `left: ${posLeft}`,
+            `top: ${posTop}`,
             `width: ${width}`,
             `height: ${height}`,
-            `background: ${styles.background}`,
-            `border: ${styles.border}`,
-            `border-radius: ${styles.borderRadius}`,
             `z-index: 1`,
+            `opacity: 1`,
+            `visibility: visible`,
           ]
             .filter(Boolean)
             .join("; ");
           wrapper.setAttribute("style", styleString);
 
-          // Get the element body and populate it
+          // Get the element body - THIS is where visual styles go
           const body = wrapper.querySelector(".element-body");
           if (body) {
-            // Apply body styling
+            // Body takes 100% of wrapper
             body.style.width = "100%";
             body.style.height = "100%";
             body.style.position = "relative";
@@ -33060,7 +33042,13 @@
             body.style.display = "flex";
             body.style.alignItems = "center";
             body.style.justifyContent = "center";
-            
+
+            // Apply visual styles from spec.style to body
+            if (typeof style === "object" && style !== null) {
+              Object.assign(body.style, style);
+            }
+
+            // Populate content
             if (html) {
               body.innerHTML = String(html).trim();
             } else if (text) {
@@ -33070,8 +33058,8 @@
             }
           }
 
-          // Apply attributes (data-*, aria-*, onclick, etc.)
-          if (typeof attributes === "object") {
+          // Apply data attributes
+          if (typeof attributes === "object" && attributes !== null) {
             Object.entries(attributes).forEach(([key, value]) => {
               if (key !== "style") {
                 wrapper.setAttribute(key, String(value));
@@ -33079,7 +33067,7 @@
             });
           }
 
-          // Inject CSS into page if provided
+          // Inject custom CSS if provided
           if (css) {
             const styleEl = document.createElement("style");
             styleEl.textContent = String(css);
@@ -33093,18 +33081,12 @@
             document.head.appendChild(animStyle);
           }
 
-          // Add to canvas
+          // Add to canvas and activate
           const canvas = document.getElementById("web-canvas");
           if (canvas) {
             canvas.appendChild(wrapper);
-
-            // CRITICAL: Hydrate the element to make it interactive/draggable
             hydrateCanvasElement(wrapper);
-
-            // Save to history
             saveToHistory();
-
-            // Select the newly added element
             selectElement(wrapper);
           }
 
