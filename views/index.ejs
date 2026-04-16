@@ -35863,7 +35863,10 @@
 
       function parseAiError(error) {
         // Handle Groq API errors with error details
-        if (error?.code === "rate_limit_exceeded" || error?.error?.code === "rate_limit_exceeded") {
+        if (
+          error?.code === "rate_limit_exceeded" ||
+          error?.error?.code === "rate_limit_exceeded"
+        ) {
           if (error?.type === "tokens" || error?.error?.type === "tokens") {
             return "⚠️ Token limit reached. Please try again in a few moments or reduce your message size.";
           }
@@ -36199,7 +36202,7 @@
             "ai-chat",
             { promptPreview: prompt.slice(0, 160) },
           );
-          
+
           // Parse error for user-friendly message
           let errorMessage;
           if (error?.apiError) {
@@ -36207,7 +36210,7 @@
           } else {
             errorMessage = parseAiError(error);
           }
-          
+
           aiChatMessages.push({
             role: "assistant",
             text: errorMessage,
@@ -36377,12 +36380,12 @@
                 }),
               });
               const data = await res.json().catch(() => ({}));
-              
+
               // Complete the retry task
               if (retryTaskId) {
                 completeAIThinkingTask(retryTaskId, 0);
               }
-              
+
               if (!res.ok || !data.success) {
                 if (data.limitReached) {
                   openUpgradeModal();
