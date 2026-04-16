@@ -32888,10 +32888,11 @@
       /**
        * Generate HTML element from Groq-formatted command spec
        * Converts element type and properties to production-ready HTML
+       * Includes content, styles, and attributes
        */
       function generateElementFromSpec(spec = {}) {
-        const { type, label, styles = {}, attributes = {} } = spec;
-        
+        const { type, label, styles = {}, content = null, attributes = {} } = spec;
+
         if (!type) return null;
 
         // Convert styles object to inline style string
@@ -32906,28 +32907,39 @@
 
         // Generate appropriate element based on type
         let html = "";
+        const contentText = content || "Sample Text";
+        
         switch (type.toLowerCase()) {
           case "button":
-            html = `<button ${attrString} style="${styleString}">Click Me</button>`;
+            html = `<button ${attrString} style="${styleString}">${contentText}</button>`;
             break;
           case "input":
-          case "text":
-            html = `<input type="text" ${attrString} style="${styleString}" placeholder="Enter text...">`;
+            html = `<input type="text" ${attrString} style="${styleString}" placeholder="${contentText}">`;
             break;
           case "image":
           case "img":
-            html = `<img src="https://via.placeholder.com/300x200" ${attrString} style="${styleString}">`;
+            html = `<img src="https://via.placeholder.com/300x200" ${attrString} style="${styleString}" alt="${contentText}">`;
             break;
-          case "text":
-          case "heading":
           case "h1":
           case "h2":
           case "h3":
-            html = `<h3 ${attrString} style="${styleString}">Heading</h3>`;
+          case "heading":
+          case "title":
+            html = `<h3 ${attrString} style="${styleString}">${contentText}</h3>`;
+            break;
+          case "text":
+          case "p":
+            html = `<p ${attrString} style="${styleString}">${contentText}</p>`;
+            break;
+          case "text":
+          case "p":
+            html = `<p ${attrString} style="${styleString}">${contentText}</p>`;
             break;
           default:
-            // Generic container
-            html = `<div ${attrString} style="${styleString}"></div>`;
+            // Generic container with content if provided
+            html = content 
+              ? `<div ${attrString} style="${styleString}">${contentText}</div>`
+              : `<div ${attrString} style="${styleString}"></div>`;
         }
 
         return html;
@@ -35596,10 +35608,12 @@
           if (managerResponse?.elementSpec && managerResponse?.parsedCommand) {
             setAiAgentStage("applying");
             const spec = managerResponse.elementSpec;
-            
+
             // Create insertion from command spec
             const insertResult = applyInsertElementSpec({
-              html: generateElementFromSpec(spec) || `<${spec.type}></${spec.type}>`,
+              html:
+                generateElementFromSpec(spec) ||
+                `<${spec.type}></${spec.type}>`,
               css: "", // CSS already in styles
               animations: "", // Already in styles
               style: spec.styles || {},
@@ -35624,7 +35638,10 @@
             setAiAgentStage("parsing");
             // Use Groq-formatted command if available
             const agentPrompt = managerResponse.formattedCommand || prompt;
-            const agentReply = await runBuilderAiAgent(agentPrompt, currentCode);
+            const agentReply = await runBuilderAiAgent(
+              agentPrompt,
+              currentCode,
+            );
             setAiAgentStage("parsing");
             let actionResult = executeAIActions(agentReply, prompt);
             const actions = actionResult?.applied || [];

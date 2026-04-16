@@ -5389,32 +5389,56 @@ app.post("/api/ai/manager", async (req, res) => {
         // Use Groq as strict command formatter - NO explanations, NO JSON, ONLY commands
         const systemPrompt = `You are an elite web builder command formatter for a professional AI website builder.
 
-Your ONLY task: Convert natural language website requests into strict builder commands.
+Your ONLY task: Convert natural language website requests into COMPLETE, PRODUCTION-READY builder commands.
 
 CRITICAL RULES:
 * Output ONLY valid builder commands - NOTHING ELSE
 * NO explanations, markdown, code blocks, or conversational text
 * NO JSON or metadata - raw commands only
-* If input is ambiguous, PREDICT what user meant
+* If input is ambiguous, PREDICT what user meant and ADD IT
 * Infer missing professional defaults automatically
+* ALWAYS include ALL visual properties described by user
+* ALWAYS include sizing (width/height or at least one dimension)
+* ALWAYS include content (text) if mentioned
+* NEVER output incomplete commands
 
-COMMAND SYNTAX (STRICT - do not deviate):
-insert <element_type> <property>; <property>; <property>;...
+COMMAND SYNTAX (STRICT):
+insert <element_type> <property>; <property>; <property>; <property>; content="text"
 
-PROPERTY INTELLIGENCE (convert descriptions to CSS):
+CRITICAL: Always end with content="..." if text/content is mentioned in request
+
+PROPERTY INTELLIGENCE (convert ALL descriptive terms to CSS):
 - "round" → border-radius:50%
+- "sharp left" → border-radius:0 12px 12px 0
+- "sharp right" → border-radius:12px 0 0 12px
+- "rounded corners" → border-radius:12px
 - "shadow" → box-shadow:0 8px 24px rgba(0,0,0,0.15)
 - "glass" → backdrop-filter:blur(12px); background:rgba(255,255,255,0.15)
 - "centered" → display:flex; justify-content:center; align-items:center
 - "bouncing" → animation:bounce 0.6s infinite ease-in-out
-- "floating" → animation:float 3s infinite ease-in-out; transform-origin:center
+- "floating" → animation:float 3s infinite ease-in-out
 - "gradient" → background:linear-gradient(135deg, #667eea 0%, #764ba2 100%)
 - "neon" → text-shadow:0 0 10px rgba(0,255,255,0.8); color:#00ffff
+- "outline dotted" → border:2px dotted
+- "outline solid" → border:2px solid
+- "outline dashed" → border:2px dashed
+- "left green" → border-left:3px solid green (or border-color if using border shorthand)
 - "hero" → Full hero section with professional defaults
 - "card" → Rounded container with shadow and padding defaults
+- "nice" → Polished look: shadow + rounded corners + padding
 
-PROFESSIONAL DEFAULTS (auto-add):
-- All text elements: font-family:system-ui; line-height:1.6
+DIMENSION DEFAULTS:
+- If "80px" mentioned → width:80px; height:80px (square)
+- If only width → auto-height or match width for proportions
+- Minimum sizes: buttons 100px, divs 120px, text 200px
+
+TEXT CONTENT HANDLING:
+- Always include content="..." if text/content mentioned
+- Examples: content="Hello World"; content="Click Me"; content="Product Title"
+- NO SINGLE QUOTES IN CONTENT - use double quotes only
+
+PROFESSIONAL DEFAULTS (auto-add to EVERY element):
+- All text elements: font-family:system-ui; line-height:1.6; color:#333
 - All buttons: padding:12px 24px; border-radius:8px; cursor:pointer
 - All containers: padding:20px; background:#f5f5f5
 - All images: max-width:100%; height:auto
@@ -5422,19 +5446,29 @@ PROFESSIONAL DEFAULTS (auto-add):
 - Colors: Use professional, accessible color schemes
 - Responsive: Include mobile-first sizing
 
-OUTPUT EXAMPLES:
+OUTPUT EXAMPLES (COMPLETE COMMANDS):
+
 User: "Make a round blue button that says Click Me"
-Output: insert button width:120px; height:120px; border-radius:50%; background:#3b82f6; color:white; font-size:16px; font-weight:bold; padding:12px; display:flex; justify-content:center; align-items:center; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.15);
+Output: insert button width:120px; height:120px; border-radius:50%; background:#3b82f6; color:white; font-size:16px; font-weight:bold; padding:12px; display:flex; justify-content:center; align-items:center; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.15); content="Click Me"
 
 User: "bouncing neon ball"
 Output: insert div width:100px; height:100px; border-radius:50%; background:#00ffff; box-shadow:0 0 20px rgba(0,255,255,0.8); animation:bounce 0.6s infinite ease-in-out;
 
-User: "card with product image and title"
-Output: insert div background:white; border-radius:12px; padding:20px; box-shadow:0 4px 12px rgba(0,0,0,0.1); display:flex; flex-direction:column; gap:12px;`;
+User: "nice div with sharp left edge corners with text hello world and outline dotted left green 80px"
+Output: insert div width:80px; height:80px; border-radius:0 12px 12px 0; background:#f5f5f5; border-left:3px dotted green; display:flex; align-items:center; justify-content:center; padding:20px; font-size:14px; color:#333; box-shadow:0 4px 8px rgba(0,0,0,0.1); content="Hello World"
+
+User: "card with product image and title and shadow"
+Output: insert div background:white; border-radius:12px; padding:20px; box-shadow:0 4px 12px rgba(0,0,0,0.1); display:flex; flex-direction:column; gap:12px; width:300px; content="Product Title"
+
+User: "green outlined box 150px"
+Output: insert div width:150px; height:150px; border:2px solid green; border-radius:8px; background:white; display:flex; align-items:center; justify-content:center; padding:20px;
+
+REMEMBER: Your output is DIRECTLY used by the renderer. Missing properties = broken design.
+ALWAYS include width/height, colors, spacing, AND content if mentioned.`;
 
         const commandRequest = `User input: "${userInput}"
 
-Generate the builder command(s). Output ONLY the raw command - no explanations or extra text.`;
+Generate the COMPLETE builder command with ALL properties. Output ONLY the raw command - no explanations or extra text.`;
 
         const groqResponse = await nodeFetch(
           "https://api.groq.com/openai/v1/chat/completions",
@@ -5447,7 +5481,7 @@ Generate the builder command(s). Output ONLY the raw command - no explanations o
             body: JSON.stringify({
               model: "mixtral-8x7b-32768",
               temperature: 0.2,
-              max_tokens: 500,
+              max_tokens: 600,
               messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: commandRequest },
@@ -5471,6 +5505,7 @@ Generate the builder command(s). Output ONLY the raw command - no explanations o
             });
           } else {
             console.log("[AI Formatter] Invalid output format:", commandOutput);
+            console.log("[AI Formatter] Raw Groq response:", commandOutput);
           }
         }
       } catch (apiErr) {
@@ -5698,14 +5733,27 @@ function parseBuilderCommand(commandText = "") {
 
   const [, elementType, propertiesString] = match;
 
-  // Parse properties separated by semicolons
+  // Parse properties - handle both: key:value and content="value" formats
   const properties = {};
+  let content = null;
+
   if (propertiesString) {
-    const propPairs = propertiesString.split(";").filter((p) => p.trim());
+    // First extract content="..." if present
+    const contentMatch = propertiesString.match(/content="([^"]+)"/);
+    if (contentMatch) {
+      content = contentMatch[1];
+      // Remove content from properties string for further parsing
+    }
+
+    // Parse remaining properties separated by semicolons
+    const propPairs = propertiesString.split(";").filter((p) => p.trim() && !p.includes("content="));
     propPairs.forEach((pair) => {
-      const [key, value] = pair.split(":").map((s) => s.trim());
-      if (key && value) {
-        properties[key] = value;
+      const cleanPair = pair.trim();
+      if (cleanPair.includes(":")) {
+        const [key, value] = cleanPair.split(":").map((s) => s.trim());
+        if (key && value) {
+          properties[key] = value;
+        }
       }
     });
   }
@@ -5714,6 +5762,7 @@ function parseBuilderCommand(commandText = "") {
     type: "insert",
     elementType: elementType.toLowerCase(),
     properties,
+    content,
     rawCommand: text,
     isValid: true,
   };
@@ -5743,6 +5792,7 @@ function commandToElementSpec(parsed) {
     type: parsed.elementType,
     label: parsed.elementType,
     styles: parsed.properties,
+    content: parsed.content,
     attributes: {
       class: `ml-${parsed.elementType}`,
     },
