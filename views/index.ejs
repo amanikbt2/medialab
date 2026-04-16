@@ -32976,11 +32976,37 @@
             id = "",
           } = spec;
 
-          // Create container wrapper
+          // Create container wrapper as proper canvas element
           const wrapper = document.createElement("div");
           wrapper.id = id || `ml-inserted-${Date.now()}`;
           wrapper.className =
-            `canvas-element ml-inserted-element ${className}`.trim();
+            `canvas-element ml-inserted-element absolute group transition-shadow active:cursor-grabbing ${className}`.trim();
+
+          // Build resizer handles like addObject does
+          const handles = ["tl", "tr", "bl", "br", "mt", "mb", "ml", "mr"];
+          let handlesHTML = handles
+            .map(
+              (h) =>
+                `<div class="resizer ${h} absolute w-2 h-2 bg-cyan-500 border border-white rounded-full opacity-0 group-hover:opacity-100 z-50"></div>`,
+            )
+            .join("");
+
+          // Build drag controls
+          const dragControlsHTML = `
+            <div class="absolute -top-8 left-0 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all z-[60]">
+              <div class="drag-handle w-7 h-7 bg-gradient-to-br from-cyan-500 to-blue-600 text-white rounded-lg border border-white/20 shadow-2xl flex items-center justify-center cursor-grab active:cursor-grabbing pointer-events-auto hover:shadow-cyan-500/50 transition-all select-none"><i class="fas fa-arrows-alt text-[10px]"></i></div>
+              <button onclick="openSmartInspector('div', this.closest('.canvas-element'))" class="w-7 h-7 bg-gray-950 text-cyan-400 rounded-lg border border-white/10 flex items-center justify-center pointer-events-auto hover:bg-cyan-950 transition-all"><i class="fas fa-sliders-h text-[10px]"></i></button>
+              <button onclick="this.closest('.canvas-element').remove(); saveToHistory();" class="w-7 h-7 bg-gray-950 text-red-500 rounded-lg border border-white/10 flex items-center justify-center pointer-events-auto hover:bg-red-950 transition-all"><i class="fas fa-trash-alt text-[10px]"></i></button>
+            </div>
+          `;
+
+          // Create element body
+          wrapper.innerHTML = `
+            ${handlesHTML}
+            ${dragControlsHTML}
+            ${renderInteractionBadgeHtml()}
+            <div class="element-body w-full h-full overflow-visible"></div>
+          `;
 
           // Apply positioning
           const styles = {
@@ -32992,24 +33018,36 @@
 
           if (x !== null && x !== undefined) {
             styles.left = typeof x === "number" ? `${x}px` : String(x);
+          } else {
+            styles.left = "100px"; // Default position
           }
+          
           if (y !== null && y !== undefined) {
             styles.top = typeof y === "number" ? `${y}px` : String(y);
+          } else {
+            styles.top = "100px"; // Default position
           }
 
           Object.assign(wrapper.style, styles);
 
-          // Set inner HTML
-          if (html) {
-            wrapper.innerHTML = String(html).trim();
-          } else if (text) {
-            wrapper.textContent = String(text);
+          // Get the element body and populate it
+          const body = wrapper.querySelector(".element-body");
+          if (body) {
+            if (html) {
+              body.innerHTML = String(html).trim();
+            } else if (text) {
+              body.textContent = String(text);
+            } else {
+              body.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#999;">Element</div>`;
+            }
           }
 
           // Apply attributes (data-*, aria-*, onclick, etc.)
           if (typeof attributes === "object") {
             Object.entries(attributes).forEach(([key, value]) => {
-              wrapper.setAttribute(key, String(value));
+              if (key !== "style") {
+                wrapper.setAttribute(key, String(value));
+              }
             });
           }
 
@@ -33031,12 +33069,21 @@
           const canvas = document.getElementById("web-canvas");
           if (canvas) {
             canvas.appendChild(wrapper);
+            
+            // CRITICAL: Hydrate the element to make it interactive/draggable
+            hydrateCanvasElement(wrapper);
+            
+            // Save to history
+            saveToHistory();
+            
+            // Select the newly added element
+            selectElement(wrapper);
           }
 
           return {
             success: true,
             elementId: wrapper.id,
-            message: `Inserted element with ID: ${wrapper.id}`,
+            message: `Inserted interactive element with ID: ${wrapper.id}`,
           };
         } catch (err) {
           console.error("Insert element spec failed:", err);
