@@ -32891,7 +32891,13 @@
        * Includes content, styles, and attributes
        */
       function generateElementFromSpec(spec = {}) {
-        const { type, label, styles = {}, content = null, attributes = {} } = spec;
+        const {
+          type,
+          label,
+          styles = {},
+          content = null,
+          attributes = {},
+        } = spec;
 
         if (!type) return null;
 
@@ -32908,7 +32914,7 @@
         // Generate appropriate element based on type
         let html = "";
         const contentText = content || "Sample Text";
-        
+
         switch (type.toLowerCase()) {
           case "button":
             html = `<button ${attrString} style="${styleString}">${contentText}</button>`;
@@ -32937,7 +32943,7 @@
             break;
           default:
             // Generic container with content if provided
-            html = content 
+            html = content
               ? `<div ${attrString} style="${styleString}">${contentText}</div>`
               : `<div ${attrString} style="${styleString}"></div>`;
         }
@@ -35608,6 +35614,34 @@
           if (managerResponse?.elementSpec && managerResponse?.parsedCommand) {
             setAiAgentStage("applying");
             const spec = managerResponse.elementSpec;
+
+            // Handle background image commands
+            if (spec.isBackgroundCommand) {
+              const target = spec.target || "body";
+              const canvas =
+                target === "body"
+                  ? document.querySelector("body") ||
+                    document.getElementById("builder-canvas")
+                  : document.querySelector(target);
+
+              if (canvas) {
+                // Apply background image styles
+                Object.assign(canvas.style, spec.styles);
+                aiChatMessages.push({
+                  role: "assistant",
+                  text: `✓ Applied background image (${spec.imageDescription}) to ${target}.`,
+                });
+              } else {
+                aiChatMessages.push({
+                  role: "assistant",
+                  text: `⚠️ Could not find target element: ${target}`,
+                });
+              }
+
+              setAiAgentStage("done");
+              renderBuilderAiChat();
+              return;
+            }
 
             // Create insertion from command spec
             const insertResult = applyInsertElementSpec({

@@ -5384,7 +5384,31 @@ app.post("/api/ai/manager", async (req, res) => {
     let commandOutput = null;
     let formattedCommand = null;
 
-    if (analyzeIntent && correctErrors && GROQ_API_KEY) {
+    // DEBUG: Log what flags we received
+    console.log("[AI Manager] Request flags:", {
+      analyzeIntent,
+      correctErrors,
+      hasGroqApiKey: !!GROQ_API_KEY,
+      groqKeyLength: GROQ_API_KEY?.length || 0,
+      userInput: userInput.substring(0, 50),
+    });
+
+    // ENFORCE: When analyzeIntent is true, MUST use Groq - NO FALLBACK
+    const mustUseGroq = analyzeIntent && correctErrors;
+
+    if (!GROQ_API_KEY && mustUseGroq) {
+      console.error(
+        "[AI Manager] ✗ GROQ_API_KEY not configured but analyzeIntent=true",
+      );
+      return res.status(500).json({
+        success: false,
+        message:
+          "Groq AI formatter not configured. Please set GROQ_API_KEY in environment.",
+      });
+    }
+
+    if (mustUseGroq && GROQ_API_KEY) {
+      console.log("[AI Manager] ✓ Entering Groq formatter stage (ENFORCED)");
       try {
         // Use Groq as strict command formatter - NO explanations, NO JSON, ONLY commands
         const systemPrompt = `You are an elite web builder command formatter for a professional AI website builder.
@@ -5463,8 +5487,25 @@ Output: insert div background:white; border-radius:12px; padding:20px; box-shado
 User: "green outlined box 150px"
 Output: insert div width:150px; height:150px; border:2px solid green; border-radius:8px; background:white; display:flex; align-items:center; justify-content:center; padding:20px;
 
+BACKGROUND/CANVAS COMMANDS:
+When user requests body/canvas background with images, use "update-background" format:
+update-background target=<body|element> image=<description>; filter=<optional>; position=<optional>
+
+User: "I want the body background to be image of cat"
+Output: update-background target=body image=cat; background-size:cover; background-position:center; background-attachment:fixed
+
+User: "body background with mountain landscape"
+Output: update-background target=body image=mountain landscape; background-size:cover; background-position:center
+
+User: "element background with sunset"
+Output: update-background target=element image=sunset; background-size:cover; background-position:center
+
+User: "dark ocean background with overlay"
+Output: update-background target=body image=ocean; background-size:cover; background-position:center; background-blend-mode:darken
+
 REMEMBER: Your output is DIRECTLY used by the renderer. Missing properties = broken design.
-ALWAYS include width/height, colors, spacing, AND content if mentioned.`;
+ALWAYS include width/height, colors, spacing, AND content if mentioned.
+For background requests, ALWAYS output valid update-background commands with image description.`;
 
         const commandRequest = `User input: "${userInput}"
 
@@ -5503,13 +5544,46 @@ Generate the COMPLETE builder command with ALL properties. Output ONLY the raw c
               original: userInput,
               formatted: formattedCommand,
             });
+          } else if (
+            commandOutput &&
+            commandOutput.startsWith("update-background")
+          ) {
+            formattedCommand = commandOutput;
+            console.log(
+              "[AI Formatter] Stage 1 Complete - Background Command:",
+              {
+                original: userInput,
+                formatted: formattedCommand,
+              },
+            );
           } else {
-            console.log("[AI Formatter] Invalid output format:", commandOutput);
-            console.log("[AI Formatter] Raw Groq response:", commandOutput);
+            console.error(
+              "[AI Formatter] INVALID FORMAT - Groq returned non-command:",
+              commandOutput.substring(0, 100),
+            );
+            return res.status(500).json({
+              success: false,
+              message:
+                "Groq AI returned invalid format. Expected builder command.",
+              receivedFormat: commandOutput.substring(0, 200),
+            });
           }
         }
       } catch (apiErr) {
         console.error("[AI Formatter] Groq API error:", apiErr.message);
+        return res.status(500).json({
+          success: false,
+          message: "Groq API error: " + apiErr.message,
+        });
+      }
+
+      // ENFORCE: If we reach here after Groq attempt, it MUST have a formatted command
+      if (!formattedCommand) {
+        console.error("[AI Formatter] Groq did not produce a valid command");
+        return res.status(500).json({
+          success: false,
+          message: "Groq formatter failed to produce a valid command.",
+        });
       }
     }
 
@@ -5722,6 +5796,11 @@ Generate the COMPLETE builder command with ALL properties. Output ONLY the raw c
 function parseBuilderCommand(commandText = "") {
   const text = String(commandText || "").trim();
 
+  // Check for background/update commands first
+  if (text.startsWith("update-background")) {
+    return parseBackgroundCommand(text);
+  }
+
   // Check if it starts with "insert"
   if (!text.startsWith("insert ")) {
     return null;
@@ -5746,7 +5825,9 @@ function parseBuilderCommand(commandText = "") {
     }
 
     // Parse remaining properties separated by semicolons
-    const propPairs = propertiesString.split(";").filter((p) => p.trim() && !p.includes("content="));
+    const propPairs = propertiesString
+      .split(";")
+      .filter((p) => p.trim() && !p.includes("content="));
     propPairs.forEach((pair) => {
       const cleanPair = pair.trim();
       if (cleanPair.includes(":")) {
@@ -5768,8 +5849,132 @@ function parseBuilderCommand(commandText = "") {
   };
 }
 
+/**
+ * Convert image descriptions to actual online image URLs
+ * Supports animal names, landscapes, objects, etc.
+ */
+function generateImageUrl(description) {
+  const query = String(description || "")
+    .trim()
+    .toLowerCase();
+
+  // Use Unsplash API for image searches - free tier
+  // Format: https://api.unsplash.com/photos/random?query=<search>&w=1920&h=1080
+  // Or simpler: https://source.unsplash.com/1920x1080/?<search>
+
+  // For better reliability, use picsum.photos or create a mapping
+  const imageMap = {
+    cat: "https://images.unsplash.com/photo-1574158622682-e40e69881006?w=1920&h=1080&fit=crop",
+    dog: "https://images.unsplash.com/photo-1633722715463-d30628519d00?w=1920&h=1080&fit=crop",
+    mountain:
+      "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&h=1080&fit=crop",
+    ocean:
+      "https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=1920&h=1080&fit=crop",
+    sunset:
+      "https://images.unsplash.com/photo-1495567720989-cebdbdd97913?w=1920&h=1080&fit=crop",
+    forest:
+      "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1920&h=1080&fit=crop",
+    beach:
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1920&h=1080&fit=crop",
+    city: "https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=1920&h=1080&fit=crop",
+    space:
+      "https://images.unsplash.com/photo-1446776877081-d282a0f896e2?w=1920&h=1080&fit=crop",
+    nature:
+      "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1920&h=1080&fit=crop",
+    landscape:
+      "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&h=1080&fit=crop",
+    portrait:
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1920&h=1080&fit=crop",
+    abstract:
+      "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=1920&h=1080&fit=crop",
+  };
+
+  // Check for exact match first
+  if (imageMap[query]) {
+    return imageMap[query];
+  }
+
+  // Check for partial matches
+  for (const [key, url] of Object.entries(imageMap)) {
+    if (query.includes(key) || key.includes(query.split(" ")[0])) {
+      return url;
+    }
+  }
+
+  // Fallback: Use Unsplash API with the description as query
+  return `https://source.unsplash.com/1920x1080/?${encodeURIComponent(query)}`;
+}
+
+/**
+ * Parse "update-background" commands
+ * Format: update-background target=<body|element> image=<description>; <properties>
+ * Returns background spec for application
+ */
+function parseBackgroundCommand(commandText = "") {
+  const text = String(commandText || "").trim();
+
+  if (!text.startsWith("update-background")) {
+    return null;
+  }
+
+  // Extract properties: target=...; image=...; other-props=...
+  const properties = {};
+  const propParts = text.split(";").map((p) => p.trim());
+
+  let imageDescription = null;
+  let target = "body";
+
+  propParts.forEach((part) => {
+    if (part.includes("=")) {
+      const [key, value] = part.split("=").map((s) => s.trim());
+      if (key.toLowerCase() === "target") {
+        target = value.toLowerCase();
+      } else if (key.toLowerCase() === "image") {
+        imageDescription = value;
+      } else {
+        properties[key] = value;
+      }
+    }
+  });
+
+  if (!imageDescription) {
+    return null;
+  }
+
+  // Generate actual image URL
+  const imageUrl = generateImageUrl(imageDescription);
+
+  // Merge default background styles with properties
+  const backgroundStyles = {
+    "background-image": `url('${imageUrl}')`,
+    "background-size": properties["background-size"] || "cover",
+    "background-position": properties["background-position"] || "center",
+    "background-attachment": properties["background-attachment"] || "scroll",
+    "background-repeat": properties["background-repeat"] || "no-repeat",
+    ...properties,
+  };
+
+  return {
+    type: "update-background",
+    target,
+    imageDescription,
+    imageUrl,
+    properties: backgroundStyles,
+    rawCommand: text,
+    isValid: true,
+  };
+}
+
 function isValidBuilderCommand(parsed) {
-  if (!parsed || !parsed.isValid) return false;
+  if (!parsed) return false;
+
+  // Handle background commands
+  if (parsed.type === "update-background") {
+    return parsed.isValid && parsed.target && parsed.properties;
+  }
+
+  // Handle insert commands
+  if (!parsed.isValid) return false;
   if (!parsed.elementType) return false;
   if (!parsed.properties || Object.keys(parsed.properties).length === 0)
     return false;
@@ -5787,7 +5992,20 @@ function isValidBuilderCommand(parsed) {
 function commandToElementSpec(parsed) {
   if (!isValidBuilderCommand(parsed)) return null;
 
-  // Convert parsed command to element spec for canvas rendering
+  // Handle background commands
+  if (parsed.type === "update-background") {
+    return {
+      type: "background",
+      target: parsed.target,
+      imageUrl: parsed.imageUrl,
+      imageDescription: parsed.imageDescription,
+      styles: parsed.properties,
+      isFromCommand: true,
+      isBackgroundCommand: true,
+    };
+  }
+
+  // Handle insert commands
   return {
     type: parsed.elementType,
     label: parsed.elementType,
