@@ -2001,6 +2001,342 @@ Be warm, encouraging, and always break things down into manageable steps.`,
 
     return prompts[topic] || prompts.general;
   }
+
+  /**
+   * Get the Command Formatter System Prompt for Groq
+   * This makes Groq act as a strict builder command formatter ONLY
+   * No explanations, markdown, or conversational text - ONLY commands
+   */
+  getCommandFormatterSystemPrompt() {
+    return `You are an elite web builder command formatter for a professional AI website builder.
+
+Your task is to convert natural language website requests into strict builder commands ONLY.
+
+CRITICAL RULES:
+- Output ONLY valid builder commands.
+- NO explanations, markdown, comments, JSON, code blocks, or extra text.
+- NO conversational responses.
+- Each command on a new line.
+- Infer missing design details professionally and automatically.
+- Expand vague requests into complete production-ready styles.
+- Generate modern, visually polished UI properties.
+- Include animations/background/image/layout styles when implied.
+- Ensure output is parser-safe and strictly follows syntax.
+
+COMMAND SYNTAX:
+insert <element_type> <property; property; property; ...>
+
+PROPERTY INTELLIGENCE - Convert these requests to CSS properties:
+- "round" or "rounded" → border-radius:50%;
+- "shadow" → box-shadow:0 8px 24px rgba(0,0,0,0.15);
+- "glass" or "frosted" → backdrop-filter:blur(12px); background:rgba(255,255,255,0.15);
+- "centered" → display:flex; justify-content:center; align-items:center;
+- "shadow" → box-shadow:0 4px 12px rgba(0,0,0,0.1);
+- "animated" or "bouncing" → animation:bounce 2s infinite ease-in-out;
+- "gradient" → background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+- "floating" → transform:translateY(-4px); box-shadow:0 8px 24px rgba(0,0,0,0.2);
+
+EXAMPLE CONVERSIONS:
+
+User: "Make a round bouncing red button"
+Output:
+insert button background:red; width:48px; height:48px; border-radius:50%; border:none; padding:0; cursor:pointer; animation:bounce 2s infinite ease-in-out; box-shadow:0 4px 12px rgba(0,0,0,0.15);
+
+User: "Create a centered hero section with gradient background"
+Output:
+insert section width:100%; min-height:100vh; display:flex; justify-content:center; align-items:center; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding:40px;
+
+User: "Add a glass card with shadow"
+Output:
+insert div width:320px; padding:24px; border-radius:16px; background:rgba(255,255,255,0.15); backdrop-filter:blur(12px); box-shadow:0 8px 24px rgba(0,0,0,0.1); border:1px solid rgba(255,255,255,0.2);
+
+REQUIRED DEFAULTS (infer automatically):
+- Padding: 16px-24px for containers, 12px for buttons
+- Border-radius: 8px for cards/inputs, 50% for circles
+- Font-size: 16px base, 14px small text, 24px headings
+- Shadows: 0 4px 12px rgba(0,0,0,0.1) default
+- Colors: Use professional palettes (grays, blues, purples)
+- Spacing: Balanced margins (16px, 24px, 32px increments)
+
+INFER USER INTENT:
+If user input is vague or unclear, predict the most likely professional intention and create the best design for it.
+
+OUTPUT ONLY COMMANDS - Nothing else. No explanation.`;
+  }
+
+  /**
+   * Validate builder command syntax
+   * Returns true if command follows: insert <element_type> <properties>
+   */
+  isValidBuilderCommand(command = "") {
+    const trimmed = String(command || "").trim();
+    if (!trimmed) return false;
+
+    // Must start with 'insert'
+    if (!trimmed.toLowerCase().startsWith("insert ")) return false;
+
+    // Must have element type and at least one property
+    const parts = trimmed.split(/\s+/);
+    if (parts.length < 3) return false; // 'insert', 'element_type', property...
+
+    // Check if it contains property syntax (semicolons or colon for CSS)
+    if (!trimmed.includes(":") && !trimmed.includes(";")) return false;
+
+    return true;
+  }
+
+  /**
+   * Extract commands from Groq response
+   * Filters out any non-command text and returns only valid commands
+   */
+  extractValidCommands(groqResponse = "") {
+    const text = String(groqResponse || "").trim();
+    if (!text) return [];
+
+    // Split by newlines
+    const lines = text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    // Filter to only valid commands
+    const validCommands = lines.filter((line) =>
+      this.isValidBuilderCommand(line),
+    );
+
+    return validCommands;
+  }
+
+  /**
+   * Parse a single builder command into structured object
+   * Example: "insert button width:48px; height:48px; border-radius:50%;"
+   * Returns: { elementType: 'button', properties: { width: '48px', height: '48px', ... } }
+   */
+  parseBuilderCommand(command = "") {
+    const trimmed = String(command || "").trim();
+    if (!this.isValidBuilderCommand(trimmed)) {
+      return null;
+    }
+
+    // Remove 'insert' prefix
+    const withoutInsert = trimmed.replace(/^insert\s+/i, "").trim();
+
+    // Split element type from properties
+    const parts = withoutInsert.split(/\s+/);
+    const elementType = parts[0];
+    const propertiesStr = withoutInsert.replace(elementType, "").trim();
+
+    // Parse properties (format: key:value; key:value;)
+    const properties = {};
+    const propPairs = propertiesStr
+      .split(";")
+      .map((pair) => pair.trim())
+      .filter(Boolean);
+
+    for (const pair of propPairs) {
+      const [key, value] = pair.split(":").map((s) => s.trim());
+      if (key && value) {
+        properties[key] = value;
+      }
+    }
+
+    return {
+      command: trimmed,
+      elementType,
+      properties,
+      rawProperties: propertiesStr,
+      isValid: Object.keys(properties).length > 0,
+    };
+  }
+
+  /**
+   * Batch parse multiple commands from Groq response
+   * Returns array of parsed command objects
+   */
+  parseBuilderCommands(groqResponse = "") {
+    const validCommands = this.extractValidCommands(groqResponse);
+    return validCommands
+      .map((cmd) => this.parseBuilderCommand(cmd))
+      .filter(Boolean);
+  }
+
+  /**
+   * Format commands for response
+   * Returns clean, parser-safe command strings
+   */
+  formatCommandsForResponse(commands = []) {
+    return Array.isArray(commands)
+      ? commands.map((cmd) =>
+          String(cmd || "")
+            .trim()
+            .replace(/\s+/g, " "),
+        )
+      : [];
+  }
+
+  /**
+   * Convert intent JSON from online AI into builder command
+   * Takes structured intent and converts to: insert <element> <properties>
+   */
+  convertIntentToCommand(intentData = {}) {
+    if (!intentData || !intentData.elementType) {
+      return null;
+    }
+
+    const elementType = String(intentData.elementType || "div").toLowerCase();
+    const props = intentData.properties || {};
+    const cssProps = [];
+
+    // Map intent properties to CSS properties
+    if (props.description) {
+      // Handle visual description (round, shadow, glass, etc.)
+      const desc = String(props.description || "").toLowerCase();
+
+      // Shape/Border
+      if (desc.includes("round")) {
+        cssProps.push("border-radius:50%");
+      } else if (desc.includes("rounded")) {
+        cssProps.push("border-radius:12px");
+      }
+
+      // Shadow
+      if (desc.includes("shadow")) {
+        cssProps.push("box-shadow:0 8px 24px rgba(0,0,0,0.15)");
+      }
+
+      // Glass effect
+      if (desc.includes("glass") || desc.includes("frosted")) {
+        cssProps.push("backdrop-filter:blur(12px)");
+        cssProps.push("background:rgba(255,255,255,0.15)");
+        cssProps.push("border:1px solid rgba(255,255,255,0.2)");
+      }
+
+      // Gradient
+      if (desc.includes("gradient")) {
+        cssProps.push(
+          "background:linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        );
+      }
+    }
+
+    // Add colors from properties
+    if (Array.isArray(props.colors) && props.colors.length > 0) {
+      const firstColor = String(props.colors[0] || "")
+        .trim()
+        .toLowerCase();
+      const colorMap = {
+        red: "#FF0000",
+        blue: "#0066FF",
+        green: "#00CC00",
+        yellow: "#FFD700",
+        purple: "#9500FF",
+        pink: "#FF1493",
+        white: "#FFFFFF",
+        black: "#000000",
+        gray: "#808080",
+        orange: "#FF6600",
+      };
+      const hexColor = colorMap[firstColor] || firstColor;
+      if (firstColor) {
+        cssProps.push(`background:${hexColor}`);
+      }
+    }
+
+    // Add animations
+    if (Array.isArray(props.animations) && props.animations.length > 0) {
+      const animationMap = {
+        bounce: "animation:bounce 2s infinite ease-in-out",
+        glow: "animation:glow 2s infinite",
+        pulse: "animation:pulse 2s infinite",
+        spin: "animation:spin 1s linear infinite",
+        slide: "animation:slide 0.5s ease-in-out",
+      };
+      const firstAnim = String(props.animations[0] || "").toLowerCase();
+      if (animationMap[firstAnim]) {
+        cssProps.push(animationMap[firstAnim]);
+      }
+    }
+
+    // Add effects
+    if (Array.isArray(props.effects)) {
+      const effects = props.effects.map((e) => String(e || "").toLowerCase());
+      if (
+        effects.includes("shadow") &&
+        !cssProps.some((p) => p.includes("box-shadow"))
+      ) {
+        cssProps.push("box-shadow:0 4px 12px rgba(0,0,0,0.1)");
+      }
+      if (effects.includes("glow")) {
+        cssProps.push("filter:drop-shadow(0 0 10px rgba(0,255,255,0.5))");
+      }
+    }
+
+    // Layout properties
+    if (props.layout === "centered" || props.layout === "center") {
+      cssProps.push("display:flex");
+      cssProps.push("justify-content:center");
+      cssProps.push("align-items:center");
+    } else if (props.layout === "flex") {
+      cssProps.push("display:flex");
+      cssProps.push("flex-wrap:wrap");
+      cssProps.push("gap:16px");
+    } else if (props.layout === "grid") {
+      cssProps.push("display:grid");
+      cssProps.push(
+        "grid-template-columns:repeat(auto-fit, minmax(200px, 1fr))",
+      );
+      cssProps.push("gap:16px");
+    }
+
+    // Positioning
+    if (props.positioning) {
+      const pos = String(props.positioning || "").toLowerCase();
+      if (pos.includes("top")) {
+        cssProps.push("position:fixed");
+        cssProps.push("top:0");
+        cssProps.push("left:0");
+        cssProps.push("right:0");
+      } else if (pos.includes("bottom")) {
+        cssProps.push("position:fixed");
+        cssProps.push("bottom:0");
+        cssProps.push("left:0");
+        cssProps.push("right:0");
+      }
+    }
+
+    // Add default spacing if it's a container
+    if (["div", "section", "container", "card"].includes(elementType)) {
+      if (!cssProps.some((p) => p.includes("padding"))) {
+        cssProps.push("padding:24px");
+      }
+      if (
+        !cssProps.some((p) => p.includes("border-radius")) &&
+        elementType === "card"
+      ) {
+        cssProps.push("border-radius:12px");
+      }
+    }
+
+    // Add default sizing for sections
+    if (elementType === "section") {
+      if (!cssProps.some((p) => p.includes("width"))) {
+        cssProps.push("width:100%");
+      }
+      if (!cssProps.some((p) => p.includes("min-height"))) {
+        cssProps.push("min-height:100vh");
+      }
+    }
+
+    // Remove duplicates
+    const uniqueProps = [...new Set(cssProps)];
+
+    // Build final command
+    if (uniqueProps.length === 0) {
+      return null;
+    }
+
+    return `insert ${elementType} ${uniqueProps.join("; ")};`;
+  }
 }
 
 // Export for use in Node/Webpack environments

@@ -4560,6 +4560,303 @@ You are a standalone autonomous system.`,
   }
 });
 
+// ========== INTENT ANALYSIS ENDPOINT ==========
+// Stage 1: Online AI analyzes user input → returns structured JSON/commands
+// ========== INTENT ANALYSIS & COMMAND CLEANUP ==========
+// Stage 1: Xtra AI (Online Groq) cleans up messy natural commands → returns builder commands
+// Stage 2: WorkflowBrain validates and parses the output
+// Stage 3: Canvas renders the result
+app.post("/api/workflow/format-command", async (req, res) => {
+  try {
+    await refreshAIModelsRegistryIfNeeded(false);
+
+    if (!req.isAuthenticated?.() || !req.user?._id) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Login required." });
+    }
+
+    if (!GROQ_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        message: "Missing GROQ_API_KEY configuration.",
+      });
+    }
+
+    const userInput = String(req.body?.input || "").trim();
+    if (!userInput) {
+      return res
+        .status(400)
+        .json({ success: false, message: "User input is required." });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
+    }
+
+    if (!user.aiQuota) {
+      user.aiQuota = { dailyLimit: 10, usedToday: 0, lastUsed: null };
+    }
+
+    const now = new Date();
+    if (!isSameCalendarDay(user.aiQuota.lastUsed, now)) {
+      user.aiQuota.usedToday = 0;
+    }
+
+    const hasUnlimitedAi = isUnlimitedAiUser(user);
+    const dailyLimit = Number(user.aiQuota.dailyLimit ?? 10);
+    const usedToday = Number(user.aiQuota.usedToday ?? 0);
+
+    if (!hasUnlimitedAi && usedToday >= dailyLimit) {
+      return res.status(403).json({
+        success: false,
+        message: "Daily AI credits reached. Upgrade to MediaLab Pro.",
+      });
+    }
+
+    // Stage 1: Use ONLINE AI models (Xtra AI) for command analysis & cleanup
+    // This is the external Groq API - understands messy natural commands and returns cleaned builder commands
+    let models = await AIModel.find({ isActive: true })
+      .sort({ priority: 1, status: -1, modelId: 1 })
+      .lean();
+
+    models = buildOnlineOnlyModels(models);
+
+    if (!models.length) {
+      await refreshAIModelsRegistryIfNeeded(true);
+      models = await AIModel.find({ isActive: true })
+        .sort({ priority: 1, status: -1, modelId: 1 })
+        .lean();
+      models = buildOnlineOnlyModels(models);
+    }
+
+    if (!models.length) {
+      // Last resort: use online models from registry
+      models = AI_MODEL_REGISTRY.filter((m) => m.type === "online").map(
+        (m) => ({
+          modelId: m.modelId,
+          provider: m.provider,
+          priority: m.priority,
+          type: "online",
+          status: "online",
+          isActive: true,
+        }),
+      );
+    }
+
+    if (!models.length) {
+      return res.status(503).json({
+        success: false,
+        message: "No Xtra AI models available for command cleanup.",
+      });
+    }
+
+    let formattedCommands = [];
+    let groqResponse = "";
+    let modelUsed = "";
+    let lastError = null;
+
+    // Stage 1: Try each online model (Xtra AI) - send messy natural command to Groq
+    for (const model of models) {
+      try {
+        // Xtra AI system prompt: STRICT web builder command cleaner - ONLY processes UI/design requests
+        const systemPrompt = `You are MediaLab Xtra AI Builder - a STRICT web element command converter.
+
+**PURPOSE**: Convert ONLY messy web UI/design requests into clean builder commands.
+**NOT FOR**: General questions, non-builder requests, factual questions, trivia, or conversations.
+
+IF THE INPUT IS NOT A WEB UI/DESIGN REQUEST, RESPOND WITH: "cannot-process"
+
+Web UI/design keywords (process these):
+- "give me", "create", "make", "build", "add", "insert" + element names
+- Style words: "red", "button", "div", "blue", "border", "margin", "padding", "shadow", etc.
+
+Non-builder requests (respond with "cannot-process"):
+- Questions: "who is", "what is", "how do I", "tell me about"
+- Unrelated topics: politics, geography, history, math, general knowledge
+- Chit-chat: greetings, random conversation
+
+**EXAMPLE CONVERSIONS** (process only if builder-related):
+1. Input: "give me a div with text contert hello world and left margin like 50px and its yellow, the outline is 100px nd green"
+   Output: insert div color:yellow; margin-left:50px; border:100px solid green; padding:16px;
+
+2. Input: "make button red text click me"
+   Output: insert button background:red; color:white; padding:12px 20px;
+
+3. Input: "Who is the president of Kenya?"
+   Output: cannot-process
+
+Command Format: insert <tag> <property:value; property:value;>;
+- Properties use CSS dash-case (margin-left, border-radius, box-shadow)
+- Values use CSS syntax (colors, measurements, etc)
+- Each property ends with semicolon
+- No explanations or markdown
+
+STRICT RULES:
+1. ONLY return builder commands for UI/design requests
+2. For non-builder: respond ONLY with "cannot-process" (nothing else)
+3. Fix spelling and interpret visual intent from messy input
+4. Return 1-3 commands maximum
+5. NO JSON, NO EXPLANATIONS, NO MARKDOWN`;
+
+        const groqCall = await nodeFetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${GROQ_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: model.modelId,
+              temperature: 0.3, // Low temperature for consistency
+              max_tokens: 500,
+              messages: [
+                {
+                  role: "system",
+                  content: systemPrompt,
+                },
+                {
+                  role: "user",
+                  content: userInput,
+                },
+              ],
+            }),
+          },
+        );
+
+        if (!groqCall.ok) {
+          const errText = await groqCall.text();
+          throw new Error(errText || `Groq failed for ${model.modelId}`);
+        }
+
+        const payload = await groqCall.json();
+        groqResponse = String(payload?.choices?.[0]?.message?.content || "")
+          .trim()
+          .replace(/<think>[\s\S]*?<\/think>/g, "");
+
+        if (!groqResponse) {
+          throw new Error("Groq returned empty response");
+        }
+
+        // Check if Groq rejected the request as non-builder
+        if (
+          groqResponse
+            .toLowerCase()
+            .includes("cannot-process")
+        ) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "This request is not a web builder/UI design command. Please ask for UI elements like buttons, divs, cards, etc.",
+            input: userInput,
+            isBuilderRequest: false,
+          });
+        }
+
+        // Stage 2: WorkflowBrain validates the builder commands
+        const parsedCommands = workflowBrain.parseBuilderCommands(groqResponse);
+
+        if (parsedCommands && parsedCommands.length > 0) {
+          formattedCommands = parsedCommands.map((cmd) => ({
+            command: `insert ${cmd.elementType} ${Object.entries(cmd.properties)
+              .map(([key, value]) => `${key}:${value}`)
+              .join("; ")};`,
+            elementType: cmd.elementType,
+            properties: cmd.properties,
+            isValid: cmd.isValid,
+          }));
+          modelUsed = model.modelId;
+
+          // Mark model as successful
+          await AIModel.updateOne(
+            { _id: model._id },
+            { $set: { status: "online", lastTested: new Date() } },
+          );
+
+          break; // Success - stop trying other models
+        }
+      } catch (modelError) {
+        console.error(
+          `[COMMAND_FORMATTER] Model ${model.modelId} failed:`,
+          modelError.message,
+        );
+        lastError = modelError;
+
+        await AIModel.updateOne(
+          { _id: model._id },
+          { $set: { status: "offline", lastTested: new Date() } },
+        );
+      }
+    }
+
+    if (!modelUsed) {
+      return res.status(503).json({
+        success: false,
+        message: "Command formatting failed: No models available.",
+        details: lastError?.message || "Unknown error",
+      });
+    }
+
+    // Update usage
+    user.aiQuota.usedToday = Number(user.aiQuota.usedToday || 0) + 1;
+    user.aiQuota.lastUsed = now;
+    await user.save();
+
+    await createUsageLog({
+      user,
+      action: "xtra-ai-command-cleanup",
+      summary: `Xtra AI cleaned up messy command into ${formattedCommands.length} valid builder commands via ${modelUsed}`,
+      source: "xtra-ai",
+      metadata: {
+        modelUsed,
+        commandCount: formattedCommands.length,
+        inputLength: userInput.length,
+      },
+    });
+
+    // Return formatted commands
+    return res.json({
+      success: true,
+      input: userInput,
+      commands: formattedCommands.map((cmd) => cmd.command),
+      parsedCommands: formattedCommands,
+      commandCount: formattedCommands.length,
+      modelUsed,
+      groqResponse,
+      creditsRemaining: hasUnlimitedAi
+        ? null
+        : Math.max(
+            0,
+            Number(user.aiQuota.dailyLimit || 10) -
+              Number(user.aiQuota.usedToday || 0),
+          ),
+    });
+  } catch (error) {
+    console.error("[XTRA_AI_CLEANUP] Endpoint error:", error);
+    await createUsageLog({
+      user: req.user || null,
+      email: req.user?.email || "",
+      name: req.user?.name || "",
+      action: "xtra-ai-command-cleanup-error",
+      summary: `[error] Xtra AI command cleanup failed: ${String(error?.message || "unknown")}`,
+      source: "xtra-ai",
+      kind: "error",
+      metadata: {
+        endpoint: "/api/workflow/format-command",
+      },
+    });
+
+    res.status(500).json({
+      success: false,
+      message: error.message || "Command formatting failed.",
+    });
+  }
+});
+
 app.post("/api/ai/chat-edit", async (req, res) => {
   try {
     await refreshAIModelsRegistryIfNeeded(false);
@@ -4661,7 +4958,8 @@ app.post("/api/ai/chat-edit", async (req, res) => {
     // Chat-edit uses ONLY online exclusive models, NEVER workflow models
     models = buildOnlineOnlyModels(models);
     if (!models.length) {
-      // Self-heal: force a fresh model sync, then probe active models anyway.
+      // Self-heal: ensure all registry models are in database
+      await ensureAIModelsRegistry();
       modelRecoveryUsed = true;
       await refreshAIModelsRegistryIfNeeded(true);
       models = await AIModel.find({ isActive: true })
@@ -4669,6 +4967,19 @@ app.post("/api/ai/chat-edit", async (req, res) => {
         .lean();
       // Again, use ONLINE-ONLY models
       models = buildOnlineOnlyModels(models);
+    }
+    if (!models.length) {
+      // Last resort: just use all online model IDs from registry directly
+      models = AI_MODEL_REGISTRY.filter((m) => m.type === "online").map(
+        (m) => ({
+          modelId: m.modelId,
+          provider: m.provider,
+          priority: m.priority,
+          type: "online",
+          status: "online",
+          isActive: true,
+        }),
+      );
     }
     if (!models.length) {
       return res.status(503).json({
