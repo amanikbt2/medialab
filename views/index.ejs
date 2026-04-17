@@ -2167,6 +2167,17 @@
         position: relative;
         margin-bottom: 0;
         flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+      .ai-model-icon {
+        width: 20px;
+        height: 20px;
+        border-radius: 0.5rem;
+        object-fit: cover;
+        flex-shrink: 0;
+        border: 1px solid rgba(148, 163, 184, 0.2);
       }
       .ai-chat-model-picker {
         width: 100%;
@@ -21121,6 +21132,7 @@
                       <div class="ai-chat-shell">
                           <div class="ai-chat-topbar">
                               <div class="ai-chat-model-wrap">
+                                  <img src="/mediafiles/wf.jpg" alt="AI" class="ai-model-icon" />
                                   <select id="ai-model-picker" onchange="changeAiModel(this.value)" class="ai-chat-model-picker">
                                       <option value="workflow">Workflow AI ↗</option>
                                       <option value="xtra">Xtra AI (Auto-Best)</option>
@@ -33270,12 +33282,14 @@
           link.removeEventListener("click", showLogin);
           link.addEventListener("click", showLogin);
         });
-        if (statusEl) statusEl.textContent = "Model: " + (aiActiveModel || "standby");
-        if (creditsEl) creditsEl.textContent =
-          aiCreditsRemaining == null
-            ? "Credits: Pro"
-            : "Credits: " +
-              String(Math.max(0, Number(aiCreditsRemaining || 0)));
+        if (statusEl)
+          statusEl.textContent = "Model: " + (aiActiveModel || "standby");
+        if (creditsEl)
+          creditsEl.textContent =
+            aiCreditsRemaining == null
+              ? "Credits: Pro"
+              : "Credits: " +
+                String(Math.max(0, Number(aiCreditsRemaining || 0)));
         if (recoveryEl)
           recoveryEl.classList.toggle(
             "hidden",
