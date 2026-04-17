@@ -2057,7 +2057,7 @@
       .ai-chat-topbar {
         display: flex;
         align-items: flex-start;
-        justify-content: space-between;
+        justify-content: flex-end;
         gap: 0.9rem;
         margin-bottom: 0.85rem;
       }
@@ -2068,6 +2068,7 @@
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: #f8fafc;
+        display: none;
       }
       .ai-chat-title span {
         display: block;
@@ -2076,6 +2077,36 @@
         margin-top: 0.45rem;
         font-size: 12px;
         color: #a5b4c8;
+        display: none;
+      }
+      .ai-xp-display {
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: #fbbf24;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      .ai-xp-display sup {
+        font-size: 0.65em;
+        vertical-align: super;
+        font-weight: 600;
+        margin-left: 0.15rem;
+      }
+      #ai-xp-progress-bar {
+        margin: 0 1rem -0.85rem 1rem;
+        margin-bottom: 0.85rem;
+      }
+      .ai-xp-change {
+        font-size: 10px;
+        font-weight: 600;
+      }
+      .ai-xp-change.gain {
+        color: #4ade80;
+      }
+      .ai-xp-change.loss {
+        color: #f87171;
       }
       .ai-chat-top-actions {
         display: flex;
@@ -21080,17 +21111,15 @@
                   <div id="ai-chat-popup" class="ai-chat-popup hidden" onclick="if(event.target.id === 'ai-chat-popup') closeBuilderAiChat();">
                       <div class="ai-chat-shell">
                           <div class="ai-chat-topbar">
-                              <div>
-                                  <p class="ai-chat-title"><span>MediaLab</span><span>AI Architect</span></p>
-                                  <p id="ai-status-indicator" class="ai-chat-statusline">Model: standby</p>
-                              </div>
                               <div class="ai-chat-top-actions">
-                                  <span id="ai-recovery-badge" class="hidden rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-amber-200">Recovering...</span>
-                                  <span id="ai-credits-badge" class="ai-chat-credit-pill">Credits: --</span>
+                                  <span id="ai-xp-display" class="ai-xp-display">0XP</span>
                                   <button onclick="closeBuilderAiChat()" class="ai-chat-close" title="Close chat">
                                       <i class="fas fa-times text-sm"></i>
                                   </button>
                               </div>
+                          </div>
+                          <div id="ai-xp-progress-bar" class="h-1 bg-white/10 rounded-full overflow-hidden">
+                              <div class="h-full w-0 bg-gradient-to-r from-amber-400 via-yellow-300 to-orange-400 transition-all duration-300"></div>
                           </div>
                           <div class="ai-chat-model-wrap">
                               <select id="ai-model-picker" onchange="changeAiModel(this.value)" class="ai-chat-model-picker">
@@ -33341,6 +33370,34 @@
           popup.classList.add("hidden");
         }
       }
+      function updateAiXpDisplay(xpChange = 0) {
+        const xpDisplay = document.getElementById("ai-xp-display");
+        const progressBar = document.getElementById("ai-xp-progress-bar");
+        if (!xpDisplay) return;
+        
+        // Update total XP (you can store this in a variable or data attribute)
+        let currentXP = parseInt(xpDisplay.dataset.currentXp || "0", 10);
+        currentXP = Math.max(0, currentXP + xpChange);
+        xpDisplay.dataset.currentXp = String(currentXP);
+        
+        // Format XP display with change indicator as superscript
+        let displayText = currentXP + "XP";
+        if (xpChange !== 0) {
+          const changeSymbol = xpChange > 0 ? "+" : "";
+          const changeClass = xpChange > 0 ? "text-emerald-300" : "text-red-300";
+          displayText = `${currentXP}XP<sup class="${changeClass} text-[0.65em]">${changeSymbol}${xpChange}</sup>`;
+        }
+        xpDisplay.innerHTML = displayText;
+        
+        // Update progress bar width (example: 0-100 XP)
+        if (progressBar) {
+          const progressChild = progressBar.querySelector("div");
+          if (progressChild) {
+            const percentFull = Math.min(100, (currentXP % 100));
+            progressChild.style.width = percentFull + "%";
+          }
+        }
+      }
       function startNewAiChat() {
         const confirmed = confirm(
           "Start a new chat? This will clear the current conversation history.",
@@ -37447,9 +37504,9 @@
           error?.error?.code === "rate_limit_exceeded"
         ) {
           if (error?.type === "tokens" || error?.error?.type === "tokens") {
-            return "⚠️ Token limit reached. Please try again in a few moments or reduce your message size.";
+            return "🚀 Xtra AI is being used by many people now, try again in a minute.";
           }
-          return "⚠️ Rate limit reached. Please try again in a few moments.";
+          return "🚀 Xtra AI is being used by many people now, try again in a minute.";
         }
 
         // Check for rate limit in error message string
@@ -37457,7 +37514,7 @@
           typeof error === "string" &&
           error.includes("rate_limit_exceeded")
         ) {
-          return "⚠️ Rate limit reached. Please try again in a few moments.";
+          return "🚀 Xtra AI is being used by many people now, try again in a minute.";
         }
 
         // Check for token limit messages
@@ -37467,7 +37524,36 @@
             error.includes("Request too large") ||
             error.includes("TPM"))
         ) {
-          return "⚠️ Token limit reached. Please try again in a few moments or reduce your message size.";
+          return "🚀 Xtra AI is being used by many people now, try again in a minute.";
+        }
+
+        // Parse JSON error objects (like the Groq error format)
+        if (typeof error === "string") {
+          try {
+            const parsed = JSON.parse(error);
+            if (
+              parsed?.error?.code === "rate_limit_exceeded" ||
+              parsed?.code === "rate_limit_exceeded"
+            ) {
+              return "🚀 Xtra AI is being used by many people now, try again in a minute.";
+            }
+            if (parsed?.error?.message) {
+              return parsed.error.message;
+            }
+          } catch (e) {
+            // Not JSON, continue with string checks
+          }
+
+          // Check raw string for rate limit
+          if (
+            error.includes("rate_limit") ||
+            error.includes("TPM") ||
+            error.includes("tokens per minute")
+          ) {
+            return "🚀 Xtra AI is being used by many people now, try again in a minute.";
+          }
+
+          return error;
         }
 
         // Fallback to original error message if available
@@ -37475,11 +37561,24 @@
           return error.message;
         }
 
-        if (typeof error === "string") {
-          return error;
-        }
-
         return "Could not complete AI request.";
+      }
+
+      function createAiRetryMessage(originalPrompt) {
+        return `<div style="margin-top: 0.5rem; padding: 0.75rem; border-radius: 0.5rem; background: rgba(34, 211, 238, 0.08); border: 1px solid rgba(34, 211, 238, 0.2);">
+          <button onclick="retryAiChatMessage(\`${escapeAttr(originalPrompt)}\`)" style="padding: 0.5rem 1rem; background: #0ea5e9; color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-weight: 500; font-size: 0.875rem;">
+            🔄 Retry
+          </button>
+        </div>`;
+      }
+
+      function retryAiChatMessage(prompt) {
+        if (!prompt) return;
+        const input = document.getElementById("ai-chat-input");
+        if (input) {
+          input.value = prompt;
+          sendBuilderAiChat();
+        }
       }
 
       async function sendBuilderAiChat() {
@@ -37871,19 +37970,47 @@
 
           // Parse error for user-friendly message
           let errorMessage;
+          let isRateLimit = false;
           if (error?.apiError) {
             errorMessage = parseAiError(error.apiError);
+            isRateLimit =
+              error.apiError?.code === "rate_limit_exceeded" ||
+              error.apiError?.error?.code === "rate_limit_exceeded" ||
+              (typeof error.apiError === "string" &&
+                (error.apiError.includes("rate_limit_exceeded") ||
+                  error.apiError.includes("TPM")));
           } else {
             errorMessage = parseAiError(error);
+            isRateLimit =
+              error?.code === "rate_limit_exceeded" ||
+              error?.error?.code === "rate_limit_exceeded" ||
+              (typeof error === "string" &&
+                (error.includes("rate_limit_exceeded") ||
+                  error.includes("TPM"))) ||
+              (error?.message && error.message.includes("rate_limit"));
           }
 
-          appendAiChatMessage(
-            {
-              role: "assistant",
-              text: errorMessage,
-            },
-            { typing: true },
-          );
+          // Add retry button for rate limit errors
+          let displayHtml;
+          if (isRateLimit) {
+            displayHtml = `<div>${errorMessage}${createAiRetryMessage(prompt)}</div>`;
+            appendAiChatMessage(
+              {
+                role: "assistant",
+                html: displayHtml,
+                text: errorMessage,
+              },
+              { typing: true },
+            );
+          } else {
+            appendAiChatMessage(
+              {
+                role: "assistant",
+                text: errorMessage,
+              },
+              { typing: true },
+            );
+          }
           setAiAgentStage("idle");
           renderBuilderAiChat();
         } finally {
