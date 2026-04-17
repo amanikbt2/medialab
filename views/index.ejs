@@ -2166,20 +2166,30 @@
       .ai-chat-model-wrap {
         position: relative;
         margin-bottom: 0;
-        max-width: 240px;
-        width: 100%;
+        flex: 1;
       }
-      .ai-model-logo {
+      .ai-model-pulse {
         position: absolute;
-        top: 0.6rem;
-        left: 0.6rem;
-        width: 48px;
-        height: 48px;
-        border-radius: 0.8rem;
-        object-fit: cover;
-        border: 1.5px solid rgba(148, 163, 184, 0.3);
-        box-shadow: 0 4px 12px rgba(2, 6, 23, 0.4);
+        top: 1rem;
+        left: 1rem;
+        width: 12px;
+        height: 12px;
+        background: #10b981;
+        border-radius: 50%;
         z-index: 10;
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+        animation: aiPulseDot 2s infinite;
+      }
+      @keyframes aiPulseDot {
+        0% {
+          box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+        }
+        50% {
+          box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+        }
       }
       .ai-model-icon {
         width: 20px;
@@ -2200,9 +2210,9 @@
           rgba(9, 14, 26, 0.9)
         );
         color: #f8fafc;
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 700;
-        padding: 0.65rem 2.4rem 0.65rem 0.85rem;
+        padding: 0.75rem 2.6rem 0.75rem 1rem;
         outline: none;
         box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
       }
@@ -21141,7 +21151,7 @@
                   </div>
                   <div id="ai-chat-popup" class="ai-chat-popup hidden" onclick="if(event.target.id === 'ai-chat-popup') closeBuilderAiChat();">
                       <div class="ai-chat-shell">
-                          <img src="/mediafiles/wf.jpg" alt="AI Logo" class="ai-model-logo" />
+                          <div class="ai-model-pulse"></div>
                           <div class="ai-chat-topbar">
                               <div class="ai-chat-model-wrap">
                                   <select id="ai-model-picker" onchange="changeAiModel(this.value)" class="ai-chat-model-picker">
