@@ -33121,25 +33121,15 @@
           dragDiv.appendChild(inspectorBtn);
           dragDiv.appendChild(deleteBtn);
 
-          // Build element-body
-          const elementBody = document.createElement("div");
-          elementBody.className = "element-body w-full h-full overflow-visible";
-          elementBody.style.width = "100%";
-          elementBody.style.height = "100%";
-          elementBody.style.overflow = "visible";
-          elementBody.style.pointerEvents = "auto";
-          elementBody.style.position = "relative";
-
           // Create badge
           const badgeHtml = renderInteractionBadgeHtml();
           const badgeDiv = document.createElement("div");
           badgeDiv.innerHTML = badgeHtml;
 
-          // Assemble wrapper with all children
+          // Assemble wrapper with all children (no element-body wrapper - content goes directly in wrapper)
           wrapper.appendChild(handlesFragment);
           wrapper.appendChild(dragDiv);
           wrapper.appendChild(badgeDiv.firstChild || badgeDiv);
-          wrapper.appendChild(elementBody);
 
           // Add hover listeners to show/hide handles and controls
           wrapper.addEventListener("mouseenter", function () {
@@ -33281,81 +33271,64 @@
           if (wrapperStyle.transformOrigin)
             wrapper.style.transformOrigin = wrapperStyle.transformOrigin;
 
-          // Get the element body (already created above)
-          const body = elementBody;
-          if (body) {
-            // Apply visual styles (exclude wrapper positioning/size keys).
-            if (Object.keys(bodyStyle).length) {
-              Object.assign(body.style, bodyStyle);
-            }
-            // Always keep the body filling the wrapper (resizing changes wrapper).
-            body.style.width = "100%";
-            body.style.height = "100%";
-            body.style.left = "";
-            body.style.top = "";
-            body.style.right = "";
-            body.style.bottom = "";
-            body.style.position = body.style.position || "relative";
+          // Create a temporary container to parse HTML
+          const tempContainer = document.createElement("div");
+          let contentElement = null;
 
-            // Populate content
-            if (html) {
-              let cleanHtml = String(html).trim();
+          if (html) {
+            let cleanHtml = String(html).trim();
 
-              // Remove carousel/navigation buttons and arrow icons only
-              // Remove builder layout scroll buttons
-              cleanHtml = cleanHtml.replace(
-                /<button[^>]*builder-layout-scroll-btn[^>]*>[\s\S]*?<\/button>/gi,
-                "",
-              );
-              // Remove buttons with prev/next classes
-              cleanHtml = cleanHtml.replace(
-                /<button[^>]*(?:prev|next)[^>]*>[\s\S]*?<\/button>/gi,
-                "",
-              );
-              // Remove div with carousel-related classes
-              cleanHtml = cleanHtml.replace(
-                /<div[^>]*class="[^"]*(?:carousel-nav|nav-button)[^"]*"[^>]*>[\s\S]*?<\/div>/gi,
-                "",
-              );
-              // Remove all navigation/directional arrow icons EXCEPT fa-arrows-alt (drag handle)
-              cleanHtml = cleanHtml.replace(
-                /<i[^>]*fa-(?!arrows-alt)(?:chevron|angle|arrow)[^>]*><\/i>/gi,
-                "",
-              );
-              // Remove button elements that contain arrow-like content or navigation
-              cleanHtml = cleanHtml.replace(
-                /<button[^>]*>[\s\S]*?(?:<i[^>]*fa-(?:chevron|angle|arrow-left|arrow-right)[^>]*>[\s\S]*?<\/i>)[\s\S]*?<\/button>/gi,
-                "",
-              );
-              // Remove standalone < > characters that look like navigation arrows
-              cleanHtml = cleanHtml.replace(/(?:<|&lt;)\s*(?:>|&gt;)/g, "");
+            // Remove carousel/navigation buttons and arrow icons only
+            // Remove builder layout scroll buttons
+            cleanHtml = cleanHtml.replace(
+              /<button[^>]*builder-layout-scroll-btn[^>]*>[\s\S]*?<\/button>/gi,
+              "",
+            );
+            // Remove buttons with prev/next classes
+            cleanHtml = cleanHtml.replace(
+              /<button[^>]*(?:prev|next)[^>]*>[\s\S]*?<\/button>/gi,
+              "",
+            );
+            // Remove div with carousel-related classes
+            cleanHtml = cleanHtml.replace(
+              /<div[^>]*class="[^"]*(?:carousel-nav|nav-button)[^"]*"[^>]*>[\s\S]*?<\/div>/gi,
+              "",
+            );
+            // Remove all navigation/directional arrow icons EXCEPT fa-arrows-alt (drag handle)
+            cleanHtml = cleanHtml.replace(
+              /<i[^>]*fa-(?!arrows-alt)(?:chevron|angle|arrow)[^>]*><\/i>/gi,
+              "",
+            );
+            // Remove button elements that contain arrow-like content or navigation
+            cleanHtml = cleanHtml.replace(
+              /<button[^>]*>[\s\S]*?(?:<i[^>]*fa-(?:chevron|angle|arrow-left|arrow-right)[^>]*>[\s\S]*?<\/i>)[\s\S]*?<\/button>/gi,
+              "",
+            );
+            // Remove standalone < > characters that look like navigation arrows
+            cleanHtml = cleanHtml.replace(/(?:<|&lt;)\s*(?:>|&gt;)/g, "");
 
-              body.innerHTML = cleanHtml;
-            } else if (text) {
-              body.textContent = String(text);
-            } else {
-              body.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#999; font-size:14px;">Content</div>`;
-            }
+            tempContainer.innerHTML = cleanHtml;
+            contentElement = tempContainer.firstElementChild || tempContainer;
+          } else if (text) {
+            const textDiv = document.createElement("div");
+            textDiv.textContent = String(text);
+            contentElement = textDiv;
+          } else {
+            const placeholderDiv = document.createElement("div");
+            placeholderDiv.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#999; font-size:14px;">Content</div>`;
+            contentElement = placeholderDiv.firstElementChild || placeholderDiv;
+          }
 
-            // Normalize inserted content so it scales with the wrapper.
-            const normalizeFill = (node) => {
-              if (!node || node.nodeType !== 1) return;
-              // Ensure the inserted root fills the wrapper.
-              node.style.width = "100%";
-              node.style.height = "100%";
-              node.style.boxSizing = "border-box";
-              if (node.tagName === "SVG") {
-                node.setAttribute("width", "100%");
-                node.setAttribute("height", "100%");
-                node.style.display = "block";
-              }
-            };
-            if (body.children.length === 1) {
-              normalizeFill(body.firstElementChild);
-            }
-            body.querySelectorAll(".smart-element").forEach((node) => {
-              normalizeFill(node);
-            });
+          // Style the content element to fill the wrapper
+          if (contentElement) {
+            contentElement.style.width = contentElement.style.width || "100%";
+            contentElement.style.height = contentElement.style.height || "100%";
+            contentElement.style.boxSizing = "border-box";
+          }
+          if (contentElement) {
+            contentElement.style.width = contentElement.style.width || "100%";
+            contentElement.style.height = contentElement.style.height || "100%";
+            contentElement.style.boxSizing = "border-box";
           }
 
           // Apply data attributes
@@ -33385,6 +33358,11 @@
             const animStyle = document.createElement("style");
             animStyle.textContent = String(animations);
             document.head.appendChild(animStyle);
+          }
+
+          // Append content element directly to wrapper (no extra container)
+          if (contentElement) {
+            wrapper.appendChild(contentElement);
           }
 
           // Add to canvas and activate
@@ -33507,6 +33485,9 @@
           effects,
         } = analysis;
 
+        // Generate unique animation class for this element
+        const animationClass = `smart-anim-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
         // Size mappings
         const sizeMap = {
           small: { w: 80, h: 80, border: 2 },
@@ -33531,53 +33512,62 @@
           const borderStyle = hasBorder
             ? `${dims.border}px solid ${primaryColor}`
             : "none";
-          html = `<div class="smart-element smart-${shape}" style="
-                  width: ${dims.w}px;
-                  height: ${dims.h}px;
+          html = `<div style="
+                  width: 100%;
+                  height: 100%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
                   border: ${borderStyle};
                   border-radius: 50%;
                   background: ${color === "gradient" ? `linear-gradient(135deg, ${primaryColor}, #FF1493)` : "transparent"};
                   ${effects.includes("glow") ? `box-shadow: 0 0 30px ${primaryColor}, inset 0 0 30px rgba(0,255,255,0.3);` : ""}
                   ${effects.includes("shadow") ? `box-shadow: 0 10px 30px rgba(0,0,0,0.3);` : ""}
+                  box-sizing: border-box;
                 "></div>`;
         } else if (shape === "box" || shape === "square") {
           const borderStyle = hasBorder
             ? `${dims.border}px solid ${primaryColor}`
-            : "1px solid rgba(0,0,0,0.1)";
+            : "none";
           const borderLeft =
             borderPosition === "left"
               ? `${dims.border * 3}px solid ${primaryColor}`
               : "none";
-          html = `<div class="smart-element smart-box" style="
-                  width: ${dims.w}px;
-                  height: ${dims.h}px;
+          html = `<div style="
+                  width: 100%;
+                  height: 100%;
                   border: ${borderStyle};
-                  border-left: ${borderLeft};
+                  ${borderLeft !== "none" ? `border-left: ${borderLeft};` : ""}
                   background: ${color === "gradient" ? `linear-gradient(135deg, ${primaryColor}33, ${primaryColor}11)` : `${primaryColor}11`};
                   border-radius: ${effects.includes("frosted") ? "20px" : "8px"};
                   ${effects.includes("glow") ? `box-shadow: 0 0 20px ${primaryColor}44;` : ""}
                   ${effects.includes("shadow") ? `box-shadow: 0 10px 30px rgba(0,0,0,0.2);` : ""}
                   ${effects.includes("blur") ? "backdrop-filter: blur(10px);" : ""}
+                  box-sizing: border-box;
                 "></div>`;
         } else if (shape === "wave") {
-          html = `<svg class="smart-element smart-wave" width="${dims.w}" height="${dims.h}" viewBox="0 0 ${dims.w} ${dims.h}">
+          html = `<svg style="width: 100%; height: 100%; display: block;" viewBox="0 0 ${dims.w} ${dims.h}">
                   <path d="M0,${dims.h / 2} Q${dims.w / 4},${dims.h / 4} ${dims.w / 2},${dims.h / 2} T${dims.w},${dims.h / 2}"
                         stroke="${primaryColor}" stroke-width="3" fill="none" stroke-linecap="round"/>
                 </svg>`;
         } else if (shape === "dot" || shape === "ball") {
-          html = `<div class="smart-element smart-dot" style="
-                  width: ${dims.w}px;
-                  height: ${dims.h}px;
+          html = `<div style="
+                  width: 100%;
+                  height: 100%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
                   background: ${color === "gradient" ? `radial-gradient(circle at 30% 30%, ${primaryColor}, #FF1493)` : primaryColor};
                   border-radius: 50%;
                   ${effects.includes("glow") ? `box-shadow: 0 0 40px ${primaryColor}, 0 0 80px ${primaryColor}88;` : ""}
                   ${effects.includes("shadow") ? `box-shadow: 0 15px 35px rgba(0,0,0,0.3);` : ""}
+                  box-sizing: border-box;
                 "></div>`;
         } else {
           // Default: creative container
-          html = `<div class="smart-element smart-custom" style="
-                  width: ${dims.w}px;
-                  height: ${dims.h}px;
+          html = `<div style="
+                  width: 100%;
+                  height: 100%;
                   background: ${color === "gradient" ? `linear-gradient(45deg, ${primaryColor}, #FF1493, ${primaryColor})` : `${primaryColor}22`};
                   border: 2px dashed ${primaryColor};
                   border-radius: 12px;
@@ -33587,6 +33577,7 @@
                   color: ${primaryColor};
                   font-weight: bold;
                   font-size: 12px;
+                  box-sizing: border-box;
                 ">Custom Element</div>`;
         }
 
@@ -33652,7 +33643,7 @@
 
         if (animationNames.length > 0) {
           const animDuration = animations.includes("bounce") ? "1s" : "2s";
-          css += `.smart-element { animation: ${animationNames.join(", ")} ${animDuration} infinite ease-in-out; }`;
+          css += `.${animationClass} { animation: ${animationNames.join(", ")} ${animDuration} infinite ease-in-out; }`;
         }
 
         return {
@@ -33661,9 +33652,10 @@
           html: html,
           css: css,
           animations: animations_css,
+          className: animationClass,
           styles: {
-            width: `${dims.w}px`,
-            height: `${dims.h}px`,
+            width: "100%",
+            height: "100%",
             position: "relative",
             cursor: "grab",
           },
