@@ -2286,6 +2286,71 @@
         text-transform: uppercase;
         color: #6b7a90;
       }
+      .ai-chat-bubble-body {
+        min-width: 0;
+        flex: 1;
+      }
+      .ai-chat-bubble-body p {
+        margin: 0;
+      }
+      .ai-chat-bubble-body p + p,
+      .ai-chat-bubble-body p + ul,
+      .ai-chat-bubble-body p + ol,
+      .ai-chat-bubble-body ul + p,
+      .ai-chat-bubble-body ol + p,
+      .ai-chat-bubble-body pre + p {
+        margin-top: 0.7rem;
+      }
+      .ai-chat-bubble-body ul,
+      .ai-chat-bubble-body ol {
+        margin: 0.7rem 0 0;
+        padding-left: 1.2rem;
+      }
+      .ai-chat-bubble-body li + li {
+        margin-top: 0.28rem;
+      }
+      .ai-chat-bubble-body pre {
+        margin: 0.75rem 0 0;
+        padding: 0.85rem 0.95rem;
+        overflow-x: auto;
+        border-radius: 0.95rem;
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        background: rgba(2, 6, 23, 0.72);
+        color: #cfe7ff;
+        font-size: 12px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .ai-chat-bubble-body code {
+        font-family:
+          "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+      .ai-chat-bubble-body :not(pre) > code {
+        padding: 0.14rem 0.42rem;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.14);
+        font-size: 0.92em;
+      }
+      .ai-chat-typing-caret {
+        display: inline-block;
+        width: 0.55rem;
+        height: 1.05em;
+        margin-left: 0.16rem;
+        vertical-align: -0.14em;
+        border-radius: 999px;
+        background: rgba(103, 232, 249, 0.92);
+        animation: aiChatCaretPulse 0.9s ease-in-out infinite;
+      }
+      @keyframes aiChatCaretPulse {
+        0%,
+        100% {
+          opacity: 0.2;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
       #web-canvas.magic-fix-active {
         filter: blur(11px) brightness(1.12) saturate(1.28);
         transition: filter 0.28s ease;
@@ -23211,6 +23276,7 @@
       let aiModelRecoveryInFlight = false;
       let aiModelSwitchingInFlight = false;
       let aiInfrastructureModels = [];
+      let aiChatTypingTimer = null;
       let builderStyleSyncTimer = null;
       let builderProjectFiles = null;
       let activeBuilderFilePath = "index.html";
@@ -32763,6 +32829,146 @@
           );
         }
       }
+      function formatAiInlineChatMarkup(text = "") {
+        let html = escapeHtmlText(String(text || ""));
+        html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+        html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+        html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+        return html;
+      }
+      function formatAiChatTextToHtml(text = "") {
+        const raw = String(text || "").replace(/\r\n/g, "\n").trim();
+        if (!raw) return "<p></p>";
+        const blocks = [];
+        const codeRegex = /```([\w-]+)?\n?([\s\S]*?)```/g;
+        let lastIndex = 0;
+        let match;
+        const pushTextBlocks = (segment = "") => {
+          String(segment || "")
+            .split(/\n{2,}/)
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .forEach((part) => {
+              const lines = part.split("\n").map((line) => line.trimEnd());
+              const bulletLines = lines.filter((line) =>
+                /^[-*]\s+/.test(line.trim()),
+              );
+              const orderedLines = lines.filter((line) =>
+                /^\d+\.\s+/.test(line.trim()),
+              );
+              if (bulletLines.length === lines.length) {
+                blocks.push(
+                  `<ul>${lines
+                    .map(
+                      (line) =>
+                        `<li>${formatAiInlineChatMarkup(
+                          line.replace(/^[-*]\s+/, ""),
+                        )}</li>`,
+                    )
+                    .join("")}</ul>`,
+                );
+                return;
+              }
+              if (orderedLines.length === lines.length) {
+                blocks.push(
+                  `<ol>${lines
+                    .map(
+                      (line) =>
+                        `<li>${formatAiInlineChatMarkup(
+                          line.replace(/^\d+\.\s+/, ""),
+                        )}</li>`,
+                    )
+                    .join("")}</ol>`,
+                );
+                return;
+              }
+              blocks.push(
+                `<p>${lines
+                  .map((line) => formatAiInlineChatMarkup(line))
+                  .join("<br />")}</p>`,
+              );
+            });
+        };
+        while ((match = codeRegex.exec(raw))) {
+          pushTextBlocks(raw.slice(lastIndex, match.index));
+          const language = escapeHtmlText(match[1] || "");
+          const codeText = escapeHtmlText(match[2] || "").trim();
+          blocks.push(
+            `<pre><code${language ? ` data-lang="${language}"` : ""}>${codeText}</code></pre>`,
+          );
+          lastIndex = match.index + match[0].length;
+        }
+        pushTextBlocks(raw.slice(lastIndex));
+        return blocks.join("");
+      }
+      function getAiChatDisplayedText(item = {}) {
+        const text = String(item?.text || "");
+        if (
+          item?.role === "assistant" &&
+          !item?.html &&
+          item?._typingDone === false
+        ) {
+          return text.slice(0, Math.max(0, Number(item._renderedChars || 0)));
+        }
+        return text;
+      }
+      function stopAiChatTyping() {
+        if (aiChatTypingTimer) {
+          clearInterval(aiChatTypingTimer);
+          aiChatTypingTimer = null;
+        }
+      }
+      function scheduleAiChatTyping() {
+        const pending = aiChatMessages.find(
+          (item) =>
+            item?.role === "assistant" &&
+            !item?.html &&
+            item?._typingDone === false,
+        );
+        if (!pending) {
+          stopAiChatTyping();
+          return;
+        }
+        if (aiChatTypingTimer) return;
+        aiChatTypingTimer = setInterval(() => {
+          const active = aiChatMessages.find(
+            (item) =>
+              item?.role === "assistant" &&
+              !item?.html &&
+              item?._typingDone === false,
+          );
+          if (!active) {
+            stopAiChatTyping();
+            renderBuilderAiChat();
+            return;
+          }
+          const fullText = String(active.text || "");
+          const current = Math.max(0, Number(active._renderedChars || 0));
+          const remaining = fullText.length - current;
+          const step =
+            remaining > 320 ? 16 : remaining > 180 ? 11 : remaining > 80 ? 7 : 4;
+          active._renderedChars = Math.min(fullText.length, current + step);
+          if (active._renderedChars >= fullText.length) {
+            active._typingDone = true;
+          }
+          renderBuilderAiChat();
+        }, 26);
+      }
+      function appendAiChatMessage(message = {}, options = {}) {
+        const nextMessage = { ...message };
+        if (
+          nextMessage.role === "assistant" &&
+          !nextMessage.html &&
+          typeof nextMessage.text === "string"
+        ) {
+          const shouldType = Boolean(options.typing);
+          nextMessage._renderedChars = shouldType ? 0 : nextMessage.text.length;
+          nextMessage._typingDone = !shouldType;
+        }
+        aiChatMessages.push(nextMessage);
+        scheduleAiChatTyping();
+        return nextMessage;
+      }
       function renderBuilderAiChat() {
         const messagesEl = document.getElementById("ai-chat-messages");
         const statusEl = document.getElementById("ai-status-indicator");
@@ -32777,17 +32983,30 @@
           .filter((item) => item.role !== "system_hidden")
           .map((item) => {
             const roleClass = item.role === "user" ? "user" : "assistant";
+            const visibleText = getAiChatDisplayedText(item);
             const content = item.html
               ? item.html
-              : escapeHtmlText(item.text || "");
+              : formatAiChatTextToHtml(visibleText);
             const copyBtn = `<button onclick="copyAiChatBubble(this)" class="ai-copy-btn" title="Copy text"><i class="fas fa-copy text-[10px]"></i></button>`;
+            const typingCaret =
+              item.role === "assistant" &&
+              !item.html &&
+              item._typingDone === false &&
+              String(item.text || "").length
+                ? '<span class="ai-chat-typing-caret"></span>'
+                : "";
             // Support HTML rendering for special message types (like login prompts)
             if (item.html) {
               return (
                 '<div class="ai-chat-bubble ' +
                 roleClass +
+                '" data-copy-text="' +
+                escapeAttr(String(item.text || "")) +
                 '">' +
+                '<div class="ai-chat-bubble-body">' +
                 content +
+                typingCaret +
+                "</div>" +
                 copyBtn +
                 "</div>"
               );
@@ -32795,8 +33014,13 @@
             return (
               '<div class="ai-chat-bubble ' +
               roleClass +
+              '" data-copy-text="' +
+              escapeAttr(String(item.text || "")) +
               '">' +
+              '<div class="ai-chat-bubble-body">' +
               content +
+              typingCaret +
+              "</div>" +
               copyBtn +
               "</div>"
             );
@@ -32945,6 +33169,7 @@
           "Start a new chat? This will clear the current conversation history.",
         );
         if (confirmed) {
+          stopAiChatTyping();
           aiChatMessages = [];
           renderBuilderAiChat();
         }
@@ -32954,6 +33179,7 @@
           "Clear all chat history? This action cannot be undone.",
         );
         if (confirmed) {
+          stopAiChatTyping();
           aiChatMessages = [];
           renderBuilderAiChat();
         }
@@ -36631,7 +36857,7 @@
           if (data.modelRecoveryUsed) aiModelRecoveryInFlight = true;
           if (data.modelSwitchUsed && data.modelSwitchReason === "rate_limit") {
             aiModelSwitchingInFlight = true;
-            aiChatMessages.push({
+            appendAiChatMessage({
               role: "assistant",
               text: "Choosing the best model for your response...",
             });
@@ -36652,7 +36878,7 @@
           new Set([...searchedFiles, ...tracedFiles]),
         ).slice(0, 14);
         for (const path of preloadFiles) {
-          aiChatMessages.push({
+          appendAiChatMessage({
             role: "assistant",
             text: `Reading ${path}...`,
           });
@@ -36668,7 +36894,10 @@
         setAiAgentStage("planning");
         const proposal = await runPhase("plan", agentContext);
         if (proposal) {
-          aiChatMessages.push({ role: "assistant", text: proposal });
+          appendAiChatMessage(
+            { role: "assistant", text: proposal },
+            { typing: true },
+          );
           renderBuilderAiChat();
         }
         setAiAgentStage("thinking");
@@ -36676,7 +36905,7 @@
           responseText = await runPhase("execute", agentContext);
           const requestedPath = parseRequestedFilePath(responseText);
           if (!requestedPath) break;
-          aiChatMessages.push({
+          appendAiChatMessage({
             role: "assistant",
             text: `Reading ${requestedPath}...`,
           });
@@ -37085,7 +37314,7 @@
         if (!prompt) return;
         if (!loggedIn || !currentUser) {
           // Show login required message in chat
-          aiChatMessages.push({
+          appendAiChatMessage({
             role: "assistant",
             html: 'You cannot access Workflow AI without logging in. <span class="ai-login-link" style="color: #4CAF50; cursor: pointer; text-decoration: underline; font-weight: 600;">Please click here to login</span>',
           });
@@ -37105,7 +37334,7 @@
         const currentCode = buildLatestAiCodeSnapshot();
         await syncAiContextSilently();
 
-        aiChatMessages.push({ role: "user", text: prompt });
+        appendAiChatMessage({ role: "user", text: prompt });
         aiChatSending = true;
         aiModelRecoveryInFlight = false;
         aiModelSwitchingInFlight = false;
@@ -37116,7 +37345,8 @@
         if (input) input.value = "";
         if (sendBtn) {
           sendBtn.disabled = true;
-          sendBtn.textContent = "Sending...";
+          sendBtn.style.opacity = "0.6";
+          sendBtn.style.pointerEvents = "none";
         }
         renderBuilderAiChat();
         try {
@@ -37367,25 +37597,34 @@
             const visibleReply = stripAgentActionBlocks(agentReply);
             if (actions.length) {
               setAiAgentStage("applying");
-              aiChatMessages.push({
-                role: "assistant",
-                text: visibleReply || "Applying changes...",
-              });
+              appendAiChatMessage(
+                {
+                  role: "assistant",
+                  text: visibleReply || "Applying changes...",
+                },
+                { typing: true },
+              );
             } else {
-              aiChatMessages.push({
-                role: "assistant",
-                text:
-                  visibleReply ||
-                  "Ready. Tell me what you want to build or fix next.",
-              });
+              appendAiChatMessage(
+                {
+                  role: "assistant",
+                  text:
+                    visibleReply ||
+                    "Ready. Tell me what you want to build or fix next.",
+                },
+                { typing: true },
+              );
             }
             if (actionResult?.safety?.skipped) {
-              aiChatMessages.push({
-                role: "assistant",
-                text:
-                  actionResult.safety.message ||
-                  "Skipped an unsafe action to avoid losing existing canvas work.",
-              });
+              appendAiChatMessage(
+                {
+                  role: "assistant",
+                  text:
+                    actionResult.safety.message ||
+                    "Skipped an unsafe action to avoid losing existing canvas work.",
+                },
+                { typing: true },
+              );
               renderBuilderAiChat();
               // One strict retry: force non-destructive ops when the model attempted a risky replace.
               setAiAgentStage("thinking");
@@ -37400,12 +37639,15 @@
               );
               const retryResult = executeAIActions(retryReply, prompt);
               if (retryResult?.applied?.length) {
-                aiChatMessages.push({
-                  role: "assistant",
-                  text:
-                    stripAgentActionBlocks(retryReply) ||
-                    "Applied a safer incremental patch.",
-                });
+                appendAiChatMessage(
+                  {
+                    role: "assistant",
+                    text:
+                      stripAgentActionBlocks(retryReply) ||
+                      "Applied a safer incremental patch.",
+                  },
+                  { typing: true },
+                );
                 actionResult = retryResult;
               }
             }
@@ -37415,10 +37657,13 @@
                 allowNormalizer: true,
               });
               if (syncResult?.normalized) {
-                aiChatMessages.push({
-                  role: "assistant",
-                  text: "Canvas updated. Elements are ready for editing.",
-                });
+                appendAiChatMessage(
+                  {
+                    role: "assistant",
+                    text: "Canvas updated. Elements are ready for editing.",
+                  },
+                  { typing: true },
+                );
               }
             } else {
               // Incremental ops already applied to canvas; keep it smooth (no full re-import).
@@ -37428,12 +37673,15 @@
             setAiAgentStage("responding");
             const chatResponse = await runBuilderAiChatResponse(prompt);
             const visibleResponse = String(chatResponse || "").trim();
-            aiChatMessages.push({
-              role: "assistant",
-              text:
-                visibleResponse ||
-                "I'm here to help! What would you like to do?",
-            });
+            appendAiChatMessage(
+              {
+                role: "assistant",
+                text:
+                  visibleResponse ||
+                  "I'm here to help! What would you like to do?",
+              },
+              { typing: true },
+            );
           }
           setAiAgentStage("done");
           renderBuilderAiChat();
@@ -37452,17 +37700,21 @@
             errorMessage = parseAiError(error);
           }
 
-          aiChatMessages.push({
-            role: "assistant",
-            text: errorMessage,
-          });
+          appendAiChatMessage(
+            {
+              role: "assistant",
+              text: errorMessage,
+            },
+            { typing: true },
+          );
           setAiAgentStage("idle");
           renderBuilderAiChat();
         } finally {
           aiChatSending = false;
           if (sendBtn) {
             sendBtn.disabled = false;
-            sendBtn.textContent = "Send";
+            sendBtn.style.opacity = "1";
+            sendBtn.style.pointerEvents = "auto";
           }
           setTimeout(() => {
             if (!aiChatSending) setAiAgentStage("idle");
@@ -37474,12 +37726,9 @@
         // Get the parent bubble
         const bubble = btn.closest(".ai-chat-bubble");
         if (!bubble) return;
-
-        // Get all text content except the button
-        const bubbleClone = bubble.cloneNode(true);
-        bubbleClone.querySelector(".ai-copy-btn")?.remove();
-
-        const text = bubbleClone.textContent.trim();
+        const text =
+          String(bubble.dataset.copyText || "").trim() ||
+          bubble.textContent.trim();
 
         // Copy to clipboard
         if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -37523,6 +37772,7 @@
         aiChatSending = false;
         aiModelRecoveryInFlight = false;
         aiModelSwitchingInFlight = false;
+        stopAiChatTyping();
 
         // Abort any pending fetch requests
         if (window.aiChatAbortController) {
@@ -37544,7 +37794,8 @@
         const stopBtn = document.getElementById("ai-chat-stop");
         if (sendBtn) {
           sendBtn.disabled = false;
-          sendBtn.textContent = "Send";
+          sendBtn.style.opacity = "1";
+          sendBtn.style.pointerEvents = "auto";
         }
         if (stopBtn) {
           stopBtn.classList.add("hidden");
