@@ -2095,8 +2095,8 @@
         margin-left: 0.15rem;
       }
       #ai-xp-progress-bar {
-        margin: 0 1rem -0.85rem 1rem;
-        margin-bottom: 0.85rem;
+        margin: 0.3rem 1rem 0.6rem 1rem;
+        height: 0.25rem;
       }
       .ai-xp-change {
         font-size: 10px;
@@ -21118,8 +21118,8 @@
                                   </button>
                               </div>
                           </div>
-                          <div id="ai-xp-progress-bar" class="h-1 bg-white/10 rounded-full overflow-hidden">
-                              <div class="h-full w-0 bg-gradient-to-r from-amber-400 via-yellow-300 to-orange-400 transition-all duration-300"></div>
+                          <div id="ai-xp-progress-bar" class="bg-white/10 rounded-full overflow-hidden">
+                              <div class="h-full w-0 bg-gradient-to-r from-amber-400 via-yellow-300 to-orange-400 transition-all duration-300" style="height: 0.25rem;"></div>
                           </div>
                           <div class="ai-chat-model-wrap">
                               <select id="ai-model-picker" onchange="changeAiModel(this.value)" class="ai-chat-model-picker">
@@ -33182,7 +33182,7 @@
         const recoveryEl = document.getElementById("ai-recovery-badge");
         const sendBtn = document.getElementById("ai-chat-send");
         const stopBtn = document.getElementById("ai-chat-stop");
-        if (!messagesEl || !statusEl || !creditsEl) return;
+        if (!messagesEl) return;
         const fallback =
           '<div class="ai-chat-bubble assistant">Hi! I can chat, plan, and apply builder fixes. Tell me your goal (for example: "build a SaaS hero", "set a cat background", or just "hello").</div>';
         const rows = aiChatMessages
@@ -33261,8 +33261,8 @@
           link.removeEventListener("click", showLogin);
           link.addEventListener("click", showLogin);
         });
-        statusEl.textContent = "Model: " + (aiActiveModel || "standby");
-        creditsEl.textContent =
+        if (statusEl) statusEl.textContent = "Model: " + (aiActiveModel || "standby");
+        if (creditsEl) creditsEl.textContent =
           aiCreditsRemaining == null
             ? "Credits: Pro"
             : "Credits: " +
@@ -33374,26 +33374,27 @@
         const xpDisplay = document.getElementById("ai-xp-display");
         const progressBar = document.getElementById("ai-xp-progress-bar");
         if (!xpDisplay) return;
-        
+
         // Update total XP (you can store this in a variable or data attribute)
         let currentXP = parseInt(xpDisplay.dataset.currentXp || "0", 10);
         currentXP = Math.max(0, currentXP + xpChange);
         xpDisplay.dataset.currentXp = String(currentXP);
-        
+
         // Format XP display with change indicator as superscript
         let displayText = currentXP + "XP";
         if (xpChange !== 0) {
           const changeSymbol = xpChange > 0 ? "+" : "";
-          const changeClass = xpChange > 0 ? "text-emerald-300" : "text-red-300";
+          const changeClass =
+            xpChange > 0 ? "text-emerald-300" : "text-red-300";
           displayText = `${currentXP}XP<sup class="${changeClass} text-[0.65em]">${changeSymbol}${xpChange}</sup>`;
         }
         xpDisplay.innerHTML = displayText;
-        
+
         // Update progress bar width (example: 0-100 XP)
         if (progressBar) {
           const progressChild = progressBar.querySelector("div");
           if (progressChild) {
-            const percentFull = Math.min(100, (currentXP % 100));
+            const percentFull = Math.min(100, currentXP % 100);
             progressChild.style.width = percentFull + "%";
           }
         }
