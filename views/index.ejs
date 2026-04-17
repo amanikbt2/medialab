@@ -2351,6 +2351,63 @@
           opacity: 1;
         }
       }
+      .ai-chat-code-block {
+        display: block;
+        width: 100%;
+        padding: 12px;
+        border-radius: 8px;
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(34, 211, 238, 0.15);
+        overflow-x: auto;
+        font-family: "Courier New", monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #cbd5e1;
+        white-space: pre;
+        word-break: break-word;
+        overflow-wrap: break-word;
+      }
+      .ai-chat-code-block code {
+        background: none;
+        border: none;
+        padding: 0;
+      }
+      .ai-chat-code-lang {
+        display: inline-block;
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #64748b;
+        margin-bottom: 8px;
+      }
+      .code-highlight-tag {
+        color: #7dd3fc;
+      }
+      .code-highlight-attr {
+        color: #f9a8d4;
+      }
+      .code-highlight-string {
+        color: #86efac;
+      }
+      .code-highlight-comment {
+        color: #64748b;
+      }
+      .code-highlight-bracket {
+        color: #f8fafc;
+      }
+      .code-highlight-keyword {
+        color: #67e8f9;
+      }
+      .code-highlight-selector {
+        color: #fcd34d;
+      }
+      .code-highlight-property {
+        color: #93c5fd;
+      }
+      .code-highlight-value {
+        color: #fdba74;
+      }
       #web-canvas.magic-fix-active {
         filter: blur(11px) brightness(1.12) saturate(1.28);
         transition: filter 0.28s ease;
@@ -32836,8 +32893,120 @@
         html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
         return html;
       }
+      function highlightCodeForChat(code = "", language = "") {
+        const lang = String(language || "")
+          .toLowerCase()
+          .trim();
+        const text = String(code || "");
+
+        if (!text) return escapeHtmlText(text);
+
+        // First escape the text
+        let escaped = escapeHtmlText(text);
+
+        if (lang === "html") {
+          // HTML syntax highlighting - highlight tags, attributes, and strings
+          return (
+            escaped
+              // Highlight opening/closing tags: &lt;tag&gt;
+              .replace(
+                /&lt;\/?(\w[-\w]*)/g,
+                '&lt;<span class="code-highlight-tag">$1</span>',
+              )
+              // Highlight closing >
+              .replace(
+                /&gt;/g,
+                '<span class="code-highlight-bracket">&gt;</span>',
+              )
+              .replace(
+                /&lt;/g,
+                '<span class="code-highlight-bracket">&lt;</span>',
+              )
+              // Highlight attributes (word before =)
+              .replace(
+                /\s([\w-]+)=/g,
+                ' <span class="code-highlight-attr">$1</span>=',
+              )
+              // Highlight attribute values
+              .replace(
+                /=(&quot;[^&]*&quot;|&#39;[^&#]*&#39;)/g,
+                '=<span class="code-highlight-string">$1</span>',
+              )
+              // Highlight comments
+              .replace(
+                /&lt;!--[\s\S]*?--&gt;/g,
+                (m) => '<span class="code-highlight-comment">' + m + "</span>",
+              )
+          );
+        } else if (lang === "css") {
+          // CSS syntax highlighting
+          return (
+            escaped
+              // Comments
+              .replace(
+                /\/\*[\s\S]*?\*\//g,
+                (m) => '<span class="code-highlight-comment">' + m + "</span>",
+              )
+              // Selectors (text before {)
+              .replace(/([^{]*){/g, (m, selector) => {
+                const highlighted = selector.replace(
+                  /([\w-#.:\[\]="]+)/g,
+                  '<span class="code-highlight-selector">$1</span>',
+                );
+                return (
+                  highlighted + '<span class="code-highlight-bracket">{</span>'
+                );
+              })
+              // Properties and values
+              .replace(
+                /([a-z-]+):\s*([^;}\n]+)/gi,
+                '<span class="code-highlight-property">$1</span>: <span class="code-highlight-value">$2</span>',
+              )
+              // Brackets
+              .replace(
+                /([{}();,])/g,
+                '<span class="code-highlight-bracket">$1</span>',
+              )
+          );
+        } else if (lang === "javascript" || lang === "js") {
+          // JavaScript syntax highlighting
+          return (
+            escaped
+              // Comments (single line)
+              .replace(
+                /\/\/.*$/gm,
+                (m) => '<span class="code-highlight-comment">' + m + "</span>",
+              )
+              // Comments (multi-line)
+              .replace(
+                /\/\*[\s\S]*?\*\//g,
+                (m) => '<span class="code-highlight-comment">' + m + "</span>",
+              )
+              // Strings
+              .replace(
+                /(&quot;|&#39;|`)[^&]*?\1/g,
+                (m) => '<span class="code-highlight-string">' + m + "</span>",
+              )
+              // Keywords
+              .replace(
+                /\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|class|extends|import|export|async|await|try|catch|throw|new|this|super|static|yield|null|undefined|true|false)\b/g,
+                '<span class="code-highlight-keyword">$1</span>',
+              )
+              // Brackets and punctuation
+              .replace(
+                /([{}()[\];:,.])/g,
+                '<span class="code-highlight-bracket">$1</span>',
+              )
+          );
+        } else {
+          // Fallback to escaped text for other languages
+          return escaped;
+        }
+      }
       function formatAiChatTextToHtml(text = "") {
-        const raw = String(text || "").replace(/\r\n/g, "\n").trim();
+        const raw = String(text || "")
+          .replace(/\r\n/g, "\n")
+          .trim();
         if (!raw) return "<p></p>";
         const blocks = [];
         const codeRegex = /```([\w-]+)?\n?([\s\S]*?)```/g;
@@ -32891,10 +33060,12 @@
         };
         while ((match = codeRegex.exec(raw))) {
           pushTextBlocks(raw.slice(lastIndex, match.index));
-          const language = escapeHtmlText(match[1] || "");
-          const codeText = escapeHtmlText(match[2] || "").trim();
+          const language = match[1] || "";
+          const codeText = (match[2] || "").trim();
+          const languageName = escapeHtmlText(language);
+          const highlightedCode = highlightCodeForChat(codeText, language);
           blocks.push(
-            `<pre><code${language ? ` data-lang="${language}"` : ""}>${codeText}</code></pre>`,
+            `<div class="ai-chat-code-block">${language ? `<div class="ai-chat-code-lang">${languageName}</div>` : ""}<code>${highlightedCode}</code></div>`,
           );
           lastIndex = match.index + match[0].length;
         }
@@ -32946,7 +33117,13 @@
           const current = Math.max(0, Number(active._renderedChars || 0));
           const remaining = fullText.length - current;
           const step =
-            remaining > 320 ? 16 : remaining > 180 ? 11 : remaining > 80 ? 7 : 4;
+            remaining > 320
+              ? 16
+              : remaining > 180
+                ? 11
+                : remaining > 80
+                  ? 7
+                  : 4;
           active._renderedChars = Math.min(fullText.length, current + step);
           if (active._renderedChars >= fullText.length) {
             active._typingDone = true;
