@@ -257,7 +257,7 @@ async function upsertAIContext(userId = "", currentCode = "") {
         expiresAt: getAiContextExpiryDate(),
       },
     },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
+    { upsert: true, returnDocument: "after", setDefaultsOnInsert: true },
   );
 }
 
@@ -2929,7 +2929,7 @@ async function syncMarketplaceItemAsBuilderTemplate(item) {
         sourceMarketplaceItemId: item._id,
       },
     },
-    { upsert: true, new: true },
+    { upsert: true, returnDocument: "after" },
   ).lean();
   return template;
 }
@@ -3583,7 +3583,7 @@ async function upsertReferralLedgerEntry({
         metadata: metadata && typeof metadata === "object" ? metadata : {},
       },
     },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
+    { upsert: true, returnDocument: "after", setDefaultsOnInsert: true },
   );
 }
 
@@ -12466,7 +12466,7 @@ app.post("/api/feedback-prompt/shown", async (req, res) => {
     const user = await User.findByIdAndUpdate(
       req.user._id,
       { $set: { feedbackPromptLastShownAt: new Date() } },
-      { new: true },
+      { returnDocument: "after" },
     );
     return res.json({
       success: true,
@@ -13161,7 +13161,7 @@ app.patch(
       const feedback = await Feedback.findByIdAndUpdate(
         req.params.id,
         { $set: updates },
-        { new: true },
+        { returnDocument: "after" },
       ).lean();
 
       if (!feedback) {
@@ -13238,7 +13238,7 @@ app.patch(
       const request = await UpgradeRequest.findByIdAndUpdate(
         req.params.id,
         { $set: updates },
-        { new: true },
+        { returnDocument: "after" },
       ).lean();
 
       if (!request) {

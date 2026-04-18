@@ -1938,6 +1938,19 @@
       .ai-chat-messages::-webkit-scrollbar {
         display: none;
       }
+      .ai-chat-message-row {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        padding: 0 0.5rem;
+        align-items: flex-start;
+      }
+      .ai-chat-message-row.user {
+        align-items: flex-end;
+      }
+      .ai-chat-message-row.assistant {
+        align-items: flex-start;
+      }
       .ai-chat-bubble {
         position: relative;
         border-radius: 1.2rem;
@@ -1945,17 +1958,15 @@
         font-size: 14px;
         line-height: 1.5;
         display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 0.65rem;
+        flex-direction: column;
+        gap: 0.55rem;
+        width: auto;
         box-shadow:
           0 18px 45px rgba(2, 6, 23, 0.22),
           inset 0 0 0 1px rgba(255, 255, 255, 0.04);
       }
       .ai-chat-bubble.user {
-        align-self: flex-end;
         max-width: 85%;
-        margin-right: 0.55rem;
         background:
           linear-gradient(
             180deg,
@@ -1967,8 +1978,7 @@
         color: #f8fafc;
       }
       .ai-chat-bubble.assistant {
-        align-self: flex-start;
-        max-width: 92%;
+        max-width: 98%;
         background: linear-gradient(
           180deg,
           rgba(16, 24, 44, 0.92),
@@ -1977,24 +1987,45 @@
         border: 1px solid rgba(148, 163, 184, 0.12);
         color: #e5edf7;
       }
-      .ai-copy-btn {
-        flex-shrink: 0;
-        background: transparent;
-        border: none;
-        color: inherit;
-        opacity: 0.44;
-        cursor: pointer;
-        padding: 0.2rem;
-        display: inline-flex;
+      .ai-chat-bubble-actions {
+        display: flex;
         align-items: center;
-        justify-content: center;
-        transition:
-          opacity 0.2s,
-          transform 0.2s;
+        gap: 0.3rem;
+        padding: 0.2rem 0;
+        margin: 0;
+        flex-shrink: 0;
+        opacity: 0;
+        transition: opacity 0.2s ease;
       }
-      .ai-copy-btn:hover {
+      .ai-chat-message-row:hover .ai-chat-bubble-actions {
         opacity: 1;
-        transform: translateY(-1px);
+      }
+      .ai-chat-message-row.user .ai-chat-bubble-actions {
+        justify-content: flex-end;
+      }
+      .ai-chat-message-row.assistant .ai-chat-bubble-actions {
+        justify-content: flex-start;
+      }
+      .ai-copy-btn,
+      .ai-edit-btn {
+        flex-shrink: 0;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        color: #94a3b8;
+        padding: 0.35rem 0.48rem;
+        border-radius: 0.45rem;
+        font-size: 11px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      .ai-copy-btn:hover,
+      .ai-edit-btn:hover {
+        background: rgba(34, 211, 238, 0.15);
+        color: #22d3ee;
+        border-color: rgba(34, 211, 238, 0.4);
       }
       .ai-agent-stage {
         display: inline-flex;
@@ -2374,6 +2405,7 @@
       .ai-chat-bubble-body {
         min-width: 0;
         flex: 1;
+        width: 100%;
       }
       .ai-chat-bubble-body p {
         margin: 0;
@@ -2406,6 +2438,7 @@
         line-height: 1.6;
         white-space: pre-wrap;
         word-break: break-word;
+        width: 98%;
       }
       .ai-chat-bubble-body code {
         font-family:
@@ -33249,6 +33282,10 @@
               ? item.html
               : formatAiChatTextToHtml(visibleText);
             const copyBtn = `<button onclick="copyAiChatBubble(this)" class="ai-copy-btn" title="Copy text"><i class="fas fa-copy text-[10px]"></i></button>`;
+            const editBtn =
+              item.role === "user"
+                ? `<button onclick="editAiChatMessage(this)" class="ai-edit-btn" title="Edit message"><i class="fas fa-pencil-alt text-[10px]"></i></button>`
+                : "";
             const typingCaret =
               item.role === "assistant" &&
               !item.html &&
@@ -33256,23 +33293,8 @@
               String(item.text || "").length
                 ? '<span class="ai-chat-typing-caret"></span>'
                 : "";
-            // Support HTML rendering for special message types (like login prompts)
-            if (item.html) {
-              return (
-                '<div class="ai-chat-bubble ' +
-                roleClass +
-                '" data-copy-text="' +
-                escapeAttr(String(item.text || "")) +
-                '">' +
-                '<div class="ai-chat-bubble-body">' +
-                content +
-                typingCaret +
-                "</div>" +
-                copyBtn +
-                "</div>"
-              );
-            }
-            return (
+            // Build the bubble with body
+            const bubbleHtml =
               '<div class="ai-chat-bubble ' +
               roleClass +
               '" data-copy-text="' +
@@ -33282,7 +33304,16 @@
               content +
               typingCaret +
               "</div>" +
-              copyBtn +
+              "</div>";
+            // Build action buttons
+            const buttonsHtml = `<div class="ai-chat-bubble-actions">${editBtn}${copyBtn}</div>`;
+            // Wrap bubble and buttons in message row
+            return (
+              '<div class="ai-chat-message-row ' +
+              roleClass +
+              '">' +
+              bubbleHtml +
+              (editBtn || copyBtn ? buttonsHtml : "") +
               "</div>"
             );
           });
@@ -38127,6 +38158,27 @@
           }
           document.body.removeChild(textArea);
         }
+      }
+
+      function editAiChatMessage(btn) {
+        // Get the parent message row and bubble
+        const messageRow = btn.closest(".ai-chat-message-row");
+        if (!messageRow) return;
+        const bubble = messageRow.querySelector(".ai-chat-bubble");
+        if (!bubble) return;
+        const text =
+          String(bubble.dataset.copyText || "").trim() ||
+          bubble.textContent.trim();
+
+        // Show feedback that edit is triggered
+        const originalIcon = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check text-[10px]"></i>';
+        setTimeout(() => {
+          btn.innerHTML = originalIcon;
+        }, 1500);
+
+        console.log("Edit message:", text);
+        // Feature can be expanded later to allow inline editing
       }
 
       function stopBuilderAiChat() {
