@@ -1261,11 +1261,15 @@
       .canvas-element.selected-premium > .absolute,
       .canvas-element.selected-secondary > .absolute {
         opacity: 1 !important;
+        pointer-events: auto !important;
+      }
+      .canvas-element:not(.selected-premium):not(.selected-secondary) > .builder-controls-container * {
+        pointer-events: none !important;
       }
       .builder-selection-chip {
         position: absolute;
         right: 0;
-        top: -1.9rem;
+        bottom: -2.1rem;
         z-index: 95;
         display: inline-flex;
         align-items: center;
@@ -29659,6 +29663,15 @@
               el.style.height = `${startH}px`;
             }
           }
+          if (movingSelection) {
+             selectedElements.forEach((item) => {
+                if (item.dataset.dragZIndex === undefined) item.dataset.dragZIndex = item.style.zIndex || "";
+                item.style.zIndex = "999999";
+             });
+          } else {
+             if (el.dataset.dragZIndex === undefined) el.dataset.dragZIndex = el.style.zIndex || "";
+             el.style.zIndex = "999999";
+          }
         };
         const selectionStarts = movingSelection
           ? selectedElements.map((item) => {
@@ -29841,6 +29854,21 @@
               el.style.left = `${Math.max(0, snapFinal(l))}px`;
               el.style.top = `${Math.max(0, snapFinal(t))}px`;
             }
+          }
+          if (movingSelection) {
+             selectedElements.forEach((item) => {
+                if (item.dataset.dragZIndex !== undefined) {
+                   item.style.zIndex = item.dataset.dragZIndex;
+                   delete item.dataset.dragZIndex;
+                }
+             });
+             if (didMove) autoSnapLayerOnDrop(selectedElements);
+          } else {
+             if (el.dataset.dragZIndex !== undefined) {
+                el.style.zIndex = el.dataset.dragZIndex;
+                delete el.dataset.dragZIndex;
+             }
+             if (didMove) autoSnapLayerOnDrop([el]);
           }
           hideBuilderGuides();
           clearLayoutDropGuides();
@@ -31066,6 +31094,63 @@
           }
         });
       }
+      function elementsIntersect(el1, el2) {
+        if (!el1 || !el2) return false;
+        const r1 = el1.getBoundingClientRect();
+        const r2 = el2.getBoundingClientRect();
+        return !(r2.left >= r1.right || r2.right <= r1.left || r2.top >= r1.bottom || r2.bottom <= r1.top);
+      }
+
+      function autoSnapLayerOnDrop(targets) {
+        if (!targets || !targets.length) return;
+        const allElements = getCanvasTopLevelElements();
+        if (!allElements.length) return;
+        normalizeCanvasLayerOrder();
+        
+        const ordered = allElements
+          .map((el, index) => ({
+            el,
+            zIndex: getElementLayerValue(el),
+            index,
+          }))
+          .sort((a, b) => a.zIndex - b.zIndex || a.index - b.index)
+          .map((entry) => entry.el);
+          
+        const targetSet = new Set(targets);
+        let highestIntersectingZ = -1;
+        let highestIntersectingEl = null;
+        
+        targets.forEach(target => {
+          ordered.forEach(other => {
+            if (targetSet.has(other)) return;
+            if (elementsIntersect(target, other)) {
+               const z = getElementLayerValue(other);
+               if (z > highestIntersectingZ) {
+                 highestIntersectingZ = z;
+                 highestIntersectingEl = other;
+               }
+            }
+          });
+        });
+        
+        if (highestIntersectingEl) {
+           const targetsInOrder = ordered.filter(el => targetSet.has(el));
+           const nonTargets = ordered.filter(el => !targetSet.has(el));
+           
+           const newOrdered = [];
+           nonTargets.forEach(nt => {
+              newOrdered.push(nt);
+              if (nt === highestIntersectingEl) {
+                 newOrdered.push(...targetsInOrder);
+              }
+           });
+           
+           newOrdered.forEach((el, index) => {
+             el.style.zIndex = String(index + 1);
+           });
+        }
+      }
+
       function shiftSelectedLayer(direction) {
         const targets = Array.from(
           new Set(
@@ -31079,6 +31164,7 @@
         const allElements = getCanvasTopLevelElements();
         if (!allElements.length) return;
         normalizeCanvasLayerOrder();
+        
         const ordered = allElements
           .map((el, index) => ({
             el,
@@ -31087,26 +31173,55 @@
           }))
           .sort((a, b) => a.zIndex - b.zIndex || a.index - b.index)
           .map((entry) => entry.el);
+          
         const step = direction === "backward" ? -1 : 1;
         let didMove = false;
+        const targetsInOrder = ordered.filter(el => targetSet.has(el));
+        
         if (step > 0) {
-          for (let i = ordered.length - 2; i >= 0; i -= 1) {
-            if (!targetSet.has(ordered[i]) || targetSet.has(ordered[i + 1])) {
-              continue;
+          // Bring Forward: Process targets from top to bottom
+          for (let i = targetsInOrder.length - 1; i >= 0; i--) {
+            const target = targetsInOrder[i];
+            const currentIndex = ordered.indexOf(target);
+            if (currentIndex === ordered.length - 1) continue;
+            
+            let swapIdx = currentIndex + 1;
+            for (let j = currentIndex + 1; j < ordered.length; j++) {
+              if (targetSet.has(ordered[j])) continue;
+              if (elementsIntersect(target, ordered[j])) {
+                swapIdx = j;
+                break;
+              }
             }
-            [ordered[i], ordered[i + 1]] = [ordered[i + 1], ordered[i]];
+            
+            ordered.splice(currentIndex, 1);
+            ordered.splice(swapIdx, 0, target);
             didMove = true;
           }
         } else {
-          for (let i = 1; i < ordered.length; i += 1) {
-            if (!targetSet.has(ordered[i]) || targetSet.has(ordered[i - 1])) {
-              continue;
+          // Send Backward: Process targets from bottom to top
+          for (let i = 0; i < targetsInOrder.length; i++) {
+            const target = targetsInOrder[i];
+            const currentIndex = ordered.indexOf(target);
+            if (currentIndex === 0) continue;
+            
+            let swapIdx = currentIndex - 1;
+            for (let j = currentIndex - 1; j >= 0; j--) {
+              if (targetSet.has(ordered[j])) continue;
+              if (elementsIntersect(target, ordered[j])) {
+                swapIdx = j;
+                break;
+              }
             }
-            [ordered[i], ordered[i - 1]] = [ordered[i - 1], ordered[i]];
+            
+            ordered.splice(currentIndex, 1);
+            ordered.splice(swapIdx, 0, target);
             didMove = true;
           }
         }
+        
         if (!didMove) return;
+        
         ordered.forEach((el, index) => {
           el.style.zIndex = String(index + 1);
         });
@@ -39580,16 +39695,16 @@
         const handles = ["tl", "tr", "bl", "br", "mt", "mb", "ml", "mr"]
           .map(
             (h) =>
-              `<div class="resizer ${h} absolute w-2 h-2 bg-cyan-500 border border-white rounded-full opacity-0 group-hover:opacity-100 z-50"></div>`,
+              `<div class="resizer ${h} absolute w-2 h-2 bg-cyan-500 border border-white rounded-full opacity-0 z-50"></div>`,
           )
           .join("");
         return `
               ${handles}
-                  <div class="absolute -top-8 left-0 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all z-[60]">
-                  <div class="drag-handle w-7 h-7 bg-gradient-to-br from-cyan-500 to-blue-600 text-white rounded-lg border border-white/20 shadow-2xl flex items-center justify-center cursor-grab active:cursor-grabbing pointer-events-auto hover:shadow-cyan-500/50 transition-all"><i class="fas fa-arrows-alt text-[10px]"></i></div>
-                  <button onclick="toggleCanvasElementVisibility(this.closest('.canvas-element'))" class="builder-visibility-btn w-7 h-7 bg-gray-950 text-slate-400 rounded-lg border border-white/10 flex items-center justify-center pointer-events-auto hover:bg-slate-800 transition-all"><i class="fas fa-eye text-[10px]"></i></button>
-                  <button onclick="openSmartInspector('${type}', this.closest('.canvas-element'))" class="w-7 h-7 bg-gray-950 text-cyan-400 rounded-lg border border-white/10 flex items-center justify-center pointer-events-auto hover:bg-cyan-950 transition-all"><i class="fas fa-sliders-h text-[10px]"></i></button>
-                  <button onclick="handleBuilderDeleteAction(this.closest('.canvas-element'))" class="w-7 h-7 bg-gray-950 text-red-500 rounded-lg border border-white/10 flex items-center justify-center pointer-events-auto hover:bg-red-950 transition-all"><i class="fas fa-trash-alt text-[10px]"></i></button>
+                  <div class="builder-controls-container absolute -top-8 left-0 flex gap-1.5 opacity-0 transition-all z-[60]">
+                  <div class="drag-handle w-7 h-7 bg-gradient-to-br from-cyan-500 to-blue-600 text-white rounded-lg border border-white/20 shadow-2xl flex items-center justify-center cursor-grab active:cursor-grabbing hover:shadow-cyan-500/50 transition-all"><i class="fas fa-arrows-alt text-[10px]"></i></div>
+                  <button onclick="toggleCanvasElementVisibility(this.closest('.canvas-element'))" class="builder-visibility-btn w-7 h-7 bg-gray-950 text-slate-400 rounded-lg border border-white/10 flex items-center justify-center hover:bg-slate-800 transition-all"><i class="fas fa-eye text-[10px]"></i></button>
+                  <button onclick="openSmartInspector('${type}', this.closest('.canvas-element'))" class="w-7 h-7 bg-gray-950 text-cyan-400 rounded-lg border border-white/10 flex items-center justify-center hover:bg-cyan-950 transition-all"><i class="fas fa-sliders-h text-[10px]"></i></button>
+                  <button onclick="handleBuilderDeleteAction(this.closest('.canvas-element'))" class="w-7 h-7 bg-gray-950 text-red-500 rounded-lg border border-white/10 flex items-center justify-center hover:bg-red-950 transition-all"><i class="fas fa-trash-alt text-[10px]"></i></button>
               </div>`;
       }
       function dockStarterSelection() {
@@ -39920,7 +40035,8 @@
             justifyContent: comp.justifyContent,
             alignItems: comp.alignItems,
             flexDirection: comp.flexDirection,
-            gap: comp.gap
+            gap: comp.gap,
+            zIndex: comp.zIndex !== "auto" ? comp.zIndex : ""
           };
 
           if (!skip && tag !== "svg" && tag !== "path") {
@@ -39965,7 +40081,7 @@
            const width = item.rect.width;
            const height = item.rect.height;
            
-           let wrapperStyles = `position: absolute; left: ${Math.max(0, left)}px; top: ${Math.max(0, top)}px; width: ${Math.max(16, width)}px; height: ${Math.max(16, height)}px; box-sizing: border-box; margin: 0;`;
+           let wrapperStyles = `position: absolute; left: ${Math.max(0, left)}px; top: ${Math.max(0, top)}px; width: ${Math.max(16, width)}px; height: ${Math.max(16, height)}px; box-sizing: border-box; margin: 0;${item.bakedStyles.zIndex ? ` z-index: ${item.bakedStyles.zIndex};` : ""}`;
            
            // State parsing
            let isHidden = false;
