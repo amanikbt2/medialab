@@ -39587,6 +39587,104 @@
           const num = parseFloat(String(value || "").replace("px", ""));
           return Number.isFinite(num) ? num : null;
         };
+        const getCanvasImportWidth = () => {
+          const inlineWidth = parsePx(canvas.style.width);
+          const clientWidth = Number(canvas.clientWidth || 0);
+          const rectWidth = Number(canvas.getBoundingClientRect().width || 0);
+          return Math.max(360, inlineWidth || clientWidth || rectWidth || 1440);
+        };
+        const stripImportedBuilderArtifacts = (root) => {
+          if (!(root instanceof HTMLElement)) return;
+          root
+            .querySelectorAll(
+              ".resizer, .drag-handle, .builder-selection-chip, .builder-guide, .builder-layout-guide-overlay, .builder-layout-slot-guide, .builder-selection-box, .builder-layout-scroll-assist, .builder-controls, .interaction-badge, .absolute.-top-8, .absolute.-top-10",
+            )
+            .forEach((node) => node.remove());
+          root.querySelectorAll("[contenteditable]").forEach((node) => {
+            node.removeAttribute("contenteditable");
+          });
+          root.querySelectorAll("[data-editor]").forEach((node) => {
+            node.removeAttribute("data-editor");
+          });
+          root.querySelectorAll(".canvas-element").forEach((node) => {
+            if (node !== root) node.classList.remove("canvas-element");
+          });
+        };
+        const normalizeImportedInnerContent = (wrapper) => {
+          const body = wrapper?.querySelector(":scope > .element-body");
+          if (!body) return;
+          body.style.boxSizing = "border-box";
+          body.style.overflow = "visible";
+          const primary =
+            body.querySelector(":scope > .ml-content") || body.firstElementChild;
+          if (!(primary instanceof HTMLElement)) return;
+          const primaryTag = String(primary.tagName || "").toLowerCase();
+          const primaryPosition = String(primary.style.position || "").toLowerCase();
+          if (primaryPosition === "fixed" || primaryPosition === "sticky") {
+            primary.style.position = "relative";
+            primary.style.left = "0px";
+            primary.style.top = "0px";
+          }
+          primary.style.boxSizing = primary.style.boxSizing || "border-box";
+          primary.style.maxWidth = "100%";
+          if (
+            ["button", "a", "input", "textarea", "select", "img", "canvas"].includes(
+              primaryTag,
+            )
+          ) {
+            primary.style.width = primary.style.width || "100%";
+            primary.style.height = primary.style.height || "100%";
+          }
+          body
+            .querySelectorAll("img, svg, canvas, video, iframe")
+            .forEach((node) => {
+              if (!(node instanceof HTMLElement)) return;
+              node.style.maxWidth = "100%";
+              if (!node.style.display) node.style.display = "block";
+            });
+          body.querySelectorAll("button, input, textarea, select").forEach((node) => {
+            if (!(node instanceof HTMLElement)) return;
+            node.style.maxWidth = "100%";
+            node.style.boxSizing = node.style.boxSizing || "border-box";
+          });
+        };
+        const clampImportedWrapperToCanvas = (wrapper) => {
+          if (!(wrapper instanceof HTMLElement)) return;
+          const canvasWidth = getCanvasImportWidth();
+          const body = wrapper.querySelector(":scope > .element-body");
+          const rect = wrapper.getBoundingClientRect();
+          let width =
+            parsePx(wrapper.style.width) || rect.width || wrapper.offsetWidth || 200;
+          let height =
+            parsePx(wrapper.style.height) || rect.height || wrapper.offsetHeight || 100;
+          let left = parsePx(wrapper.style.left);
+          let top = parsePx(wrapper.style.top);
+          if (!Number.isFinite(left)) left = wrapper.offsetLeft || 0;
+          if (!Number.isFinite(top)) top = wrapper.offsetTop || 0;
+          width = Math.max(32, Math.round(width));
+          height = Math.max(32, Math.round(height));
+          if (width > canvasWidth) {
+            width = Math.max(32, canvasWidth - 8);
+          }
+          left = Math.max(0, Math.round(left));
+          top = Math.max(0, Math.round(top));
+          if (left + width > canvasWidth) {
+            left = Math.max(0, canvasWidth - width);
+          }
+          wrapper.style.position = "absolute";
+          wrapper.style.left = `${left}px`;
+          wrapper.style.top = `${top}px`;
+          wrapper.style.width = `${width}px`;
+          wrapper.style.height = `${height}px`;
+          wrapper.style.maxWidth = `${canvasWidth}px`;
+          wrapper.style.boxSizing = "border-box";
+          if (body) {
+            body.style.width = "100%";
+            body.style.height = "100%";
+            body.style.maxWidth = "100%";
+            body.style.boxSizing = "border-box";
+          }
+        };
         const liftAbsoluteChildBoxToWrapper = (wrapper) => {
           const body = wrapper?.querySelector(":scope > .element-body");
           if (!body) return;
@@ -39727,13 +39825,12 @@
           body.innerHTML = importedContent
             ? importedContent.outerHTML
             : node.innerHTML;
-          body
-            .querySelectorAll("[contenteditable]")
-            .forEach((editable) => editable.removeAttribute("contenteditable"));
+          stripImportedBuilderArtifacts(body);
 
           // Normalize a common import shape: `.ml-content` is absolutely positioned inside a wrapper.
           // Lift its box to the wrapper and reset the inner node to relative so selection/drag math matches visuals.
           liftAbsoluteChildBoxToWrapper(wrapper);
+          normalizeImportedInnerContent(wrapper);
           canvas.appendChild(wrapper);
 
           // CRITICAL FIX: Verify and stabilize all position/size properties
@@ -39787,6 +39884,8 @@
             } else if (!wrapper.style.top) {
               wrapper.style.top = Math.round(computedT) + "px";
             }
+            normalizeImportedInnerContent(wrapper);
+            clampImportedWrapperToCanvas(wrapper);
           });
         });
         normalizeCanvasLayerOrder();
