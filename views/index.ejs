@@ -1263,7 +1263,9 @@
         opacity: 1 !important;
         pointer-events: auto !important;
       }
-      .canvas-element:not(.selected-premium):not(.selected-secondary) > .builder-controls-container * {
+      .canvas-element:not(.selected-premium):not(.selected-secondary)
+        > .builder-controls-container
+        * {
         pointer-events: none !important;
       }
       .builder-selection-chip {
@@ -21117,9 +21119,7 @@
                               <button id="tab-arrange" onclick="toggleBuilderTab('arrange', event)" class="builder-tab">Arrange</button>
                               <button id="tab-templates" onclick="toggleBuilderTab('templates', event)" class="builder-tab">Templates</button>
                               <button id="tab-community" onclick="toggleBuilderTab('community', event)" class="builder-tab">Community</button>
-                              <button id="builder-code-toggle" onclick="toggleBuilderCodeMode()" class="w-9 h-9 shrink-0 flex items-center justify-center text-cyan-300 hover:text-white border border-cyan-400/20 rounded-xl bg-cyan-500/10 transition-colors shadow-[0_0_0_1px_rgba(6,182,212,0.12)]">
-                                  <i class="fas fa-code text-sm"></i>
-                              </button>
+                              <button id="builder-code-toggle" onclick="toggleBuilderCodeMode()" class="builder-tab">Code</button>
                               <button id="tab-exit" onclick="quickExitStudio(); hideBuilderPanels();" class="builder-tab builder-tab-exit">Exit</button>
                           </div>
                           </div>
@@ -29663,15 +29663,8 @@
               el.style.height = `${startH}px`;
             }
           }
-          if (movingSelection) {
-             selectedElements.forEach((item) => {
-                if (item.dataset.dragZIndex === undefined) item.dataset.dragZIndex = item.style.zIndex || "";
-                item.style.zIndex = "999999";
-             });
-          } else {
-             if (el.dataset.dragZIndex === undefined) el.dataset.dragZIndex = el.style.zIndex || "";
-             el.style.zIndex = "999999";
-          }
+          // Removed temporary 999999 z-index to match Figma/professional builders.
+          // Elements now retain their absolute layer depth perfectly during drags.
         };
         const selectionStarts = movingSelection
           ? selectedElements.map((item) => {
@@ -29855,21 +29848,8 @@
               el.style.top = `${Math.max(0, snapFinal(t))}px`;
             }
           }
-          if (movingSelection) {
-             selectedElements.forEach((item) => {
-                if (item.dataset.dragZIndex !== undefined) {
-                   item.style.zIndex = item.dataset.dragZIndex;
-                   delete item.dataset.dragZIndex;
-                }
-             });
-             if (didMove) autoSnapLayerOnDrop(selectedElements);
-          } else {
-             if (el.dataset.dragZIndex !== undefined) {
-                el.style.zIndex = el.dataset.dragZIndex;
-                delete el.dataset.dragZIndex;
-             }
-             if (didMove) autoSnapLayerOnDrop([el]);
-          }
+          // No z-index restoration or auto-snapping needed anymore.
+          // Layers will perfectly respect their source code DOM order and z-index at all times.
           hideBuilderGuides();
           clearLayoutDropGuides();
           syncLayoutScrollAssist();
@@ -31098,58 +31078,15 @@
         if (!el1 || !el2) return false;
         const r1 = el1.getBoundingClientRect();
         const r2 = el2.getBoundingClientRect();
-        return !(r2.left >= r1.right || r2.right <= r1.left || r2.top >= r1.bottom || r2.bottom <= r1.top);
+        return !(
+          r2.left >= r1.right ||
+          r2.right <= r1.left ||
+          r2.top >= r1.bottom ||
+          r2.bottom <= r1.top
+        );
       }
 
-      function autoSnapLayerOnDrop(targets) {
-        if (!targets || !targets.length) return;
-        const allElements = getCanvasTopLevelElements();
-        if (!allElements.length) return;
-        normalizeCanvasLayerOrder();
-        
-        const ordered = allElements
-          .map((el, index) => ({
-            el,
-            zIndex: getElementLayerValue(el),
-            index,
-          }))
-          .sort((a, b) => a.zIndex - b.zIndex || a.index - b.index)
-          .map((entry) => entry.el);
-          
-        const targetSet = new Set(targets);
-        let highestIntersectingZ = -1;
-        let highestIntersectingEl = null;
-        
-        targets.forEach(target => {
-          ordered.forEach(other => {
-            if (targetSet.has(other)) return;
-            if (elementsIntersect(target, other)) {
-               const z = getElementLayerValue(other);
-               if (z > highestIntersectingZ) {
-                 highestIntersectingZ = z;
-                 highestIntersectingEl = other;
-               }
-            }
-          });
-        });
-        
-        if (highestIntersectingEl) {
-           const targetsInOrder = ordered.filter(el => targetSet.has(el));
-           const nonTargets = ordered.filter(el => !targetSet.has(el));
-           
-           const newOrdered = [];
-           nonTargets.forEach(nt => {
-              newOrdered.push(nt);
-              if (nt === highestIntersectingEl) {
-                 newOrdered.push(...targetsInOrder);
-              }
-           });
-           
-           newOrdered.forEach((el, index) => {
-             el.style.zIndex = String(index + 1);
-           });
-        }
-      }
+
 
       function shiftSelectedLayer(direction) {
         const targets = Array.from(
@@ -31164,8 +31101,8 @@
         const allElements = getCanvasTopLevelElements();
         if (!allElements.length) return;
         normalizeCanvasLayerOrder();
-        
-        const ordered = allElements
+
+        let ordered = allElements
           .map((el, index) => ({
             el,
             zIndex: getElementLayerValue(el),
@@ -31173,55 +31110,63 @@
           }))
           .sort((a, b) => a.zIndex - b.zIndex || a.index - b.index)
           .map((entry) => entry.el);
-          
+
         const step = direction === "backward" ? -1 : 1;
-        let didMove = false;
-        const targetsInOrder = ordered.filter(el => targetSet.has(el));
-        
+        const targetsInOrder = ordered.filter((el) => targetSet.has(el));
+        const nonTargets = ordered.filter((el) => !targetSet.has(el));
+
         if (step > 0) {
-          // Bring Forward: Process targets from top to bottom
-          for (let i = targetsInOrder.length - 1; i >= 0; i--) {
-            const target = targetsInOrder[i];
-            const currentIndex = ordered.indexOf(target);
-            if (currentIndex === ordered.length - 1) continue;
-            
-            let swapIdx = currentIndex + 1;
-            for (let j = currentIndex + 1; j < ordered.length; j++) {
+          let highestIntersectingIdx = -1;
+          targetsInOrder.forEach((target) => {
+            const targetIdx = ordered.indexOf(target);
+            for (let j = ordered.length - 1; j > targetIdx; j--) {
               if (targetSet.has(ordered[j])) continue;
               if (elementsIntersect(target, ordered[j])) {
-                swapIdx = j;
+                if (j > highestIntersectingIdx) highestIntersectingIdx = j;
                 break;
               }
             }
-            
-            ordered.splice(currentIndex, 1);
-            ordered.splice(swapIdx, 0, target);
-            didMove = true;
+          });
+
+          if (highestIntersectingIdx !== -1) {
+            const highestEl = ordered[highestIntersectingIdx];
+            const newOrdered = [];
+            nonTargets.forEach((nt) => {
+              newOrdered.push(nt);
+              if (nt === highestEl) newOrdered.push(...targetsInOrder);
+            });
+            ordered = newOrdered;
+          } else {
+            // Fallback to absolute front if no intersection above
+            ordered = [...nonTargets, ...targetsInOrder];
           }
         } else {
-          // Send Backward: Process targets from bottom to top
-          for (let i = 0; i < targetsInOrder.length; i++) {
-            const target = targetsInOrder[i];
-            const currentIndex = ordered.indexOf(target);
-            if (currentIndex === 0) continue;
-            
-            let swapIdx = currentIndex - 1;
-            for (let j = currentIndex - 1; j >= 0; j--) {
+          let lowestIntersectingIdx = Infinity;
+          targetsInOrder.forEach((target) => {
+            const targetIdx = ordered.indexOf(target);
+            for (let j = 0; j < targetIdx; j++) {
               if (targetSet.has(ordered[j])) continue;
               if (elementsIntersect(target, ordered[j])) {
-                swapIdx = j;
+                if (j < lowestIntersectingIdx) lowestIntersectingIdx = j;
                 break;
               }
             }
-            
-            ordered.splice(currentIndex, 1);
-            ordered.splice(swapIdx, 0, target);
-            didMove = true;
+          });
+
+          if (lowestIntersectingIdx !== Infinity) {
+            const lowestEl = ordered[lowestIntersectingIdx];
+            const newOrdered = [];
+            nonTargets.forEach((nt) => {
+              if (nt === lowestEl) newOrdered.push(...targetsInOrder);
+              newOrdered.push(nt);
+            });
+            ordered = newOrdered;
+          } else {
+            // Fallback to absolute back if no intersection below
+            ordered = [...targetsInOrder, ...nonTargets];
           }
         }
-        
-        if (!didMove) return;
-        
+
         ordered.forEach((el, index) => {
           el.style.zIndex = String(index + 1);
         });
@@ -31457,10 +31402,18 @@
         persistActiveBuilderFileContent();
         const nextCodeMode = !builderCodeMode;
         if (!nextCodeMode && isBuilderHtmlFile(activePath)) {
-          compileCodeBackToVisualMode().finally(() => {
-            builderCodeMode = false;
-            updateBuilderUI();
-          });
+          showBuilderSnackbar("Syncing visual canvas...", "info");
+          setTimeout(() => {
+            try {
+              tryApplyCodeModeToCanvas({ silent: true });
+              builderCodeMode = false;
+              updateBuilderUI();
+              showBuilderSnackbar("Visual canvas synchronized.", "success");
+            } catch (err) {
+              console.error(err);
+              showBuilderSnackbar("Sync failed.", "error");
+            }
+          }, 50);
           return;
         }
         builderCodeMode = nextCodeMode;
@@ -33152,7 +33105,6 @@
         return { html, css, body, interactionScript, globalImportCss };
       }
       function buildCodeModeDocument() {
-        if (builderRawImportDocument) return builderRawImportDocument;
         const payload = buildExportPayload("medialab-page");
         if (!payload) return "";
         const cssBlock = payload.css
@@ -33165,12 +33117,45 @@
         const interactionBlock = payload.interactionScript
           ? `\n${payload.interactionScript}`
           : "";
+
+        let headContent = `
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>MediaLab Project</title>
+        `;
+        let customScripts = "";
+
+        if (builderRawImportDocument) {
+          try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(
+              builderRawImportDocument,
+              "text/html",
+            );
+            if (doc.head) {
+              doc.head.querySelectorAll("style").forEach((s) => {
+                if (
+                  s.textContent.includes("medialab-page") ||
+                  s.textContent.includes("MediaLab")
+                ) {
+                  s.remove();
+                }
+              });
+              headContent = doc.head.innerHTML;
+            }
+            const scripts = doc.body.querySelectorAll("script");
+            scripts.forEach((s) => {
+              customScripts += s.outerHTML + "\n";
+            });
+          } catch (e) {
+            console.warn(e);
+          }
+        }
+
         return `<!DOCTYPE html>
       <html lang="en">
         <head>
-          <meta charset="UTF-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <title>MediaLab Creative Export</title>
+          ${headContent}
           <style>
       ${cssBlock}
       ${globalImportBlock}
@@ -33189,6 +33174,7 @@
         <body>
       ${payload.body || "  "}
       ${interactionBlock}
+      ${customScripts}
         </body>
       </html>`;
       }
@@ -35228,7 +35214,8 @@
             padding: "0",
             fontSize: "0",
           });
-          visibilityBtn.innerHTML = '<i class="fas fa-eye" style="font-size:10px;"></i>';
+          visibilityBtn.innerHTML =
+            '<i class="fas fa-eye" style="font-size:10px;"></i>';
           visibilityBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             if (typeof toggleCanvasElementVisibility === "function") {
@@ -39668,7 +39655,8 @@
       }
       function toggleCanvasElementVisibility(wrapper) {
         if (!wrapper) return;
-        const isHidden = wrapper.getAttribute("data-builder-state") === "hidden";
+        const isHidden =
+          wrapper.getAttribute("data-builder-state") === "hidden";
         if (isHidden) {
           wrapper.removeAttribute("data-builder-state");
           wrapper.style.opacity = "";
@@ -39983,42 +39971,76 @@
         };
         builderImportedProject = null;
         builderRawImportDocument = "";
-        
+
         // Pass 1: Measure
         reportProgress?.(25, "Measuring imported layout...");
         const measureContainer = document.createElement("div");
-        measureContainer.style.cssText = "position: absolute; top: 0; left: 0; width: 100vw; min-height: 100vh; opacity: 0.001; pointer-events: none; z-index: -9999; overflow: hidden;";
-        
-        const clones = Array.from(nodes).map(n => n.cloneNode(true));
-        clones.forEach(c => measureContainer.appendChild(c));
+        measureContainer.style.cssText =
+          "position: absolute; top: 0; left: 0; width: 100vw; min-height: 100vh; opacity: 0.001; pointer-events: none; z-index: -9999; overflow: hidden;";
+
+        const clones = Array.from(nodes).map((n) => n.cloneNode(true));
+        clones.forEach((c) => measureContainer.appendChild(c));
         document.body.appendChild(measureContainer);
-        
+
         measureContainer.offsetHeight; // force reflow
 
         const flatElements = [];
         const canvasRect = canvas.getBoundingClientRect();
         const containerRect = measureContainer.getBoundingClientRect();
-        
+
         function traverseAndMeasure(node) {
           if (!(node instanceof HTMLElement)) return;
           const tag = node.tagName.toLowerCase();
-          if (["style", "script", "meta", "link", "title", "noscript", "template"].includes(tag)) return;
-          
+          if (
+            [
+              "style",
+              "script",
+              "meta",
+              "link",
+              "title",
+              "noscript",
+              "template",
+            ].includes(tag)
+          )
+            return;
+
           const rect = node.getBoundingClientRect();
           const comp = window.getComputedStyle(node);
-          
-          const hasBg = comp.backgroundColor !== "rgba(0, 0, 0, 0)" && comp.backgroundColor !== "transparent";
+
+          const hasBg =
+            comp.backgroundColor !== "rgba(0, 0, 0, 0)" &&
+            comp.backgroundColor !== "transparent";
           const hasBorder = comp.borderWidth && comp.borderWidth !== "0px";
-          const hasTextContent = Array.from(node.childNodes).some(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim().length > 0);
-          const isInteractive = ["button", "input", "select", "textarea", "a", "img"].includes(tag);
-          const isSvgWrapper = node.querySelector("svg") !== null || tag === "svg" || tag === "path";
-          
+          const hasTextContent = Array.from(node.childNodes).some(
+            (n) =>
+              n.nodeType === Node.TEXT_NODE && n.textContent.trim().length > 0,
+          );
+          const isInteractive = [
+            "button",
+            "input",
+            "select",
+            "textarea",
+            "a",
+            "img",
+          ].includes(tag);
+          const isSvgWrapper =
+            node.querySelector("svg") !== null ||
+            tag === "svg" ||
+            tag === "path";
+
           let skip = false;
           // Skip generic layout wrappers with no visual styling/text
-          if (tag === "div" && !hasBg && !hasBorder && !hasTextContent && !isInteractive && !isSvgWrapper) {
-             skip = true;
+          if (
+            tag === "div" &&
+            !hasBg &&
+            !hasBorder &&
+            !hasTextContent &&
+            !isInteractive &&
+            !isSvgWrapper
+          ) {
+            skip = true;
           }
-          
+
           const bakedStyles = {
             color: comp.color,
             fontFamily: comp.fontFamily,
@@ -40036,117 +40058,148 @@
             alignItems: comp.alignItems,
             flexDirection: comp.flexDirection,
             gap: comp.gap,
-            zIndex: comp.zIndex !== "auto" ? comp.zIndex : ""
+            zIndex: comp.zIndex !== "auto" ? comp.zIndex : "",
           };
 
           if (!skip && tag !== "svg" && tag !== "path") {
             flatElements.push({
-               originalNode: node,
-               rect: rect,
-               bakedStyles: bakedStyles,
-               type: detectImportedCanvasType(node),
-               tag: tag
+              originalNode: node,
+              rect: rect,
+              bakedStyles: bakedStyles,
+              type: detectImportedCanvasType(node),
+              tag: tag,
             });
           }
-          
+
           if (tag !== "svg" && !isInteractive) {
-             Array.from(node.children).forEach(traverseAndMeasure);
+            Array.from(node.children).forEach(traverseAndMeasure);
           }
         }
-        
+
         clones.forEach(traverseAndMeasure);
-        
+
         // Pass 2: Extract & Place
         const total = Math.max(1, flatElements.length);
-        
+
         // Clear canvas (except guides)
-        Array.from(canvas.children).forEach(c => {
-           if (c.id !== "builder-guides") c.remove();
+        Array.from(canvas.children).forEach((c) => {
+          if (c.id !== "builder-guides") c.remove();
         });
         ensureBuilderGuides(canvas);
         initCanvasSelection(canvas);
-        
+
         flatElements.forEach((item, index) => {
-           reportProgress?.(Math.min(92, 42 + Math.round(((index + 1) / total) * 48)), `Flattening objects (${index + 1}/${total})...`);
-           
-           const wrapper = document.createElement("div");
-           wrapper.id = item.originalNode.id || `imported_${Date.now()}_${index}`;
-           wrapper.setAttribute("data-type", item.type);
-           wrapper.className = "canvas-element absolute group transition-shadow active:cursor-grabbing";
-           
-           // Convert relative container rect to absolute canvas rect coordinates
-           // containerRect.left is the origin.
-           const left = item.rect.left - containerRect.left;
-           const top = item.rect.top - containerRect.top;
-           const width = item.rect.width;
-           const height = item.rect.height;
-           
-           let wrapperStyles = `position: absolute; left: ${Math.max(0, left)}px; top: ${Math.max(0, top)}px; width: ${Math.max(16, width)}px; height: ${Math.max(16, height)}px; box-sizing: border-box; margin: 0;${item.bakedStyles.zIndex ? ` z-index: ${item.bakedStyles.zIndex};` : ""}`;
-           
-           // State parsing
-           let isHidden = false;
-           if (item.bakedStyles.display === "none" || item.bakedStyles.opacity === "0" || item.bakedStyles.visibility === "hidden" || item.originalNode.classList.contains("hidden")) {
-              isHidden = true;
-              wrapper.setAttribute("data-builder-state", "hidden");
-           }
-           
-           wrapper.setAttribute("style", wrapperStyles);
-           wrapper.innerHTML = `${buildEditorHandles(item.type)}<div class="element-body w-full h-full overflow-visible"></div>`;
-           
-           if (isHidden) {
-              wrapper.style.opacity = "0.2";
-              const icon = wrapper.querySelector(".builder-visibility-btn i");
-              if (icon) {
-                 icon.className = "fas fa-eye-slash text-[10px]";
-                 icon.parentElement.style.color = "#f43f5e";
+          reportProgress?.(
+            Math.min(92, 42 + Math.round(((index + 1) / total) * 48)),
+            `Flattening objects (${index + 1}/${total})...`,
+          );
+
+          const wrapper = document.createElement("div");
+          wrapper.id =
+            item.originalNode.id || `imported_${Date.now()}_${index}`;
+          wrapper.setAttribute("data-type", item.type);
+          wrapper.className =
+            "canvas-element absolute group transition-shadow active:cursor-grabbing";
+
+          // Convert relative container rect to absolute canvas rect coordinates
+          // containerRect.left is the origin.
+          const left = item.rect.left - containerRect.left;
+          const top = item.rect.top - containerRect.top;
+          const width = item.rect.width;
+          const height = item.rect.height;
+
+          let wrapperStyles = `position: absolute; left: ${Math.max(0, left)}px; top: ${Math.max(0, top)}px; width: ${Math.max(16, width)}px; height: ${Math.max(16, height)}px; box-sizing: border-box; margin: 0;${item.bakedStyles.zIndex ? ` z-index: ${item.bakedStyles.zIndex};` : ""}`;
+
+          // State parsing
+          let isHidden = false;
+          if (
+            item.bakedStyles.display === "none" ||
+            item.bakedStyles.opacity === "0" ||
+            item.bakedStyles.visibility === "hidden" ||
+            item.originalNode.classList.contains("hidden")
+          ) {
+            isHidden = true;
+            wrapper.setAttribute("data-builder-state", "hidden");
+          }
+
+          wrapper.setAttribute("style", wrapperStyles);
+          wrapper.innerHTML = `${buildEditorHandles(item.type)}<div class="element-body w-full h-full overflow-visible"></div>`;
+
+          if (isHidden) {
+            wrapper.style.opacity = "0.2";
+            const icon = wrapper.querySelector(".builder-visibility-btn i");
+            if (icon) {
+              icon.className = "fas fa-eye-slash text-[10px]";
+              icon.parentElement.style.color = "#f43f5e";
+            }
+          }
+
+          const body = wrapper.querySelector(".element-body");
+          const contentNode = item.originalNode.cloneNode(true);
+          contentNode.removeAttribute("id");
+
+          // Remove children that are also being extracted so they don't render twice!
+          Array.from(contentNode.children).forEach((child) => {
+            if (
+              child.tagName &&
+              child.tagName.toLowerCase() !== "svg" &&
+              child.tagName.toLowerCase() !== "path" &&
+              !["b", "i", "strong", "em", "span"].includes(
+                child.tagName.toLowerCase(),
+              )
+            ) {
+              child.remove();
+            }
+          });
+
+          // Interaction parsing
+          if (contentNode.hasAttribute("onclick")) {
+            const clickScript = contentNode.getAttribute("onclick");
+            if (
+              clickScript.includes("display") &&
+              clickScript.includes("block")
+            ) {
+              const targetMatch = clickScript.match(
+                /getElementById\(['"]([^'"]+)['"]\)/,
+              );
+              if (targetMatch) {
+                wrapper.setAttribute(
+                  "data-interaction",
+                  `click:toggleVisibility:${targetMatch[1]}`,
+                );
               }
-           }
-           
-           const body = wrapper.querySelector(".element-body");
-           const contentNode = item.originalNode.cloneNode(true);
-           contentNode.removeAttribute("id");
-           
-           // Remove children that are also being extracted so they don't render twice!
-           Array.from(contentNode.children).forEach(child => {
-              if (child.tagName && child.tagName.toLowerCase() !== "svg" && child.tagName.toLowerCase() !== "path" && !["b","i","strong","em","span"].includes(child.tagName.toLowerCase())) {
-                 child.remove();
-              }
-           });
-           
-           // Interaction parsing
-           if (contentNode.hasAttribute("onclick")) {
-              const clickScript = contentNode.getAttribute("onclick");
-              if (clickScript.includes("display") && clickScript.includes("block")) {
-                 const targetMatch = clickScript.match(/getElementById\(['"]([^'"]+)['"]\)/);
-                 if (targetMatch) {
-                   wrapper.setAttribute("data-interaction", `click:toggleVisibility:${targetMatch[1]}`);
-                 }
-              } else {
-                 wrapper.setAttribute("data-interaction", `click:customFunction`);
-              }
-              contentNode.removeAttribute("onclick");
-           }
-           
-           // Apply baked styles to content Node to survive extraction
-           Object.entries(item.bakedStyles).forEach(([key, val]) => {
-              if (val && val !== "none" && val !== "normal" && val !== "rgba(0, 0, 0, 0)" && val !== "0px") {
-                 contentNode.style[key] = val;
-              }
-           });
-           
-           // Override display if hidden
-           if (isHidden) contentNode.style.display = "block";
-           
-           contentNode.style.margin = "0px";
-           contentNode.style.width = "100%";
-           contentNode.style.height = "100%";
-           contentNode.style.boxSizing = "border-box";
-           
-           body.innerHTML = contentNode.outerHTML;
-           stripImportedBuilderArtifacts(body);
-           canvas.appendChild(wrapper);
+            } else {
+              wrapper.setAttribute("data-interaction", `click:customFunction`);
+            }
+            contentNode.removeAttribute("onclick");
+          }
+
+          // Apply baked styles to content Node to survive extraction
+          Object.entries(item.bakedStyles).forEach(([key, val]) => {
+            if (
+              val &&
+              val !== "none" &&
+              val !== "normal" &&
+              val !== "rgba(0, 0, 0, 0)" &&
+              val !== "0px"
+            ) {
+              contentNode.style[key] = val;
+            }
+          });
+
+          // Override display if hidden
+          if (isHidden) contentNode.style.display = "block";
+
+          contentNode.style.margin = "0px";
+          contentNode.style.width = "100%";
+          contentNode.style.height = "100%";
+          contentNode.style.boxSizing = "border-box";
+
+          body.innerHTML = contentNode.outerHTML;
+          stripImportedBuilderArtifacts(body);
+          canvas.appendChild(wrapper);
         });
-        
+
         document.body.removeChild(measureContainer);
         normalizeCanvasLayerOrder();
         normalizeCanvasElementPositions();
@@ -40208,11 +40261,14 @@
         updateBuilderFileContent(activePath, editor.value);
         applyCanvasPageBackground(extractBodyBackgroundFromDocument(doc), true);
         reportProgress?.(36, "Mapping DOM into builder graph...");
-        const bodyChildren = Array.from(doc.body.children).filter(
-          (node) =>
+        const bodyChildren = Array.from(doc.body.children).filter((node) => {
+          if (["script", "style", "link", "meta", "noscript", "template"].includes(node.tagName.toLowerCase())) return false;
+          return (
             node.classList.contains("ml-container") ||
-            node.classList.contains("canvas-element"),
-        );
+            node.classList.contains("canvas-element") ||
+            (node.style && node.style.position === "absolute" && node.style.left && node.style.top)
+          );
+        });
         const importNodes = bodyChildren.length
           ? bodyChildren
           : buildSyntheticImportNodesFromDocument(doc);
