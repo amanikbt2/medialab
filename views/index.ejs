@@ -38116,69 +38116,383 @@
       }
 
       function copyAiChatBubble(btn) {
-        // Get the parent bubble
-        const bubble = btn.closest(".ai-chat-bubble");
+        // Get the parent message row and find the bubble with copy text
+        const messageRow = btn.closest(".ai-chat-message-row");
+        if (!messageRow) return;
+
+        const bubble = messageRow.querySelector(".ai-chat-bubble");
         if (!bubble) return;
-        const text =
-          String(bubble.dataset.copyText || "").trim() ||
-          bubble.textContent.trim();
+
+        // Get the original text from data-copy-text attribute
+        const text = String(bubble.dataset.copyText || "").trim();
+
+        if (!text) {
+          console.warn("No text to copy");
+          return;
+        }
 
         // Copy to clipboard
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard
             .writeText(text)
             .then(() => {
-              // Show brief success feedback
+              // Show success feedback with checkmark
               const originalIcon = btn.innerHTML;
               btn.innerHTML = '<i class="fas fa-check text-[10px]"></i>';
+              btn.style.opacity = "1";
               setTimeout(() => {
                 btn.innerHTML = originalIcon;
               }, 1500);
             })
             .catch((err) => {
               console.error("Copy failed:", err);
-              showBuilderSnackbar("Copy failed", "error");
+              showBuilderSnackbar("Failed to copy", "error");
             });
         } else {
           // Fallback for older browsers
           const textArea = document.createElement("textarea");
           textArea.value = text;
+          textArea.style.position = "fixed";
+          textArea.style.opacity = "0";
           document.body.appendChild(textArea);
           textArea.select();
           try {
             document.execCommand("copy");
             const originalIcon = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-check text-[10px]"></i>';
+            btn.style.opacity = "1";
             setTimeout(() => {
               btn.innerHTML = originalIcon;
             }, 1500);
           } catch (err) {
             console.error("Copy failed:", err);
-            showBuilderSnackbar("Copy failed", "error");
+            showBuilderSnackbar("Failed to copy", "error");
           }
           document.body.removeChild(textArea);
         }
       }
 
       function editAiChatMessage(btn) {
-        // Get the parent message row and bubble
+        // Get the parent message row
         const messageRow = btn.closest(".ai-chat-message-row");
         if (!messageRow) return;
+
         const bubble = messageRow.querySelector(".ai-chat-bubble");
         if (!bubble) return;
-        const text =
-          String(bubble.dataset.copyText || "").trim() ||
-          bubble.textContent.trim();
 
-        // Show feedback that edit is triggered
-        const originalIcon = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check text-[10px]"></i>';
-        setTimeout(() => {
-          btn.innerHTML = originalIcon;
-        }, 1500);
+        // Get the original text
+        const originalText = String(bubble.dataset.copyText || "").trim();
+        if (!originalText) return;
 
-        console.log("Edit message:", text);
-        // Feature can be expanded later to allow inline editing
+        // Find message index in aiChatMessages
+        let messageIndex = -1;
+        for (let i = 0; i < aiChatMessages.length; i++) {
+          if (
+            String(aiChatMessages[i].text || "").trim() === originalText &&
+            aiChatMessages[i].role === "user"
+          ) {
+            messageIndex = i;
+            break;
+          }
+        }
+
+        if (messageIndex === -1) return;
+
+        // Hide the bubble and show edit UI
+        const bubbleBody = bubble.querySelector(".ai-chat-bubble-body");
+        const actionsDiv = messageRow.querySelector(".ai-chat-bubble-actions");
+
+        // Create edit container
+        const editContainer = document.createElement("div");
+        editContainer.className = "ai-chat-edit-container";
+        editContainer.style.cssText = `
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          width: 100%;
+          padding: 0.75rem;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(148, 163, 184, 0.2);
+          border-radius: 0.75rem;
+        `;
+
+        // Create textarea
+        const textarea = document.createElement("textarea");
+        textarea.value = originalText;
+        textarea.style.cssText = `
+          width: 100%;
+          min-height: 60px;
+          padding: 0.5rem;
+          border-radius: 0.5rem;
+          border: 1px solid rgba(148, 163, 184, 0.3);
+          background: rgba(2, 6, 23, 0.8);
+          color: #e5edf7;
+          font-family: inherit;
+          font-size: 14px;
+          resize: vertical;
+          outline: none;
+        `;
+        textarea.focus();
+
+        // Create button container
+        const buttonContainer = document.createElement("div");
+        buttonContainer.style.cssText = `
+          display: flex;
+          gap: 0.5rem;
+          justify-content: flex-end;
+        `;
+
+        // Cancel button
+        const cancelBtn = document.createElement("button");
+        cancelBtn.textContent = "Cancel";
+        cancelBtn.style.cssText = `
+          padding: 0.4rem 0.8rem;
+          border-radius: 0.4rem;
+          border: 1px solid rgba(148, 163, 184, 0.2);
+          background: rgba(255, 255, 255, 0.06);
+          color: #94a3b8;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        `;
+        cancelBtn.onmouseover = () => {
+          cancelBtn.style.background = "rgba(255, 255, 255, 0.1)";
+          cancelBtn.style.color = "#cbd5e1";
+        };
+        cancelBtn.onmouseout = () => {
+          cancelBtn.style.background = "rgba(255, 255, 255, 0.06)";
+          cancelBtn.style.color = "#94a3b8";
+        };
+
+        // Update button
+        const updateBtn = document.createElement("button");
+        updateBtn.textContent = "Update";
+        updateBtn.style.cssText = `
+          padding: 0.4rem 0.8rem;
+          border-radius: 0.4rem;
+          border: 1px solid rgba(34, 211, 238, 0.3);
+          background: rgba(34, 211, 238, 0.15);
+          color: #22d3ee;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        `;
+        updateBtn.onmouseover = () => {
+          updateBtn.style.background = "rgba(34, 211, 238, 0.25)";
+          updateBtn.style.borderColor = "rgba(34, 211, 238, 0.5)";
+        };
+        updateBtn.onmouseout = () => {
+          updateBtn.style.background = "rgba(34, 211, 238, 0.15)";
+          updateBtn.style.borderColor = "rgba(34, 211, 238, 0.3)";
+        };
+
+        // Cancel handler
+        cancelBtn.onclick = () => {
+          editContainer.remove();
+          bubbleBody.style.display = "block";
+          actionsDiv.style.display = "flex";
+        };
+
+        // Update handler - resend the edited message
+        updateBtn.onclick = async () => {
+          const editedText = textarea.value.trim();
+          if (!editedText) return;
+
+          if (editedText !== originalText) {
+            // Update message in array
+            aiChatMessages[messageIndex].text = editedText;
+            aiChatMessages[messageIndex].html = null;
+            aiChatMessages[messageIndex]._renderedChars = editedText.length;
+            aiChatMessages[messageIndex]._typingDone = true;
+
+            // Re-render to show updated message
+            renderBuilderAiChat();
+          }
+
+          // Resend the edited message using the same logic as sendBuilderAiChat
+          const currentCode = buildLatestAiCodeSnapshot();
+          await syncAiContextSilently();
+
+          // Remove the edit container
+          editContainer.remove();
+
+          aiChatSending = true;
+          aiModelRecoveryInFlight = false;
+          aiModelSwitchingInFlight = false;
+
+          window.aiChatAbortController = new AbortController();
+
+          const sendBtn = document.getElementById("ai-chat-send");
+          if (sendBtn) {
+            sendBtn.disabled = true;
+            sendBtn.style.opacity = "0.6";
+            sendBtn.style.pointerEvents = "none";
+          }
+
+          try {
+            setAiAgentStage("thinking");
+
+            let managerResponse;
+            const isXtraAi = aiSelectedModel === "xtra";
+            const isFirstMessage =
+              aiChatMessages.filter((m) => m.role !== "system_hidden").length <=
+              1;
+            const userContextData = isFirstMessage
+              ? {
+                  userName: String(currentUser?.name || "").trim(),
+                  userLocation: String(currentUser?.location || "").trim(),
+                }
+              : null;
+
+            if (isXtraAi) {
+              try {
+                const requestBody = {
+                  userInput: editedText,
+                  currentCanvasCode: currentCode,
+                  analyzeIntent: true,
+                  correctErrors: true,
+                };
+
+                if (userContextData) {
+                  requestBody.userContext = userContextData;
+                }
+
+                managerResponse = await fetch("/api/ai/best-model", {
+                  method: "POST",
+                  credentials: "include",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(requestBody),
+                  signal: window.aiChatAbortController?.signal,
+                })
+                  .then((r) => r.json())
+                  .catch((err) => {
+                    if (err.name === "AbortError")
+                      return { success: false, aborted: true };
+                    return {
+                      success: false,
+                      error: "Xtra AI temporarily unavailable",
+                    };
+                  });
+
+                if (managerResponse?.aborted) {
+                  aiChatSending = false;
+                  return;
+                }
+
+                if (!managerResponse?.success) {
+                  aiSelectedModel = "workflow";
+                  aiChatMessages.push({
+                    role: "assistant",
+                    text: `⚠️ Xtra AI unavailable. Using Workflow AI instead.`,
+                  });
+                  renderBuilderAiChat();
+
+                  managerResponse = await fetch("/api/ai/manager", {
+                    method: "POST",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      userInput: editedText,
+                      currentCanvasCode: currentCode,
+                      analyzeIntent: true,
+                      correctErrors: true,
+                      ...(userContextData && { userContext: userContextData }),
+                    }),
+                    signal: window.aiChatAbortController?.signal,
+                  })
+                    .then((r) => r.json())
+                    .catch((err) => {
+                      if (err.name === "AbortError")
+                        return { success: false, aborted: true };
+                      return { success: false };
+                    });
+                }
+              } catch (err) {
+                if (err.name === "AbortError") {
+                  aiChatSending = false;
+                  return;
+                }
+                managerResponse = { success: false };
+              }
+            } else {
+              managerResponse = await fetch("/api/ai/manager", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  userInput: editedText,
+                  currentCanvasCode: currentCode,
+                  analyzeIntent: true,
+                  correctErrors: true,
+                  ...(userContextData && { userContext: userContextData }),
+                }),
+                signal: window.aiChatAbortController?.signal,
+              })
+                .then((r) => r.json())
+                .catch((err) => {
+                  if (err.name === "AbortError")
+                    return { success: false, aborted: true };
+                  return { success: false };
+                });
+            }
+
+            if (managerResponse?.aborted) {
+              aiChatSending = false;
+              if (sendBtn) {
+                sendBtn.disabled = false;
+                sendBtn.style.opacity = "1";
+                sendBtn.style.pointerEvents = "auto";
+              }
+              return;
+            }
+
+            // Handle response (same as normal send flow)
+            if (managerResponse?.success) {
+              appendAiChatMessage({
+                role: "assistant",
+                text: managerResponse.content || "Response received",
+                typing: true,
+              });
+            } else {
+              appendAiChatMessage({
+                role: "assistant",
+                text:
+                  managerResponse?.message ||
+                  "Request failed. Please try again.",
+              });
+            }
+          } catch (error) {
+            console.error("Edit and resend failed:", error);
+            appendAiChatMessage({
+              role: "assistant",
+              text: "An error occurred while resending. Please try again.",
+            });
+          } finally {
+            aiChatSending = false;
+            if (sendBtn) {
+              sendBtn.disabled = false;
+              sendBtn.style.opacity = "1";
+              sendBtn.style.pointerEvents = "auto";
+            }
+            renderBuilderAiChat();
+          }
+        };
+
+        // Assemble edit container
+        buttonContainer.appendChild(cancelBtn);
+        buttonContainer.appendChild(updateBtn);
+        editContainer.appendChild(textarea);
+        editContainer.appendChild(buttonContainer);
+
+        // Replace bubble content with edit container
+        bubbleBody.style.display = "none";
+        actionsDiv.style.display = "none";
+        bubble.appendChild(editContainer);
+
+        // Focus textarea
+        textarea.focus();
+        textarea.select();
       }
 
       function stopBuilderAiChat() {
