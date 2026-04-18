@@ -32488,6 +32488,49 @@
         sanitizeNode(rootNode, { clearRootClass: true });
         rootNode.querySelectorAll("*").forEach((node) => sanitizeNode(node));
       }
+      function normalizeOutputStageClone(
+        stageNode,
+        {
+          stageId = "medialab-export-stage",
+          pageBackground = "#ffffff",
+          width = 1440,
+          height = 900,
+        } = {},
+      ) {
+        if (!(stageNode instanceof HTMLElement)) return;
+        const safeWidth = Math.max(320, Math.round(Number(width) || 0) || 1440);
+        const safeHeight = Math.max(
+          320,
+          Math.round(Number(height) || 0) || 900,
+        );
+        stageNode.id = stageId;
+        stageNode.removeAttribute("class");
+        Object.assign(stageNode.style, {
+          position: "relative",
+          left: "0px",
+          top: "0px",
+          right: "auto",
+          bottom: "auto",
+          inset: "auto",
+          margin: "0px",
+          padding: "0px",
+          width: `${safeWidth}px`,
+          minWidth: `${safeWidth}px`,
+          maxWidth: "none",
+          height: `${safeHeight}px`,
+          minHeight: `${safeHeight}px`,
+          borderRadius: "0px",
+          boxShadow: "none",
+          transform: "none",
+          transition: "none",
+          background: pageBackground,
+          backgroundImage: "none",
+          backgroundSize: "auto",
+          backgroundPosition: "0 0",
+          backgroundRepeat: "repeat",
+          overflow: "hidden",
+        });
+      }
       function extractPositioningStyles(styleStr = "") {
         const styles = {};
         const styleMap = {};
@@ -32673,13 +32716,12 @@
           parseFloat(canvas.style.height || "0") || 0,
         );
         const clone = canvas.cloneNode(true);
-        clone.id = "medialab-export-stage";
-        clone.style.margin = "0";
-        clone.style.maxWidth = "none";
-        clone.style.borderRadius = "0";
-        clone.style.boxShadow = "none";
-        clone.style.transform = "none";
-        clone.style.transition = "none";
+        normalizeOutputStageClone(clone, {
+          stageId: "medialab-export-stage",
+          pageBackground,
+          width,
+          height,
+        });
         clone
           .querySelectorAll(
             ".resizer, .drag-handle, .builder-selection-chip, .builder-guide, .builder-layout-guide-overlay, .builder-layout-slot-guide, .builder-selection-box, .builder-layout-scroll-assist, .absolute.-top-8, .absolute.-top-10, .builder-controls, .interaction-badge, [contenteditable='true'], [data-editor]",
@@ -32729,7 +32771,7 @@
           ),
           formatCssRule(
             "body",
-            `margin: 0; min-height: 100vh; background: ${pageBackground}; font-family: Inter, system-ui, sans-serif; position: relative; overflow-x: hidden;`,
+            `margin: 0; min-height: 100vh; min-width: ${Math.max(320, Math.round(width))}px; background: ${pageBackground}; font-family: Inter, system-ui, sans-serif; position: relative; overflow: hidden;`,
           ),
           formatCssRule(
             ".canvas-element",
@@ -32745,7 +32787,7 @@
           ),
           formatCssRule(
             "#medialab-export-stage",
-            `position: relative; width: ${Math.max(320, Math.round(width))}px; min-width: ${Math.max(320, Math.round(width))}px; min-height: ${Math.max(320, Math.round(height))}px; height: auto; background: ${pageBackground}; overflow: visible;`,
+            `position: relative; left: 0; top: 0; width: ${Math.max(320, Math.round(width))}px; min-width: ${Math.max(320, Math.round(width))}px; height: ${Math.max(320, Math.round(height))}px; min-height: ${Math.max(320, Math.round(height))}px; background: ${pageBackground}; overflow: hidden;`,
           ),
           String(dynamicCss || "").trim(),
         ];
@@ -32823,13 +32865,20 @@
         if (!canvas) return "";
 
         const clone = canvas.cloneNode(true);
-        clone.id = "medialab-run-stage";
-        clone.style.margin = "0";
-        clone.style.maxWidth = "none";
-        clone.style.borderRadius = "0";
-        clone.style.boxShadow = "none";
-        clone.style.transform = "none";
-        clone.style.transition = "none";
+        normalizeOutputStageClone(clone, {
+          stageId: "medialab-run-stage",
+          pageBackground: getCanvasPageStyleState(canvas).background,
+          width: Math.max(
+            canvas.scrollWidth,
+            canvas.offsetWidth,
+            parseFloat(canvas.style.width || "0") || 0,
+          ),
+          height: Math.max(
+            canvas.scrollHeight,
+            canvas.offsetHeight,
+            parseFloat(canvas.style.height || "0") || 0,
+          ),
+        });
 
         // Preserve exact inline styles of all elements from original canvas
         const preserveElementStyles = (cloned, original) => {
@@ -32941,13 +32990,14 @@
               margin: 0;
               min-height: 100%;
               background: ${pageBackground};
-              overflow: auto;
+              overflow: hidden;
             }
             body {
               position: relative;
               font-family: Inter, system-ui, sans-serif;
               min-width: ${Math.max(320, Math.round(width))}px;
               min-height: ${Math.max(320, Math.round(height))}px;
+              overflow: hidden;
             }
       ${String(builderImportedGlobalCss || "").trim()}
             .canvas-element {
@@ -32980,15 +33030,15 @@
       ${dynamicCss}
             #medialab-run-stage {
               position: relative;
+              left: 0;
+              top: 0;
               width: ${Math.max(320, Math.round(width))}px;
               min-width: ${Math.max(320, Math.round(width))}px;
-              height: auto;
+              height: ${Math.max(320, Math.round(height))}px;
               min-height: ${Math.max(320, Math.round(height))}px;
               background: ${pageBackground};
-              overflow: visible;
+              overflow: hidden;
               inset: auto;
-              left: auto;
-              top: auto;
             }
           </style>
         </head>
