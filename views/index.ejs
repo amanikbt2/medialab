@@ -32377,8 +32377,6 @@
       }
       function filterExportClasses(classList = []) {
         const blocked = new Set([
-          "canvas-element",
-          "absolute",
           "group",
           "transition-shadow",
           "active:cursor-grabbing",
@@ -32864,6 +32862,7 @@
         const canvas = document.getElementById("web-canvas");
         if (!canvas) return "";
 
+        const dynamicCss = syncStyleTag({ forExport: true });
         const clone = canvas.cloneNode(true);
         normalizeOutputStageClone(clone, {
           stageId: "medialab-run-stage",
@@ -32880,31 +32879,74 @@
           ),
         });
 
-        // Preserve exact inline styles of all elements from original canvas
+        // Preserve exact inline styles and exported layout styles of all canvas elements.
         const preserveElementStyles = (cloned, original) => {
-          if (original.style.cssText) {
-            cloned.style.cssText = original.style.cssText;
+          if (!(cloned instanceof HTMLElement) || !(original instanceof HTMLElement)) return;
+
+          const wrapperStyle = String(
+            original.style.cssText || original.dataset.mlWrapperStyle || "",
+          ).trim();
+          if (wrapperStyle) {
+            cloned.style.cssText = wrapperStyle;
+          } else {
+            const positioningStyle = extractPositioningStyles(
+              String(original.dataset.mlWrapperStyle || original.style.cssText || ""),
+            );
+            if (positioningStyle) cloned.style.cssText = positioningStyle;
           }
-          // Preserve styles for all descendants
-          const clonedChildren = cloned.querySelectorAll("*");
-          const originalChildren = original.querySelectorAll("*");
-          clonedChildren.forEach((clonedChild, index) => {
-            const originalChild = originalChildren[index];
-            if (originalChild && originalChild.style.cssText) {
-              clonedChild.style.cssText = originalChild.style.cssText;
+
+          const originalInner = getElementInnerNode(original);
+          const clonedInner = getElementInnerNode(cloned);
+          const innerStyle = String(
+            originalInner?.style?.cssText || original.dataset.mlInnerStyle || "",
+          ).trim();
+          if (clonedInner && innerStyle) clonedInner.style.cssText = innerStyle;
+
+          const originalChildrenById = new Map();
+          original.querySelectorAll("*").forEach((child) => {
+            if (child.id) originalChildrenById.set(child.id, child);
+          });
+
+          const originalChildren = Array.from(original.querySelectorAll("*"));
+          cloned.querySelectorAll("*").forEach((clonedChild, index) => {
+            const originalChild =
+              (clonedChild.id && originalChildrenById.get(clonedChild.id)) ||
+              originalChildren[index];
+            if (!originalChild) return;
+            const childStyle = String(
+              originalChild.style.cssText ||
+                originalChild.dataset.mlWrapperStyle ||
+                originalChild.dataset.mlInnerStyle ||
+                "",
+            ).trim();
+            if (childStyle) {
+              clonedChild.style.cssText = childStyle;
+            } else {
+              const positioningStyle = extractPositioningStyles(
+                String(
+                  originalChild.dataset.mlWrapperStyle ||
+                    originalChild.dataset.mlInnerStyle ||
+                    originalChild.style.cssText ||
+                    "",
+                ),
+              );
+              if (positioningStyle) {
+                clonedChild.style.cssText = positioningStyle;
+              }
             }
           });
         };
 
-        clone.querySelectorAll(":scope > .canvas-element").forEach((el) => {
+        clone.querySelectorAll(".canvas-element").forEach((el) => {
           const original = canvas.querySelector(`#${el.id}`);
           if (original) {
-            // Copy ALL inline styles from original
             preserveElementStyles(el, original);
-            // Ensure absolute positioning for run mode
-            if (el.classList.contains("in-layout-flow")) {
-              el.classList.remove("in-layout-flow");
-            }
+          }
+        });
+
+        clone.querySelectorAll(":scope > .canvas-element").forEach((el) => {
+          if (el.classList.contains("in-layout-flow")) {
+            el.classList.remove("in-layout-flow");
           }
         });
 
@@ -32957,7 +32999,6 @@
         let canvasHtml = clone.outerHTML;
 
         const pageBackground = getCanvasPageStyleState(canvas).background;
-        const dynamicCss = syncStyleTag({ forExport: true });
         const width = Math.max(
           canvas.scrollWidth,
           canvas.offsetWidth,
