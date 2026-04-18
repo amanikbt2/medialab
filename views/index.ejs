@@ -32498,44 +32498,20 @@
         interactionEntries = [],
         options = {},
       ) {
-        const lines = [];
         const sectionTargetIds = new Set();
         interactionEntries.forEach((entry) => {
-          const sourceId = String(entry?.sourceId || "").trim();
-          const eventName = String(entry?.eventName || "").trim();
           const action = entry?.action || {};
-          if (!sourceId || !eventName || !action.actionType) return;
-          const sourceRef = `document.getElementById(${JSON.stringify(sourceId)})`;
-          let body = "";
-          if (action.actionType === "alert" && action.value) {
-            body = `window.alert(${JSON.stringify(action.value)});`;
-          } else if (action.actionType === "redirect" && action.url) {
-            body = `window.location.href = ${JSON.stringify(action.url)};`;
-          } else if (
-            action.actionType === "toggle" &&
-            action.targetId &&
-            (action.value || "hidden")
-          ) {
-            body = `const target = document.getElementById(${JSON.stringify(action.targetId)}); if (target) target.classList.toggle(${JSON.stringify(action.value || "hidden")});`;
-          } else if (action.actionType === "addSection" && action.targetId) {
+          if (!action.actionType) return;
+          if (action.actionType === "addSection" && action.targetId) {
             sectionTargetIds.add(String(action.targetId));
-            body = `switchSection(${JSON.stringify(action.targetId)});`;
-          } else if (action.actionType === "playSound" && action.soundUrl) {
-            body = `const audio = new Audio(${JSON.stringify(action.soundUrl)}); audio.play().catch(() => {});`;
-          } else if (action.actionType === "customCode" && action.code) {
-            body = `try { ${escapeJsString(String(action.code || "").replace(/<\/script/gi, "<\\\\/script"))} } catch (error) { console.error("MediaLab custom interaction failed:", error); }`;
           }
-          if (!body) return;
-          lines.push(
-            `(() => { const source = ${sourceRef}; if (!source) return; source.addEventListener(${JSON.stringify(eventName)}, (event) => { ${body} }); })();`,
-          );
         });
         const defaultSectionId = String(options?.defaultSectionId || "").trim();
         const needsSectionNavigation = Boolean(
           defaultSectionId || sectionTargetIds.size,
         );
-        if (!lines.length && !needsSectionNavigation) return "";
-        const scriptLines = lines.map((line) => `  ${line}`).join("\n");
+        const hasInteractionEntries = interactionEntries.length > 0;
+        if (!hasInteractionEntries && !needsSectionNavigation) return "";
         const sectionHelpers = needsSectionNavigation
           ? [
               "  function hideAllSections() {",
@@ -32564,11 +32540,66 @@
               .filter(Boolean)
               .join("\n")
           : "";
+        const interactionBootstrap = hasInteractionEntries
+          ? [
+              "  function parseMediaLabInteractions(value) {",
+              "    try {",
+              "      const parsed = JSON.parse(value || '{}');",
+              "      return parsed && typeof parsed === 'object' ? parsed : {};",
+              "    } catch {",
+              "      return {};",
+              "    }",
+              "  }",
+              "  function runMediaLabInteraction(source, action, event) {",
+              "    if (!source || !action || !action.actionType) return;",
+              "    const targetId = String(action.targetId || '').trim();",
+              "    if (action.actionType === 'alert' && action.value) {",
+              "      window.alert(action.value);",
+              "      return;",
+              "    }",
+              "    if (action.actionType === 'redirect' && action.url) {",
+              "      window.location.href = action.url;",
+              "      return;",
+              "    }",
+              "    if (action.actionType === 'toggle' && targetId) {",
+              "      const target = document.getElementById(targetId);",
+              "      if (target) target.classList.toggle(action.value || 'hidden');",
+              "      return;",
+              "    }",
+              "    if (action.actionType === 'addSection' && targetId) {",
+              "      if (typeof switchSection === 'function') switchSection(targetId);",
+              "      return;",
+              "    }",
+              "    if (action.actionType === 'playSound' && action.soundUrl) {",
+              "      const audio = new Audio(action.soundUrl);",
+              "      audio.play().catch(() => {});",
+              "      return;",
+              "    }",
+              "    if (action.actionType === 'customCode' && action.code) {",
+              "      try {",
+              "        const runner = new Function('event', 'source', String(action.code || ''));",
+              "        runner(event, source);",
+              "      } catch (error) {",
+              '        console.error("MediaLab custom interaction failed:", error);',
+              "      }",
+              "    }",
+              "  }",
+              "  document.querySelectorAll('[data-interactions]').forEach((source) => {",
+              "    const interactions = parseMediaLabInteractions(source.dataset.interactions || '{}');",
+              "    Object.entries(interactions).forEach(([eventName, action]) => {",
+              "      if (!eventName || !action || !action.actionType) return;",
+              "      source.addEventListener(eventName, (event) => {",
+              "        runMediaLabInteraction(source, action, event);",
+              "      });",
+              "    });",
+              "  });",
+            ].join("\n")
+          : "";
         return [
           "<script>",
           'document.addEventListener("DOMContentLoaded", () => {',
           sectionHelpers,
-          scriptLines,
+          interactionBootstrap,
           "});",
           "</scr" + "ipt>",
         ].join("\n");
@@ -32578,46 +32609,98 @@
         if (!canvas) return null;
         const pageBackground = getCanvasPageStyleState(canvas).background;
         const dynamicCss = syncStyleTag({ forExport: true });
+        const width = Math.max(
+          canvas.scrollWidth,
+          canvas.offsetWidth,
+          parseFloat(canvas.style.width || "0") || 0,
+        );
+        const height = Math.max(
+          canvas.scrollHeight,
+          canvas.offsetHeight,
+          parseFloat(canvas.style.height || "0") || 0,
+        );
+        const clone = canvas.cloneNode(true);
+        clone.id = "medialab-export-stage";
+        clone.style.margin = "0";
+        clone.style.maxWidth = "none";
+        clone.style.borderRadius = "0";
+        clone.style.boxShadow = "none";
+        clone.style.transform = "none";
+        clone.style.transition = "none";
+        clone
+          .querySelectorAll(
+            ".resizer, .drag-handle, .builder-selection-chip, .builder-guide, .builder-layout-guide-overlay, .builder-layout-slot-guide, .builder-selection-box, .builder-layout-scroll-assist, .absolute.-top-8, .absolute.-top-10, .builder-controls, .interaction-badge, [contenteditable='true'], [data-editor]",
+          )
+          .forEach((node) => {
+            if (node.hasAttribute?.("contenteditable")) {
+              node.removeAttribute("contenteditable");
+              return;
+            }
+            node.remove();
+          });
+        clone.querySelectorAll("[contenteditable]").forEach((node) => {
+          node.removeAttribute("contenteditable");
+        });
+        const cloneDefaultSectionId =
+          getDefaultSectionIdForRuntime(clone) || "section_main";
+        clone.querySelectorAll('[data-ml-role="section"]').forEach((section) => {
+          const isDefault = String(section.id || "") === cloneDefaultSectionId;
+          section.style.display = isDefault ? "block" : "none";
+          section.style.visibility = isDefault ? "visible" : "hidden";
+          section.style.pointerEvents = isDefault ? "auto" : "none";
+          section.style.opacity = isDefault ? "1" : "0";
+          section.classList.toggle("section-active", isDefault);
+          section.classList.toggle("section-hidden", !isDefault);
+        });
         const cssBlocks = [
+          formatCssRule(
+            "html, body",
+            "margin: 0; min-height: 100%; height: 100%;",
+          ),
           formatCssRule(
             "body",
             `margin: 0; min-height: 100vh; background: ${pageBackground}; font-family: Inter, system-ui, sans-serif; position: relative; overflow-x: hidden;`,
           ),
           formatCssRule(
-            ".element-body",
-            "box-sizing: border-box; width: 100%; height: 100%; overflow: visible;",
+            ".canvas-element",
+            "position: absolute;",
           ),
           formatCssRule(
-            '[data-ml-role="section"] > .element-body',
-            "position: relative; width: 100%; height: 100%; overflow: visible;",
+            ".element-body",
+            "position: relative; box-sizing: border-box; width: 100%; height: 100%; overflow: visible;",
+          ),
+          formatCssRule(
+            '[data-ml-role="section"]',
+            "width: 100%; min-height: 100%;",
+          ),
+          formatCssRule(
+            "#medialab-export-stage",
+            `position: relative; width: ${Math.max(320, Math.round(width))}px; min-width: ${Math.max(320, Math.round(width))}px; min-height: ${Math.max(320, Math.round(height))}px; height: auto; background: ${pageBackground}; overflow: visible;`,
           ),
           String(dynamicCss || "").trim(),
         ];
-        const exportNodes = [];
         const interactionEntries = [];
-        canvas
-          .querySelectorAll(":scope > .canvas-element")
-          .forEach((sourceNode, index) => {
-            const clean = buildCleanExportNode(sourceNode, index);
-            exportNodes.push(clean.node.outerHTML);
-            Object.entries(clean.interactions || {}).forEach(
-              ([eventName, action]) => {
-                interactionEntries.push({
-                  sourceId: clean.node.id,
-                  eventName,
-                  action,
-                });
-              },
-            );
+        clone.querySelectorAll(".canvas-element").forEach((sourceNode) => {
+          const sourceId = String(sourceNode.id || "").trim();
+          if (!sourceId) return;
+          Object.entries(
+            normalizeElementInteractions(
+              JSON.parse(sourceNode.dataset.interactions || "{}"),
+            ),
+          ).forEach(([eventName, action]) => {
+            interactionEntries.push({
+              sourceId,
+              eventName,
+              action,
+            });
           });
+        });
         const css = cssBlocks.join("\n\n");
         const globalImportCss = String(builderImportedGlobalCss || "").trim();
-        const body = exportNodes
-          .map((markup) => formatHtmlFragment(markup, "  "))
-          .join("\n\n");
+        const body = formatHtmlFragment(clone.outerHTML, "  ");
         const interactionScript = buildInteractionScriptForExport(
           interactionEntries,
-          { defaultSectionId: getDefaultSectionIdForRuntime(canvas) },
+          { defaultSectionId: getDefaultSectionIdForRuntime(clone) },
         );
         const interactionBlock = interactionScript
           ? `\n  ${interactionScript}`
@@ -32767,23 +32850,21 @@
         );
 
         const interactionEntries = [];
-        canvas
-          .querySelectorAll(":scope > .canvas-element")
-          .forEach((sourceNode) => {
-            const clonedNodeId = sourceNode.id;
-            if (!clonedNodeId) return;
-            Object.entries(
-              normalizeElementInteractions(
-                JSON.parse(sourceNode.dataset.interactions || "{}"),
-              ),
-            ).forEach(([eventName, action]) => {
-              interactionEntries.push({
-                sourceId: clonedNodeId,
-                eventName,
-                action,
-              });
+        clone.querySelectorAll(".canvas-element").forEach((sourceNode) => {
+          const clonedNodeId = String(sourceNode.id || "").trim();
+          if (!clonedNodeId) return;
+          Object.entries(
+            normalizeElementInteractions(
+              JSON.parse(sourceNode.dataset.interactions || "{}"),
+            ),
+          ).forEach(([eventName, action]) => {
+            interactionEntries.push({
+              sourceId: clonedNodeId,
+              eventName,
+              action,
             });
           });
+        });
 
         const interactionScript = buildInteractionScriptForExport(
           interactionEntries,
