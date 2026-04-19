@@ -7675,6 +7675,7 @@
       let collaborationMediaPromptShownForRoom = "";
       let collaborationMediaPromptAudioSelected = false;
       let collaborationMediaPromptVideoSelected = true;
+      let collaborationRoomPurpose = "meeting";
       let collaborationInactiveOverlay = null;
       let collaborationJoinProgressTimer = null;
       let connectivityPresenceState =
@@ -8523,7 +8524,9 @@
       }
       function generateRemoteWorkflowLink() {
         if (!collaborationRoomId || !collaborationIsHost || !collaborationHostToken) {
-          generateCollaborationLink();
+          generateCollaborationLink("remote-ai");
+        } else {
+          collaborationRoomPurpose = "remote-ai";
         }
         remoteWorkflowLink = buildRemoteWorkflowLink();
         syncRemoteWorkflowLinkUi();
@@ -8656,6 +8659,10 @@
         );
       }
       function openCollaborationMediaPrompt() {
+        if (remoteAiModeActive) {
+          collaborationMediaPromptDismissed = true;
+          return;
+        }
         const prompt = document.getElementById("builder-collab-media-prompt");
         if (!prompt) return;
         collaborationMediaPromptAudioSelected = false;
@@ -8702,6 +8709,7 @@
         collaborationJoined = false;
         collaborationIsHost = false;
         collaborationCanEdit = true;
+        collaborationRoomPurpose = "meeting";
         collaborationDropdownOpen = false;
         collaborationAutoReconnectEnabled = false;
         collaborationUsers = [];
@@ -8966,6 +8974,16 @@
         return true;
       }
       function maybeShowCollaborationMediaPrompt() {
+        if (remoteAiModeActive) {
+          collaborationMediaPromptDismissed = true;
+          closeCollaborationMediaPrompt();
+          return;
+        }
+        if (collaborationRoomPurpose !== "meeting") {
+          collaborationMediaPromptDismissed = true;
+          closeCollaborationMediaPrompt();
+          return;
+        }
         if (
           !collaborationRoomId ||
           !collaborationJoined ||
@@ -10035,7 +10053,7 @@
             : "",
         });
       }
-      function generateCollaborationLink() {
+      function generateCollaborationLink(purpose = "meeting") {
         hideCollaborationInactiveOverlay();
         collaborationRoomId = String(
           globalThis.crypto?.randomUUID?.() ||
@@ -10047,6 +10065,10 @@
         );
         collaborationShareLink =
           buildCollaborationShareLink(collaborationRoomId);
+        collaborationRoomPurpose =
+          String(purpose || "meeting").trim().toLowerCase() === "remote-ai"
+            ? "remote-ai"
+            : "meeting";
         collaborationIsHost = true;
         collaborationCanEdit = true;
         collaborationJoined = false;
@@ -10157,6 +10179,7 @@
         const roomId = getCollaborationRoomParam();
         if (!roomId) return false;
         const hostToken = getCollaborationHostTokenParam();
+        collaborationRoomPurpose = hasRemoteAiModeParam() ? "remote-ai" : "meeting";
         collaborationRoomId = roomId;
         collaborationHostToken = hostToken;
         collaborationShareLink = buildCollaborationShareLink(roomId);
@@ -10216,7 +10239,8 @@
           92,
         );
         collaborationJoined = true;
-        collaborationMediaPromptDismissed = false;
+        collaborationMediaPromptDismissed =
+          remoteAiModeActive || collaborationRoomPurpose !== "meeting";
         collaborationMediaPromptShownForRoom = "";
         collaborationCanEdit = Boolean(payload.user?.canEdit);
         collaborationIsHost = Boolean(payload.user?.isHost);
