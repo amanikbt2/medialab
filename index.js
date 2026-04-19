@@ -493,6 +493,48 @@ function requireAuth(req, res) {
   return true;
 }
 
+async function resolveRemoteWorkflowAiUser(req) {
+  if (req.isAuthenticated?.() && req.user?._id) {
+    const authUser = await User.findById(req.user._id);
+    return authUser
+      ? { user: authUser, mode: "session" }
+      : { user: null, mode: "session", error: "User not found." };
+  }
+  const roomId = normalizeCollaborationRoomId(req.body?.remoteRoomId);
+  const hostToken = normalizeCollaborationHostToken(req.body?.remoteHostToken);
+  if (!roomId || !hostToken) {
+    return { user: null, mode: "remote", error: "Login required." };
+  }
+  const activeRoom = collaborationRooms.get(roomId);
+  const meetingRecord = await getCollaborationMeetingRecord(roomId);
+  const expectedHostToken = String(
+    meetingRecord?.hostToken || activeRoom?.hostToken || "",
+  ).trim();
+  if (!expectedHostToken || hostToken !== expectedHostToken) {
+    return {
+      user: null,
+      mode: "remote",
+      error: "Remote workflow link is invalid or expired.",
+    };
+  }
+  const hostUserId = String(meetingRecord?.hostUserId || "").trim();
+  if (!hostUserId) {
+    return {
+      user: null,
+      mode: "remote",
+      error: "Remote workflow owner could not be resolved.",
+    };
+  }
+  const hostUser = await User.findById(hostUserId);
+  return hostUser
+    ? { user: hostUser, mode: "remote" }
+    : {
+        user: null,
+        mode: "remote",
+        error: "Remote workflow owner account is unavailable.",
+      };
+}
+
 function normalizeVirtualModelName(value = "") {
   return String(value || "")
     .trim()
@@ -5505,11 +5547,14 @@ app.post("/api/ai/workspace-fetch", async (req, res) => {
 
 app.post("/api/ai/manager", async (req, res) => {
   try {
-    if (!req.isAuthenticated?.() || !req.user?._id) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Login required." });
+    const authResolution = await resolveRemoteWorkflowAiUser(req);
+    if (!authResolution.user?._id) {
+      return res.status(401).json({
+        success: false,
+        message: authResolution.error || "Login required.",
+      });
     }
+    req.user = authResolution.user;
 
     const userInput = String(req.body?.userInput || "").trim();
     const currentCanvasCode = String(req.body?.currentCanvasCode || "").trim();
@@ -5536,7 +5581,7 @@ app.post("/api/ai/manager", async (req, res) => {
       userInput: userInput.substring(0, 50),
     });
 
-    const user = await User.findById(req.user._id);
+    const user = authResolution.user;
 
     // === PREMIUM DUAL-TIER: SUPER COMPONENTS ===
     console.log(`[AI Manager] User isPro status: ${user?.isPro ? 'TRUE' : 'FALSE'}`);
@@ -6815,11 +6860,14 @@ function sanitizeAutoFixHTML(html = "") {
 // Tests all models in parallel and returns the best performing one
 app.post("/api/ai/best-model", async (req, res) => {
   try {
-    if (!req.isAuthenticated?.() || !req.user?._id) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Login required." });
+    const authResolution = await resolveRemoteWorkflowAiUser(req);
+    if (!authResolution.user?._id) {
+      return res.status(401).json({
+        success: false,
+        message: authResolution.error || "Login required.",
+      });
     }
+    req.user = authResolution.user;
 
     const userInput = String(req.body?.userInput || "").trim();
     const currentCode = String(req.body?.currentCanvasCode || "").trim();

@@ -2384,6 +2384,28 @@
         background: rgba(30, 41, 59, 0.95);
         border-color: rgba(148, 163, 184, 0.26);
       }
+      .ai-chat-remote-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        border: 1px solid rgba(34, 211, 238, 0.2);
+        background: rgba(8, 18, 34, 0.78);
+        color: #67e8f9;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          transform 0.2s,
+          background 0.2s,
+          border-color 0.2s,
+          color 0.2s;
+      }
+      .ai-chat-remote-btn:hover {
+        transform: translateY(-1px);
+        background: rgba(16, 35, 58, 0.94);
+        border-color: rgba(34, 211, 238, 0.4);
+        color: #ecfeff;
+      }
       .ai-chat-model-wrap {
         position: relative;
         margin-bottom: 0;
@@ -2688,6 +2710,185 @@
         text-transform: uppercase;
         color: #64748b;
         margin-bottom: 8px;
+      }
+      .ai-remote-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 420;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(2, 6, 23, 0.74);
+        backdrop-filter: blur(16px);
+      }
+      .ai-remote-card {
+        width: min(100%, 460px);
+        border-radius: 1.6rem;
+        border: 1px solid rgba(34, 211, 238, 0.16);
+        background:
+          radial-gradient(
+            circle at top right,
+            rgba(34, 211, 238, 0.12),
+            transparent 34%
+          ),
+          linear-gradient(180deg, rgba(8, 15, 30, 0.98), rgba(4, 9, 20, 0.98));
+        box-shadow: 0 28px 80px rgba(2, 6, 23, 0.58);
+        padding: 1.15rem;
+      }
+      .ai-remote-card-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+      .ai-remote-eyebrow {
+        margin: 0;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: #67e8f9;
+      }
+      .ai-remote-title {
+        margin: 0.45rem 0 0;
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: #f8fafc;
+      }
+      .ai-remote-copy {
+        margin: 0.45rem 0 0;
+        color: #a7b6ca;
+        font-size: 0.93rem;
+        line-height: 1.55;
+      }
+      .ai-remote-actions {
+        margin-top: 1rem;
+      }
+      .ai-remote-primary,
+      .ai-remote-copy-btn {
+        border-radius: 999px;
+        font-weight: 800;
+        transition:
+          transform 0.2s,
+          filter 0.2s,
+          background 0.2s;
+      }
+      .ai-remote-primary {
+        min-width: 128px;
+        padding: 0.85rem 1.15rem;
+        background: linear-gradient(135deg, #34d399, #22d3ee);
+        color: #082032;
+      }
+      .ai-remote-copy-btn {
+        padding: 0.82rem 1rem;
+        background: rgba(255, 255, 255, 0.08);
+        color: #f8fafc;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+      }
+      .ai-remote-primary:hover,
+      .ai-remote-copy-btn:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.04);
+      }
+      .ai-remote-link-wrap {
+        margin-top: 1rem;
+        padding: 0.95rem;
+        border-radius: 1.2rem;
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .ai-remote-label {
+        display: block;
+        margin-bottom: 0.45rem;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #67e8f9;
+      }
+      .ai-remote-link-row {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+      .ai-remote-link-input {
+        flex: 1;
+        min-width: 0;
+        border-radius: 0.95rem;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        background: rgba(2, 6, 23, 0.62);
+        padding: 0.85rem 0.95rem;
+        color: #e2e8f0;
+        font-size: 0.9rem;
+        outline: none;
+      }
+      .ai-remote-note {
+        margin: 0.6rem 0 0;
+        color: #8da0b8;
+        font-size: 0.82rem;
+        line-height: 1.5;
+      }
+      body.remote-ai-mode {
+        background: #020617;
+      }
+      body.remote-ai-mode #ai-chat-popup {
+        right: 0;
+        bottom: 0;
+        width: 100vw;
+        height: 100vh;
+        max-width: none;
+        max-height: none;
+        border-radius: 0;
+        border: none;
+        z-index: 500;
+      }
+      body.remote-ai-mode #ai-chat-popup::before {
+        inset: 0;
+        border-radius: 0;
+        border: none;
+      }
+      body.remote-ai-mode #ai-chat-popup::after {
+        opacity: 0.2;
+      }
+      body.remote-ai-mode .ai-chat-shell {
+        padding:
+          max(0.9rem, env(safe-area-inset-top))
+          0.85rem
+          max(0.85rem, env(safe-area-inset-bottom))
+          0.85rem;
+      }
+      body.remote-ai-mode .ai-chat-stage {
+        border-radius: 1.1rem;
+      }
+      body.remote-ai-mode .ai-chat-input-dock {
+        margin-top: 0.7rem;
+      }
+      body.remote-ai-mode .ai-chat-bubble.user {
+        max-width: 88%;
+      }
+      body.remote-ai-mode .ai-chat-bubble.assistant {
+        max-width: 100%;
+      }
+      body.remote-ai-mode .ai-chat-message-row {
+        padding: 0;
+      }
+      body.remote-ai-mode #builder-ai-toggle,
+      body.remote-ai-mode #builder-explorer-toggle,
+      body.remote-ai-mode #builder-terminal-toggle,
+      body.remote-ai-mode #builder-collaboration-toggle,
+      body.remote-ai-mode #builder-collab-audio-toggle,
+      body.remote-ai-mode #builder-collab-video-toggle {
+        display: none !important;
+      }
+      @media (max-width: 640px) {
+        .ai-remote-link-row {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .ai-remote-copy-btn {
+          width: 100%;
+        }
       }
       .code-highlight-tag {
         color: #7dd3fc;
@@ -7461,6 +7662,8 @@
       let collaborationRemoteStreams = new Map();
       let collaborationAudioMeters = new Map();
       let collaborationAudioMeterFrame = 0;
+      let remoteWorkflowLink = "";
+      let remoteAiModeActive = false;
       let collaborationAudioContext = null;
       let collaborationMediaUpdateToken = 0;
       let collaborationMediaUpdating = false;
@@ -8150,8 +8353,36 @@
           return "";
         }
       }
+      function hasRemoteAiModeParam() {
+        try {
+          const value = String(
+            new URL(window.location.href).searchParams.get("remote_ai") || "",
+          )
+            .trim()
+            .toLowerCase();
+          return ["1", "true", "yes", "on"].includes(value);
+        } catch {
+          return false;
+        }
+      }
       function hasCollaborationRoomParam() {
         return Boolean(getCollaborationRoomParam());
+      }
+      function canUseRemoteWorkflowAi() {
+        return Boolean(
+          remoteAiModeActive &&
+            collaborationRoomId &&
+            collaborationHostToken &&
+            collaborationIsHost,
+        );
+      }
+      function getRemoteWorkflowAiPayload() {
+        return canUseRemoteWorkflowAi()
+          ? {
+              remoteRoomId: collaborationRoomId,
+              remoteHostToken: collaborationHostToken,
+            }
+          : {};
       }
       function getCollaborationPaletteColor(seed = "") {
         const text =
@@ -8253,6 +8484,71 @@
           return base.toString();
         } catch {
           return `${COLLAB_SHARE_BASE_URL}/?room=${encodeURIComponent(normalizedRoomId)}&host=${encodeURIComponent(normalizedHostToken)}`;
+        }
+      }
+      function buildRemoteWorkflowLink() {
+        const roomId = String(collaborationRoomId || "").trim();
+        if (!roomId) return "";
+        const baseLink =
+          collaborationIsHost && collaborationHostToken
+            ? buildCollaborationHostLink(roomId, collaborationHostToken)
+            : buildCollaborationShareLink(roomId);
+        if (!baseLink) return "";
+        try {
+          const url = new URL(baseLink);
+          url.searchParams.set("remote_ai", "1");
+          return url.toString();
+        } catch {
+          return `${baseLink}${baseLink.includes("?") ? "&" : "?"}remote_ai=1`;
+        }
+      }
+      function openRemoteWorkflowControl() {
+        syncRemoteWorkflowLinkUi();
+        document
+          .getElementById("ai-remote-control-modal")
+          ?.classList.remove("hidden");
+      }
+      function closeRemoteWorkflowControl() {
+        document
+          .getElementById("ai-remote-control-modal")
+          ?.classList.add("hidden");
+      }
+      function syncRemoteWorkflowLinkUi() {
+        const wrap = document.getElementById("ai-remote-link-wrap");
+        const input = document.getElementById("ai-remote-link-output");
+        if (!wrap || !input) return;
+        const nextLink = String(remoteWorkflowLink || "").trim();
+        input.value = nextLink;
+        wrap.classList.toggle("hidden", !nextLink);
+      }
+      function generateRemoteWorkflowLink() {
+        if (!collaborationRoomId || !collaborationIsHost || !collaborationHostToken) {
+          generateCollaborationLink();
+        }
+        remoteWorkflowLink = buildRemoteWorkflowLink();
+        syncRemoteWorkflowLinkUi();
+        if (remoteWorkflowLink) {
+          showBuilderSnackbar(
+            "Remote workflow link is ready for your phone.",
+            "success",
+          );
+        } else {
+          showBuilderSnackbar(
+            "Could not prepare the remote workflow link.",
+            "error",
+          );
+        }
+      }
+      async function copyRemoteWorkflowLink() {
+        if (!remoteWorkflowLink) {
+          generateRemoteWorkflowLink();
+        }
+        if (!remoteWorkflowLink) return;
+        try {
+          await navigator.clipboard.writeText(remoteWorkflowLink);
+          showBuilderSnackbar("Phone control link copied.", "success");
+        } catch {
+          showBuilderSnackbar("Could not copy that phone link.", "error");
         }
       }
       function syncCollaborationHostUrl(replace = true) {
@@ -8416,6 +8712,7 @@
         collaborationHostToken = "";
         collaborationAudioEnabled = false;
         collaborationVideoEnabled = false;
+        remoteWorkflowLink = "";
         collaborationMediaPromptDismissed = true;
         collaborationMediaPromptShownForRoom = "";
         stopCollaborationLocalMediaTracks();
@@ -9755,9 +10052,11 @@
         collaborationJoined = false;
         collaborationAudioEnabled = false;
         collaborationVideoEnabled = false;
+        remoteWorkflowLink = buildRemoteWorkflowLink();
         syncCollaborationHostUrl(true);
         joinCollaborationRoom(true);
         updateCollaborationUi();
+        syncRemoteWorkflowLinkUi();
       }
       async function copyCollaborationLink() {
         if (!collaborationShareLink) {
@@ -9927,6 +10226,8 @@
         if (collaborationIsHost && collaborationHostToken) {
           syncCollaborationHostUrl(true);
         }
+        remoteWorkflowLink = buildRemoteWorkflowLink();
+        syncRemoteWorkflowLinkUi();
         if (payload.latestSnapshot?.html) {
           applyRemoteCollaborationSnapshot(payload.latestSnapshot);
         }
@@ -21457,6 +21758,7 @@
                           <i class="fas fa-sitemap text-sm"></i>
                       </button>
                   </div>
+                  
                   <div id="ai-chat-popup" class="ai-chat-popup hidden" onclick="if(event.target.id === 'ai-chat-popup') closeBuilderAiChat();">
                       <div class="ai-chat-shell">
                           <div class="ai-model-pulse"></div>
@@ -21467,9 +21769,14 @@
                                       <option value="xtra">Xtra AI (Auto-Best)</option>
                                   </select>
                               </div>
-                              <button onclick="closeBuilderAiChat()" class="ai-chat-close" title="Close chat">
-                                  <i class="fas fa-times text-sm"></i>
-                              </button>
+                              <div class="ai-chat-top-actions">
+                                  <button type="button" onclick="openRemoteWorkflowControl()" class="ai-chat-remote-btn" title="Remote workflow control">
+                                      <i class="fas fa-globe-americas text-sm"></i>
+                                  </button>
+                                  <button onclick="closeBuilderAiChat()" class="ai-chat-close" title="Close chat">
+                                      <i class="fas fa-times text-sm"></i>
+                                  </button>
+                              </div>
                           </div>
                           <div class="ai-xp-progress-wrapper">
                               <div id="ai-xp-progress-bar" class="bg-white/10 rounded-full overflow-hidden">
@@ -21501,6 +21808,33 @@
                                   </div>
                                   <span class="ai-chat-message-count"><span id="ai-message-count">0</span> messages</span>
                               </div>
+                          </div>
+                      </div>
+                  </div>
+                  <div id="ai-remote-control-modal" class="ai-remote-modal hidden" onclick="if (event.target.id === 'ai-remote-control-modal') closeRemoteWorkflowControl();">
+                      <div class="ai-remote-card">
+                          <div class="ai-remote-card-top">
+                              <div>
+                                  <p class="ai-remote-eyebrow">Remote workflow control</p>
+                                  <h3 class="ai-remote-title">Remote workflow control</h3>
+                                  <p class="ai-remote-copy">Create a phone-ready control link for this live builder session.</p>
+                              </div>
+                              <button type="button" onclick="closeRemoteWorkflowControl()" class="ai-chat-close" title="Close remote workflow control">
+                                  <i class="fas fa-times text-sm"></i>
+                              </button>
+                          </div>
+                          <div class="ai-remote-actions">
+                              <button type="button" onclick="generateRemoteWorkflowLink()" class="ai-remote-primary">
+                                  Get Link
+                              </button>
+                          </div>
+                          <div id="ai-remote-link-wrap" class="ai-remote-link-wrap hidden">
+                              <label class="ai-remote-label" for="ai-remote-link-output">Phone control link</label>
+                              <div class="ai-remote-link-row">
+                                  <input id="ai-remote-link-output" type="text" readonly class="ai-remote-link-input" />
+                                  <button type="button" onclick="copyRemoteWorkflowLink()" class="ai-remote-copy-btn">Copy</button>
+                              </div>
+                              <p class="ai-remote-note">Opening this link on your phone joins the current project and launches the dedicated AI control view.</p>
                           </div>
                       </div>
                   </div>
@@ -23274,8 +23608,19 @@
         }
         await initializeDataExplorerSession();
         const collaborationActivated = await activateCollaborationFromUrl();
+        const remoteAiRequested = hasRemoteAiModeParam();
         const hasDeepLinkState = hasExplicitRouterState();
         await initRouter();
+        const remoteAiReady =
+          remoteAiRequested &&
+          (collaborationActivated || hasCollaborationRoomParam());
+        applyRemoteAiMode(remoteAiReady);
+        if (remoteAiReady) {
+          setTimeout(() => {
+            toggleBuilderAiPopup(true);
+            document.getElementById("ai-chat-input")?.focus();
+          }, 220);
+        }
         initConnectivityPresenceToasts();
         try {
           const lastTool = String(
@@ -34299,6 +34644,14 @@
           popup.classList.add("hidden");
         }
       }
+      function applyRemoteAiMode(shouldEnable = false) {
+        remoteAiModeActive = Boolean(shouldEnable);
+        document.body.classList.toggle("remote-ai-mode", remoteAiModeActive);
+        if (remoteAiModeActive) {
+          goToStudio("web-builder");
+          toggleBuilderAiPopup(true);
+        }
+      }
       function updateAiXpDisplay(xpChange = 0) {
         const xpDisplay = document.getElementById("ai-xp-display");
         const progressBar = document.getElementById("ai-xp-progress-bar");
@@ -38665,8 +39018,9 @@
         const sendBtn = document.getElementById("ai-chat-send");
         const editor = document.getElementById("builder-code-editor");
         const prompt = String(input?.value || "").trim();
+        const remoteWorkflowPayload = getRemoteWorkflowAiPayload();
         if (!prompt) return;
-        if (!loggedIn || !currentUser) {
+        if ((!loggedIn || !currentUser) && !remoteWorkflowPayload.remoteRoomId) {
           // Show login required message in chat
           appendAiChatMessage({
             role: "assistant",
@@ -38722,6 +39076,7 @@
                   currentCanvasCode: currentCode,
                   analyzeIntent: true,
                   correctErrors: true,
+                  ...remoteWorkflowPayload,
                 }),
                 signal: window.aiChatAbortController?.signal,
               })
@@ -38761,6 +39116,7 @@
                     currentCanvasCode: currentCode,
                     analyzeIntent: true,
                     correctErrors: true,
+                    ...remoteWorkflowPayload,
                   }),
                   signal: window.aiChatAbortController?.signal,
                 })
@@ -38790,6 +39146,7 @@
                 currentCanvasCode: currentCode,
                 analyzeIntent: true,
                 correctErrors: true,
+                ...remoteWorkflowPayload,
               }),
               signal: window.aiChatAbortController?.signal,
             })
@@ -38808,7 +39165,7 @@
 
           if (!managerResponse?.success) {
             // Check if there's a detailed error from the API
-            const errorDetail = managerResponse?.error;
+            const errorDetail = managerResponse?.error || managerResponse?.message;
             if (errorDetail) {
               const err = new Error("API Error");
               err.apiError = errorDetail;
