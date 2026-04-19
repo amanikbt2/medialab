@@ -1,25 +1,92 @@
 import nodeFetch from "node-fetch";
+import fs from "fs";
+import path from "path";
 
+const STATE_FILE = path.join(process.cwd(), "ai_key_state.json");
 const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || "";
 const GEMINI_KEYS = rawKeys.split(",").map(k => k.trim()).filter(k => k.length > 0);
 
+const KEY_LABELS = {
+  "AIzaSyDQRQBOM_e5epWed4hiA_Pzf-_81Rt_4Mg": "kbt1",
+  "AIzaSyAJE2mJpIlZt_P6mc_7axK7k1qAk8iALYA": "kbt2",
+  "AIzaSyB-IBL4wo43PEsRBUaSZtsM960IZPQp1eg": "s1",
+  "AIzaSyDPFa9m7MuYz-1SXlRStY4heAYhS3FqgAI": "s2",
+  "AIzaSyCeocpDWn_3Ac7PMSl0wCBLMrQ8JcJjOe0": "s3",
+  "AIzaSyDy4Ckgpl83LovGJxl6TRq8Uz9aVzl1l0U": "s4",
+  "AIzaSyCQtEoNPt1XSD11MwV-lNnQ2vpm8bpjhVs": "s5",
+  "AIzaSyBdmlKzQN665XamnQzD5Co9v8Z9OKJmJsc": "s6",
+  "AIzaSyAFGJtQ9c20mpt07KHj3Jsi7fuqH7rbfZY": "s7",
+  "AIzaSyDHcaolbHHFPOHogwvGhB7i65BFpvVHhtY": "s8",
+  "AIzaSyDdHnoe_XhT7NP9WFxYFQnpjFmFBdAZlu8": "s9",
+  "AIzaSyDxRnCXjGGovGjVvKnIbTY_qQ5dRfONmdw": "s10",
+  "AIzaSyCS6s3q0TPOLk_XGfekXovPHsPMYfTS3KM": "s12",
+};
+
+function loadState() {
+  if (fs.existsSync(STATE_FILE)) {
+    try { return JSON.parse(fs.readFileSync(STATE_FILE, "utf8")); } catch(e) {}
+  }
+  return {};
+}
+function saveState(state) {
+  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+}
+
 if (!global.geminiKeyPool) {
+  const savedState = loadState();
   global.geminiKeyPool = {};
   GEMINI_KEYS.forEach((key, i) => {
-    // Provide a human readable index so we know which key is which without logging the full key
-    global.geminiKeyPool[key] = { id: `Key-${i+1}`, exhausted: false, resetTime: 0, usageCount: 0 };
+    const label = KEY_LABELS[key] || `Key-${i+1}`;
+    const saved = savedState[key] || { usageCount: 0, exhausted: false, resetTime: 0 };
+    global.geminiKeyPool[key] = { 
+      id: label, 
+      exhausted: saved.exhausted || false, 
+      resetTime: saved.resetTime || 0, 
+      usageCount: saved.usageCount || 0 
+    };
   });
+  saveState(global.geminiKeyPool);
+
+  // Background Health Check (Every 3 Hours)
+  setInterval(async () => {
+     console.log("[PremiumBrain] Running 3-Hour Health Check on Exhausted API Keys...");
+     for (const key of GEMINI_KEYS) {
+        const state = global.geminiKeyPool[key];
+        if (state.exhausted) {
+           try {
+             const res = await nodeFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+               method: "POST", headers: { "Content-Type": "application/json" },
+               body: JSON.stringify({ contents: [{ parts: [{ text: "ping" }] }] })
+             });
+             if (res.ok) {
+               console.log(`[PremiumBrain] API Key ${state.id} limit restored! Back to READY.`);
+               state.exhausted = false;
+               state.resetTime = 0;
+               state.usageCount = 0;
+               saveState(global.geminiKeyPool);
+             }
+           } catch(e) {}
+        }
+     }
+  }, 3 * 60 * 60 * 1000);
 }
 
 export const PremiumBrain = {
   getAvailableKey() {
     const now = Date.now();
+    let updated = false;
     for (const key of GEMINI_KEYS) {
       const state = global.geminiKeyPool[key];
       if (state.exhausted && now > state.resetTime) {
          state.exhausted = false; // Cooldown expired
+         state.usageCount = 0;
+         updated = true;
       }
-      if (!state.exhausted) {
+    }
+    if (updated) saveState(global.geminiKeyPool);
+
+    for (const key of GEMINI_KEYS) {
+      if (!global.geminiKeyPool[key].exhausted) {
          return key;
       }
     }
@@ -30,7 +97,8 @@ export const PremiumBrain = {
     if (global.geminiKeyPool[key]) {
        global.geminiKeyPool[key].exhausted = true;
        global.geminiKeyPool[key].resetTime = Date.now() + retryMs;
-       console.log(`[PremiumBrain] ${global.geminiKeyPool[key].id} (...${key.slice(-4)}) exhausted! Cooldown: ${retryMs/1000}s`);
+       saveState(global.geminiKeyPool);
+       console.log(`[PremiumBrain] ${global.geminiKeyPool[key].id} exhausted! Cooldown: ${retryMs/1000}s`);
     }
   },
 
@@ -75,6 +143,7 @@ export const PremiumBrain = {
     }
 
     global.geminiKeyPool[apiKey].usageCount++;
+    saveState(global.geminiKeyPool);
 
     const response = await nodeFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
       method: "POST",

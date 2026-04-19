@@ -1359,7 +1359,6 @@
         const geminiPool = usage.geminiPool || {};
         
         const usagePercent = Number(user.usagePercent || 0);
-        const barTone = resolveUsageProgressClasses(usagePercent);
         const cooldownLabel = Number(user.cooldownMs || 0) > 0
           ? `${formatDuration(user.cooldownMs)} remaining`
           : "No cooldown active";
@@ -1367,88 +1366,122 @@
         const poolKeys = Object.values(geminiPool);
         const totalKeys = poolKeys.length;
         const activeKeys = poolKeys.filter(k => !k.exhausted || Date.now() > k.resetTime).length;
-        
-        const poolHtml = totalKeys > 0 ? `
-          <div class="glass border border-white/10 rounded-[1.2rem] p-4 mt-4">
-            <div class="flex items-center justify-between mb-3">
-               <div>
-                  <h4 class="text-sm font-bold text-white">Gemini Rotation Pool</h4>
-                  <p class="text-[11px] text-slate-400 mt-1">Multi-account rate limit bypass.</p>
-               </div>
-               <div class="text-[11px] px-2 py-1 rounded border ${activeKeys === 0 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'} font-bold">
-                 ${activeKeys} / ${totalKeys} Active
-               </div>
-            </div>
-            <div class="space-y-2">
-               ${poolKeys.map(k => {
-                  const isReady = !k.exhausted || Date.now() > k.resetTime;
-                  let statusHtml = '';
-                  if (isReady) {
-                     statusHtml = \`<span class="text-emerald-400 text-[10px] font-bold">READY</span>\`;
-                  } else {
-                     const waitMs = Math.max(0, k.resetTime - Date.now());
-                     statusHtml = \`<span class="text-rose-400 text-[10px] font-bold">COOLDOWN: \${Math.ceil(waitMs/1000)}s</span>\`;
-                  }
-                  return \`
-                     <div class="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
-                        <div class="flex items-center gap-2">
-                           <div class="w-2 h-2 rounded-full \${isReady ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}"></div>
-                           <span class="text-xs text-white">\${k.id}</span>
-                        </div>
-                        <div class="flex items-center gap-4">
-                           <span class="text-[10px] text-slate-400">\${k.usageCount} calls</span>
-                           \${statusHtml}
-                        </div>
+        const activeKeyLabel = activeKeys > 0 ? poolKeys.find(k => !k.exhausted || Date.now() > k.resetTime).id : "None";
+
+        const groqHtml = models.length ? models.map(model => {
+            const runPercent = Number(model.runPercent24h || 0);
+            const rowTone = resolveUsageProgressClasses(runPercent);
+            return `<div class="p-3 bg-white/5 rounded-lg border border-white/5 mb-2">
+              <div class="flex items-start justify-between gap-2">
+                 <div class="min-w-0">
+                   <p class="truncate text-xs font-bold text-white">${escapeHtml(model.modelId || "unknown")}</p>
+                   <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 mt-1">P${Number(model.priority || 0)} • ${String(model.status || "offline").toUpperCase()}</p>
+                 </div>
+                 <span class="text-[10px] font-black text-cyan-200">${runPercent.toFixed(1)}%</span>
+              </div>
+              <div class="mt-2 h-1 w-full rounded-full bg-white/10 overflow-hidden">
+                 <div class="h-full ${rowTone}" style="width:${Math.max(0, Math.min(100, runPercent))}%;"></div>
+              </div>
+              <div class="mt-2 text-[10px] text-slate-400">${Number(model.runs24h || 0)} runs in 24h</div>
+            </div>`;
+        }).join('') : '<p class="text-xs text-slate-500 text-center p-4">No data.</p>';
+
+        const poolHtml = totalKeys > 0 ? poolKeys.map(k => {
+            const isReady = !k.exhausted || Date.now() > k.resetTime;
+            // Limit 1500 per day
+            const limit = 1500;
+            const percent = Math.min(100, (Number(k.usageCount) / limit) * 100);
+            const tone = resolveUsageProgressClasses(percent);
+            
+            let statusHtml = '';
+            let statusTag = '';
+            if (isReady && k.usageCount === 0) {
+               statusTag = `<span class="px-2 py-0.5 rounded bg-slate-500/10 border border-slate-500/20 text-slate-400 text-[9px] font-bold">UNUSED</span>`;
+            } else if (isReady) {
+               statusTag = `<span class="px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[9px] font-bold">IN PROGRESS</span>`;
+            } else {
+               const waitMs = Math.max(0, k.resetTime - Date.now());
+               statusTag = `<span class="px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[9px] font-bold">LIMITED (${Math.ceil(waitMs/1000)}s)</span>`;
+            }
+
+            return `
+               <div class="p-3 rounded-lg bg-white/5 border border-white/5 mb-2">
+                  <div class="flex items-center justify-between mb-2">
+                     <div class="flex items-center gap-2">
+                        <div class="w-1.5 h-1.5 rounded-full ${isReady ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}"></div>
+                        <span class="text-xs font-bold text-white">${k.id}</span>
                      </div>
-                  \`;
-               }).join('')}
-            </div>
-          </div>
-        ` : '';
+                     ${statusTag}
+                  </div>
+                  <div class="flex justify-between items-center text-[9px] text-slate-400 mb-1 mt-3">
+                     <span>${k.usageCount} / ${limit}</span>
+                     <span>${percent.toFixed(1)}%</span>
+                  </div>
+                  <div class="h-1 w-full rounded-full bg-white/10 overflow-hidden">
+                     <div class="h-full ${isReady ? tone : 'bg-rose-500'}" style="width:${percent}%;"></div>
+                  </div>
+               </div>
+            `;
+         }).join('') : '<p class="text-xs text-slate-500 text-center p-4">No Gemini keys found.</p>';
 
         el.innerHTML = `
-          <div class="glass border border-white/10 rounded-[1.2rem] p-4">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p class="text-[11px] uppercase tracking-[0.22em] text-slate-400 font-bold">AI Models Console</p>
-                <p class="text-xs text-slate-500 mt-1">Live registry and usage distribution.</p>
-              </div>
-              <div class="text-xs text-cyan-200 rounded-lg border border-cyan-400/20 bg-cyan-500/10 px-3 py-1.5">Runs 24h: ${Number(usage?.totals?.runs24h || 0)}</div>
-            </div>
-            <div class="mt-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
-              <div class="flex items-center justify-between text-xs text-slate-400">
-                <span>${escapeHtml(user.email || "dev@gmail.com")}</span>
-                <span>${user.isUnlimited ? "Unlimited" : `${Number(user.usedToday || 0)}/${Number(user.dailyLimit || 10)}`}</span>
-              </div>
-              <div class="mt-2 h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
-                <div class="h-full ${barTone}" style="width:${Math.max(0, Math.min(100, usagePercent))}%;"></div>
-              </div>
-              <div class="mt-2 text-[11px] text-slate-400">Cooldown: ${cooldownLabel}</div>
-            </div>
-          </div>
-          ${poolHtml}
-          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-4">
-            ${models.length
-              ? models
-                  .map((model) => {
-                    const runPercent = Number(model.runPercent24h || 0);
-                    const rowTone = resolveUsageProgressClasses(runPercent);
-                    return `<div class="glass border border-white/10 rounded-xl p-3">
-                      <div class="flex items-start justify-between gap-2">
-                        <div class="min-w-0">
-                          <p class="truncate text-xs font-bold text-white">${escapeHtml(model.modelId || "unknown")}</p>
-                          <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 mt-1">P${Number(model.priority || 0)} • ${String(model.status || "offline").toUpperCase()}</p>
-                        </div>
-                        <span class="text-[10px] font-black text-cyan-200">${runPercent.toFixed(1)}%</span>
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+             <!-- Box 1: Free Plan Models -->
+             <div class="glass border border-white/10 rounded-[1.2rem] p-4 flex flex-col">
+                <div class="mb-4 border-b border-white/10 pb-3">
+                   <h4 class="text-sm font-bold text-white uppercase tracking-wide">Free Plan Models</h4>
+                   <p class="text-[10px] text-slate-400 mt-1">Groq Fallback Hierarchy</p>
+                </div>
+                <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar" style="max-height: 400px;">
+                   ${groqHtml}
+                </div>
+             </div>
+
+             <!-- Box 2: Pro Plan Models -->
+             <div class="glass border border-emerald-500/20 rounded-[1.2rem] p-4 flex flex-col relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none"></div>
+                <div class="mb-4 border-b border-emerald-500/20 pb-3 relative z-10">
+                   <div class="flex items-center justify-between">
+                     <h4 class="text-sm font-bold text-emerald-400 uppercase tracking-wide">Pro Plan Models</h4>
+                     <span class="px-2 py-0.5 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold shadow-[0_0_10px_rgba(16,185,129,0.2)]">Active: ${activeKeyLabel}</span>
+                   </div>
+                   <p class="text-[10px] text-slate-400 mt-1">Gemini AI Network</p>
+                </div>
+                <div class="relative z-10 mt-2">
+                   <div class="flex items-center justify-between text-xs text-slate-300 mb-2">
+                     <span>Global Account Quota</span>
+                     <span>${user.isUnlimited ? "Unlimited" : `${Number(user.usedToday || 0)} / ${Number(user.dailyLimit || 10)}`}</span>
+                   </div>
+                   <div class="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+                     <div class="h-full bg-emerald-400" style="width:${Math.max(0, Math.min(100, usagePercent))}%;"></div>
+                   </div>
+                   <div class="mt-3 text-[11px] text-slate-400">Cooldown: ${cooldownLabel}</div>
+                   
+                   <div class="mt-6 p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
+                      <div class="text-[10px] font-bold text-amber-400 mb-1 flex items-center gap-1">
+                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="linejoin" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                         Auto-Rotation Active
                       </div>
-                      <div class="mt-2 h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
-                        <div class="h-full ${rowTone}" style="width:${Math.max(0, Math.min(100, runPercent))}%;"></div>
-                      </div>
-                      <div class="mt-2 text-[10px] text-slate-400">${Number(model.runs24h || 0)} runs in 24h</div>
-                    </div>`;
-                  })
-                  .join("")
-              : `<div class="rounded-xl border border-dashed border-white/10 p-4 text-center text-sm text-slate-400">No AI model telemetry yet.</div>`}
+                      <p class="text-[9px] text-slate-400 leading-relaxed">Requests are automatically load-balanced across the Rotation Pool. Exhausted keys are seamlessly bypassed.</p>
+                   </div>
+                </div>
+             </div>
+
+             <!-- Box 3: API Key Rotation Pool -->
+             <div class="glass border border-white/10 rounded-[1.2rem] p-4 flex flex-col">
+                <div class="mb-4 border-b border-white/10 pb-3 flex justify-between items-center">
+                   <div>
+                      <h4 class="text-sm font-bold text-white uppercase tracking-wide">Key Rotation Pool</h4>
+                      <p class="text-[10px] text-slate-400 mt-1">Progress & Health</p>
+                   </div>
+                   <div class="text-[10px] px-2 py-0.5 rounded border ${activeKeys === 0 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'} font-bold">
+                     ${activeKeys} / ${totalKeys} Ready
+                   </div>
+                </div>
+                <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar" style="max-height: 400px;">
+                   ${poolHtml}
+                </div>
+             </div>
           </div>
         `;
       }
