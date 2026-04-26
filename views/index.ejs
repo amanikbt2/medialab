@@ -18164,31 +18164,6 @@
           })
           .slice(0, limit);
       }
-      async function fetchAdsenseConsoleReport() {
-        if (!loggedIn || !currentUser) return null;
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 7000);
-          const controller = new AbortController(); clearTimeout(timeoutId); const timeoutId = setTimeout(() => controller.abort(), 8000); const res = await fetch("/api/adsense/report", {
-            credentials: "include", signal: controller.signal
-          }); clearTimeout(timeoutId);
-          const data = await res.json();
-          if (!res.ok || !data.success) {
-            throw new Error(data.message || "Could not load AdSense stats.");
-          }
-          currentAdsenseConsoleReport = data;
-          return data;
-        } catch (error) {
-          console.warn("AdSense report fetch skipped:", error);
-          currentAdsenseConsoleReport = {
-            success: false,
-            connected: Boolean(currentUser?.adsenseConnected),
-            stats: null,
-            message: error.message || "Could not load AdSense stats.",
-          };
-          return currentAdsenseConsoleReport;
-        }
-      }
       async function syncAdsenseStatus(options = {}) {
         if (!loggedIn || !currentUser?.adsenseConnected) return null;
         try {
@@ -18287,16 +18262,6 @@
           authBootstrapReady = true;
           return Boolean(loggedIn && currentUser);
         }
-      }
-      function hasAdsenseStats(report) {
-        if (!report?.connected || !report?.stats) return false;
-        const stats = report.stats || {};
-        return [
-          Number(stats.estimatedEarnings || 0),
-          Number(stats.impressions || 0),
-          Number(stats.pageViewsRpm || 0),
-          Number(stats.clicks || 0),
-        ].some((value) => value > 0);
       }
       function isAdsenseApprovedUser(user = currentUser || {}) {
         return Boolean(user?.adsenseConnected && user?.adsenseApprovedAt);
@@ -18931,56 +18896,7 @@
         document.getElementById("adsense-link-modal")?.classList.add("hidden");
         document.getElementById("adsense-link-modal")?.classList.remove("flex");
       }
-      function openAdsenseLinkModal() {
-        if (!loggedIn || !currentUser) {
-          showLogin();
-          return;
-        }
-        const hostedUrl = getPreferredAdsenseHostedUrl();
-        if (!hostedUrl) {
-          openAppDialog({
-            chip: "Publish First",
-            title: "Cannot connect to AdSense yet",
-            message:
-              "Please publish your first project so MediaLab can detect your hosted Render domain before connecting AdSense.",
-            tone: "error",
-            confirmLabel: "OK",
-            cancelLabel: "Close",
-          });
-          return;
-        }
-        document.getElementById("adsense-link-error")?.classList.add("hidden");
-        document
-          .getElementById("adsense-link-success")
-          ?.classList.add("hidden");
-        document
-          .getElementById("adsense-link-checklist")
-          ?.classList.add("hidden");
-        document
-          .getElementById("adsense-domain-register-box")
-          ?.classList.add("hidden");
-        document
-          .getElementById("adsense-portal-panel")
-          ?.classList.add("hidden");
-        document
-          .getElementById("adsense-google-reconnect-btn")
-          ?.classList.add("hidden");
-        const input = document.getElementById("adsense-link-url-input");
-        if (input) {
-          input.value = hostedUrl;
-        }
-        document
-          .getElementById("adsense-link-modal")
-          ?.classList.remove("hidden");
-        document.getElementById("adsense-link-modal")?.classList.add("flex");
-        if (currentUser?.adsenseConnected) {
-          renderAdsensePortalMode();
-          document
-            .getElementById("adsense-portal-panel")
-            ?.classList.remove("hidden");
-        }
-      }
-      async function disconnectAdsenseAccount() {
+      function disconnectAdsenseAccount() {
         if (!loggedIn || !currentUser) {
           showLogin();
           return;
@@ -21052,9 +20968,7 @@
             loggedIn && currentUser?.githubUsername
               ? await fetchGithubProjects()
               : currentUser?.liveProjects || [];
-          const adsenseReport = loggedIn
-            ? await fetchAdsenseConsoleReport()
-            : null;
+          
           aiInfrastructureModels = await fetchAiInfrastructureModels();
           const recentProjects = liveProjects.slice(0, 3);
           const balance = getCurrentBalance();
@@ -21125,76 +21039,6 @@
                                 <p class="text-[11px] text-right text-slate-300/70">Recent sites stay synced here.</p>
                               </div>
                             </div>
-                          </div>
-                          <div class="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(15,23,42,0.82))] backdrop-blur-2xl p-5 sm:p-6 shadow-[0_24px_60px_rgba(2,6,23,0.32)]">
-                            <div class="flex items-start justify-between gap-4">
-                              <div>
-                                <p class="text-[10px] font-black uppercase tracking-[0.24em] text-amber-300">AdSense Revenue</p>
-                                <h3 class="mt-2 text-2xl font-semibold tracking-tight text-white">Real-time creator stats</h3>
-                                <p class="mt-2 text-sm text-slate-400">${
-                                  adsenseReport?.connected
-                                    ? "Live numbers pulled from your Google AdSense connection across your hosted MediaLab domains."
-                                    : "Monetization Disabled for real-time earnings, impressions, RPM, and click performance."
-                                }</p>
-                              </div>
-                              <div class="flex items-center gap-2">
-                                ${
-                                  adsenseReport?.connected
-                                    ? `<button onclick="openAdsenseConnectionInfo()" class="inline-flex h-10 w-10 items-center justify-center rounded-[1rem] border border-white/10 bg-white/5 text-slate-300 hover:border-amber-400/30 hover:text-amber-200 transition-all" aria-label="AdSense account options">
-                                        <i class="fas fa-info text-sm"></i>
-                                      </button>`
-                                    : ``
-                                }
-                                <div class="w-12 h-12 rounded-[1.3rem] border border-amber-400/20 bg-amber-500/10 flex items-center justify-center text-amber-300 shadow-[0_10px_30px_rgba(245,158,11,0.14)]">
-                                  <i class="fab fa-google"></i>
-                                </div>
-                              </div>
-                            </div>
-                              ${
-                                hasAdsenseStats(adsenseReport)
-                                  ? `<div class="mt-5 grid grid-cols-2 gap-3">
-                                      <div class="rounded-[1.4rem] border border-white/10 bg-slate-950/70 p-4">
-                                        <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Estimated Earnings</p>
-                                        <p class="mt-2 text-2xl font-black text-white">$${Number(adsenseReport.stats.estimatedEarnings || 0).toFixed(2)}</p>
-                                      </div>
-                                      <div class="rounded-[1.4rem] border border-white/10 bg-slate-950/70 p-4">
-                                        <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Impressions</p>
-                                        <p class="mt-2 text-2xl font-black text-white">${formatCompactNumber(adsenseReport.stats.impressions || 0)}</p>
-                                      </div>
-                                      <div class="rounded-[1.4rem] border border-white/10 bg-slate-950/70 p-4">
-                                        <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Page RPM</p>
-                                        <p class="mt-2 text-2xl font-black text-white">$${Number(adsenseReport.stats.pageViewsRpm || 0).toFixed(2)}</p>
-                                      </div>
-                                      <div class="rounded-[1.4rem] border border-white/10 bg-slate-950/70 p-4">
-                                        <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Clicks</p>
-                                        <p class="mt-2 text-2xl font-black text-white">${formatCompactNumber(adsenseReport.stats.clicks || 0)}</p>
-                                      </div>
-                                    </div>
-                                    <p class="mt-4 text-xs leading-6 text-slate-400">${adsenseReport.message || ""}</p>`
-                                  : adsenseReport?.connected
-                                    ? `<div class="mt-5 rounded-[1.5rem] border border-dashed border-emerald-400/20 bg-emerald-500/5 p-5">
-                                        <div class="grid grid-cols-2 gap-3">
-                                          <div class="rounded-[1.2rem] border border-white/10 bg-slate-950/50 p-4">
-                                            <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">AdSense Status</p>
-                                            <p class="mt-2 text-base font-semibold text-white">${getAdsenseReviewLabel(adsenseReport.siteStatus || currentUser?.adsenseSiteStatus || "")}</p>
-                                          </div>
-                                          <div class="rounded-[1.2rem] border border-white/10 bg-slate-950/50 p-4">
-                                            <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Publisher ID</p>
-                                            <p class="mt-2 break-all text-sm leading-6 font-semibold text-white sm:text-base">${currentUser?.adsenseId || "Waiting"}</p>
-                                          </div>
-                                        </div>
-                                        <p class="mt-4 text-sm leading-6 text-slate-400">${adsenseReport.message || "No current AdSense data yet. Once Google starts returning live stats for your hosted domain, they will appear here automatically."}</p>
-                                        <p class="mt-3 text-xs text-emerald-300">Last checked: ${adsenseReport.lastCheckedAt ? formatProjectTimestamp(adsenseReport.lastCheckedAt) : "Waiting"}</p>
-                                      </div>`
-                                    : `<div class="mt-5 rounded-[1.5rem] border border-dashed border-amber-400/20 bg-amber-500/5 p-5">
-                                      <p class="text-sm font-semibold text-white">Monetization Disabled for Real-Time Stats</p>
-                                      <p class="mt-2 text-sm leading-6 text-slate-400">MediaLab will reuse your Google sign-in, request AdSense read access, and then pull your actual earnings and traffic metrics into the Console.</p>
-                                      <button onclick="openAdsenseLinkModal()" class="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white text-slate-950 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] hover:bg-amber-50 transition-all shadow-[0_18px_35px_rgba(255,255,255,0.12)]">
-                                        <i class="fas fa-link"></i>
-                                        Monetization Disabled
-                                      </button>
-                                    </div>`
-                              }
                           </div>
                           ${buildGithubStorageStatusMarkup("console")}
                           ${renderAiInfrastructureConsoleCard(aiInfrastructureModels)}
