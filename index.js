@@ -12406,6 +12406,14 @@ app.patch(
 );
 
 
+
+app.get("/api/admin/redemptions", adminRateLimit, requireAdminApi, (req, res) => {
+  res.json({ success: true, redemptions: [], withdrawals: [] });
+});
+
+app.get("/api/admin/marketplace", adminRateLimit, requireAdminApi, (req, res) => {
+  res.json({ success: true, pendingListings: [], pendingPurchases: [] });
+});
 app.get(
   "/api/admin/analytics",
   adminRateLimit,
