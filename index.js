@@ -29,7 +29,7 @@ import Feedback from "./models/Feedback.js";
 import UpgradeRequest from "./models/UpgradeRequest.js";
 import UsageLog from "./models/UsageLog.js";
 import Download from "./models/Download.js";
-import WithdrawalRequest from "./models/WithdrawalRequest.js";
+
 import MarketplaceItem from "./models/MarketplaceItem.js";
 import BuilderTemplate from "./models/BuilderTemplate.js";
 import Notification from "./models/Notification.js";
@@ -3879,13 +3879,13 @@ app.post("/api/downloads", async (req, res) => {
                   )
                 : false;
               if (!priorReward) {
-                referrer.accountBalance = Number(
-                  (Number(referrer.accountBalance || 0) + 0.01).toFixed(2),
+                referrer.xp = Number(
+                  (Number(referrer.xp || 0) + 50),
                 );
                 referrer.referralInstallCount =
                   Number(referrer.referralInstallCount || 0) + 1;
                 referrer.referralEarnings = Number(
-                  (Number(referrer.referralEarnings || 0) + 0.01).toFixed(2),
+                  (Number(referrer.referralEarnings || 0) + 50),
                 );
                 referrer.referralRewards = [
                   ...(Array.isArray(referrer.referralRewards)
@@ -11623,885 +11623,6 @@ app.post("/api/deploy-status", express.json(), async (req, res) => {
   }
 });
 
-app.post("/api/adsense/link-site", express.json(), async (req, res) => {
-  if (!req.isAuthenticated() || !req.user) {
-    return res
-      .status(401)
-      .json({ success: false, message: "You need to sign in first." });
-  }
-
-  try {
-    const submittedDomain = String(req.body?.domainName || "")
-      .trim()
-      .toLowerCase();
-    const liveProjectUrl = normalizeRenderUrl(req.body?.liveProjectUrl || "");
-    const domainName =
-      submittedDomain || extractDomainNameFromUrl(liveProjectUrl);
-    if (!domainName) {
-      return res.status(400).json({
-        success: false,
-        message: "Enter your project domain first.",
-      });
-    }
-
-    const user = await User.findById(req.user._id).select(
-      "+googleRefreshToken +adsenseAdCode",
-    );
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found." });
-    }
-    if (!user.googleRefreshToken) {
-      return res.status(400).json({
-        success: false,
-        requiresGoogleReconnect: true,
-        message:
-          "Reconnect Google first so MediaLab can read your AdSense data.",
-      });
-    }
-    const allowedDomains = collectHostedProjectDomains(user);
-    if (!allowedDomains.includes(domainName)) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "That domain is not recognized as one of your MediaLab hosted project domains.",
-      });
-    }
-    const auth = getAdsenseOAuthClient(user);
-    const adsense = google.adsense({ version: "v2", auth });
-    const accountsResponse = await adsense.accounts.list();
-    const accounts = accountsResponse.data?.accounts || [];
-
-    let matchedAccount = null;
-    let matchedSite = null;
-    for (const account of accounts) {
-      const sitesResponse = await adsense.accounts.sites.list({
-        parent: account.name,
-        pageSize: 200,
-      });
-      const sites = sitesResponse.data?.sites || [];
-      matchedSite = sites.find((site) => {
-        const siteUrl =
-          site.siteUrl ||
-          site.url ||
-          site.domain ||
-          site.reportingDimensionId ||
-          "";
-        const siteDomain =
-          extractDomainNameFromUrl(siteUrl) || String(siteUrl).trim();
-        return siteDomain === domainName;
-      });
-      if (matchedSite) {
-        matchedAccount = account;
-        break;
-      }
-    }
-
-    if (!matchedAccount || !matchedSite) {
-      return res.status(404).json({
-        success: false,
-        message:
-          "We couldn't find this domain in your AdSense account. Make sure you've added it in your AdSense dashboard under Sites.",
-        domainName,
-        suggestedDomainUrl: liveProjectUrl || `https://${domainName}`,
-      });
-    }
-
-    const adClientsResponse = await adsense.accounts.adclients.list({
-      parent: matchedAccount.name,
-      pageSize: 50,
-    });
-    const adClients = adClientsResponse.data?.adClients || [];
-    const matchedAdClient =
-      adClients.find((client) =>
-        String(client.productCode || "")
-          .toUpperCase()
-          .includes("AFC"),
-      ) ||
-      adClients[0] ||
-      null;
-
-    let adCode = "";
-    if (matchedAdClient?.name) {
-      const adCodeResponse = await adsense.accounts.adclients.getAdcode({
-        name: matchedAdClient.name,
-      });
-      adCode = String(adCodeResponse.data?.adCode || "").trim();
-    }
-
-    const adsenseIdMatch = adCode.match(/ca-pub-\d+/i);
-    if (adsenseIdMatch?.[0]) {
-      user.adsenseId = normalizeAdsensePublisherId(adsenseIdMatch[0]);
-    }
-    user.adsenseAccountName = matchedAccount.name || "";
-    user.adsenseSiteUrl =
-      matchedSite.siteUrl ||
-      matchedSite.url ||
-      matchedSite.domain ||
-      domainName;
-    user.adsenseSiteStatus =
-      matchedSite.state || matchedSite.status || matchedSite.platformType || "";
-    user.adsenseLastCheckedAt = new Date();
-    user.adsenseApprovedAt =
-      normalizeAdsenseReviewState(user.adsenseSiteStatus) === "approved"
-        ? new Date()
-        : null;
-    if (adCode) {
-      user.adsenseAdCode = adCode;
-    }
-    await user.save();
-    const siteState = String(user.adsenseSiteStatus || "").toUpperCase();
-    const reviewPending =
-      siteState === "REQUIRES_REVIEW" || siteState === "GETTING_READY";
-    await createUserNotification({
-      userId: user._id,
-      type: reviewPending ? "adsense-review" : "adsense-linked",
-      title: reviewPending
-        ? "AdSense verification started"
-        : "AdSense connected",
-      message: reviewPending
-        ? "Google is reviewing your AdSense site. MediaLab will keep checking the status for you."
-        : "Your AdSense account is linked and ready for monetization checks.",
-      targetType: "console",
-      metadata: {
-        siteStatus: user.adsenseSiteStatus || "",
-        siteUrl: user.adsenseSiteUrl || "",
-        adsenseId: user.adsenseId || "",
-      },
-    });
-
-    let adsTxtDetected = false;
-    for (const candidateUrl of buildAdsTxtCandidateUrls(user)) {
-      try {
-        const response = await fetch(candidateUrl, {
-          method: "GET",
-          redirect: "follow",
-          headers: { "User-Agent": "MediaLab-AdsTxt-Verify" },
-        });
-        if (response.status < 400) {
-          adsTxtDetected = true;
-          break;
-        }
-      } catch {}
-    }
-
-    return res.json({
-      success: true,
-      message: `Success! We found your AdSense account ${user.adsenseId || ""}.`,
-      accountName: user.adsenseAccountName,
-      adsenseId: user.adsenseId,
-      siteUrl: user.adsenseSiteUrl,
-      siteStatus: user.adsenseSiteStatus,
-      checklist: {
-        scriptInjectedAutomatic: Boolean(user.adsenseAdCode || user.adsenseId),
-        adsTxtDetected,
-        googleReviewPending: reviewPending,
-      },
-      user: toSafeUser(user),
-    });
-  } catch (error) {
-    console.error("AdSense link-site failed:", error);
-    return res.status(500).json({
-      success: false,
-      message:
-        error?.response?.data?.error?.message ||
-        error?.message ||
-        "Could not link your AdSense site right now.",
-    });
-  }
-});
-
-app.post("/api/github/monetize-project", express.json(), async (req, res) => {
-  if (!req.isAuthenticated() || !req.user) {
-    return res
-      .status(401)
-      .json({ success: false, message: "You need to sign in first." });
-  }
-  try {
-    const filename = String(req.body?.filename || "").trim();
-    if (!filename) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Missing project filename." });
-    }
-    const user = await User.findById(req.user._id).select(
-      "+githubToken +adsenseAdCode",
-    );
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found." });
-    }
-    if (!user.githubUsername || !user.githubToken) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Connect GitHub first." });
-    }
-    if (!user.adsenseId && !user.adsenseAdCode) {
-      return res.status(400).json({
-        success: false,
-        message: "Link your AdSense domain first before monetizing a project.",
-      });
-    }
-    if (!user.adsenseApprovedAt) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Google hasn't approved your AdSense request yet. Please check the status in Console before monetizing this page.",
-      });
-    }
-
-    user.liveProjects = Array.isArray(user.liveProjects)
-      ? user.liveProjects
-      : [];
-    const projectIndex = user.liveProjects.findIndex(
-      (item) =>
-        String(item?.fileName || item?.filename || "").trim() === filename,
-    );
-    if (projectIndex < 0) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Live project not found." });
-    }
-    const project = user.liveProjects[projectIndex];
-    const octokit = buildGithubClient(user);
-    const contentResponse = await octokit.rest.repos.getContent({
-      owner: user.githubUsername,
-      repo: project.repo || getUserGithubRepoName(user),
-      path: filename,
-    });
-    if (Array.isArray(contentResponse.data) || !contentResponse.data?.content) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "That project entry file could not be monetized automatically.",
-      });
-    }
-    const sourceHtml = Buffer.from(
-      contentResponse.data.content,
-      "base64",
-    ).toString("utf8");
-    const monetizedHtml = buildPublishedHtmlFromSource({
-      documentHtml: sourceHtml,
-      projectName: project.name || "MediaLab Project",
-      adsenseId: user.adsenseId || "",
-      adsenseAdCode: user.adsenseAdCode || "",
-    });
-    await octokit.rest.repos.createOrUpdateFileContents({
-      owner: user.githubUsername,
-      repo: project.repo || getUserGithubRepoName(user),
-      path: filename,
-      sha: contentResponse.data.sha,
-      message: `Enable monetization for ${filename} from MediaLab`,
-      content: Buffer.from(monetizedHtml, "utf8").toString("base64"),
-    });
-
-    project.monetizationEnabled = true;
-    project.isMonetized = true;
-    project.adDisabledPages = [];
-    project.monetizationDisabledAt = null;
-    project.monetizationVerifiedAt = new Date();
-    project.adsensePublisherId = user.adsenseId || "";
-    project.updatedAt = new Date();
-    await user.save();
-
-    return res.json({
-      success: true,
-      message: "Project monetization enabled.",
-      project,
-      user: toSafeUser(user),
-    });
-  } catch (error) {
-    console.error("Project monetization failed:", error);
-    return res.status(500).json({
-      success: false,
-      message:
-        error?.message || "Could not enable monetization for this project.",
-    });
-  }
-});
-
-app.post(
-  "/api/projects/:id/toggle-monetization",
-  express.json(),
-  async (req, res) => {
-    if (!req.isAuthenticated() || !req.user) {
-      return res
-        .status(401)
-        .json({ success: false, message: "You need to sign in first." });
-    }
-
-    try {
-      const projectId = decodeURIComponent(String(req.params?.id || "").trim());
-      if (!projectId) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Missing project id." });
-      }
-
-      const user = await User.findById(req.user._id).select(
-        "+githubToken +adsenseAdCode",
-      );
-      if (!user) {
-        return res
-          .status(404)
-          .json({ success: false, message: "User not found." });
-      }
-      if (!user.githubUsername || !user.githubToken) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Connect GitHub first." });
-      }
-
-      user.liveProjects = Array.isArray(user.liveProjects)
-        ? user.liveProjects
-        : [];
-      const projectIndex = user.liveProjects.findIndex(
-        (item) =>
-          String(item?.fileName || item?.filename || "").trim() === projectId,
-      );
-      if (projectIndex < 0) {
-        return res
-          .status(404)
-          .json({ success: false, message: "Live project not found." });
-      }
-
-      const project = user.liveProjects[projectIndex];
-      if (!project.monetizationEnabled && !project.isMonetized) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Activate monetization for this project first before using the ad toggle.",
-        });
-      }
-
-      const entryPath = String(
-        project.fileName || project.filename || "",
-      ).trim();
-      if (!entryPath) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Project entry file is missing." });
-      }
-
-      const octokit = buildGithubClient(user);
-      const contentResponse = await octokit.rest.repos.getContent({
-        owner: user.githubUsername,
-        repo: project.repo || getUserGithubRepoName(user),
-        path: entryPath,
-      });
-      if (
-        Array.isArray(contentResponse.data) ||
-        !contentResponse.data?.content
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "That project entry file could not be updated for monetization.",
-        });
-      }
-
-      const sourceHtml = Buffer.from(
-        contentResponse.data.content,
-        "base64",
-      ).toString("utf8");
-      const nextIsMonetized = !Boolean(project.isMonetized);
-      const cleanedHtml = stripAdsenseFromHtml(sourceHtml);
-      const nextHtml = nextIsMonetized
-        ? buildPublishedHtmlFromSource({
-            documentHtml: cleanedHtml,
-            projectName: project.name || "MediaLab Project",
-            adsenseId: user.adsenseId || "",
-            adsenseAdCode: user.adsenseAdCode || "",
-          })
-        : cleanedHtml;
-
-      await octokit.rest.repos.createOrUpdateFileContents({
-        owner: user.githubUsername,
-        repo: project.repo || getUserGithubRepoName(user),
-        path: entryPath,
-        sha: contentResponse.data.sha,
-        message: `${nextIsMonetized ? "Enable" : "Disable"} monetization for ${entryPath} from MediaLab`,
-        content: Buffer.from(nextHtml, "utf8").toString("base64"),
-      });
-
-      const disabledPageKey = String(
-        project.entryPath || project.fileName || project.filename || "",
-      ).trim();
-      project.isMonetized = nextIsMonetized;
-      project.adDisabledPages = Array.isArray(project.adDisabledPages)
-        ? project.adDisabledPages
-        : [];
-      if (nextIsMonetized) {
-        project.adDisabledPages = project.adDisabledPages.filter(
-          (item) => String(item || "").trim() !== disabledPageKey,
-        );
-        project.monetizationDisabledAt = null;
-      } else {
-        if (
-          disabledPageKey &&
-          !project.adDisabledPages.includes(disabledPageKey)
-        ) {
-          project.adDisabledPages.push(disabledPageKey);
-        }
-        project.monetizationDisabledAt = new Date();
-      }
-      project.updatedAt = new Date();
-      await user.save();
-
-      await createUsageLog({
-        ...buildUsageIdentity(req),
-        action: nextIsMonetized
-          ? "project-monetization-on"
-          : "project-monetization-off",
-        summary: nextIsMonetized
-          ? `enabled ad revenue on ${project.name || entryPath}`
-          : `disabled ad revenue on ${project.name || entryPath}`,
-        source: "adsense",
-        metadata: {
-          projectId,
-          entryPath,
-          isMonetized: nextIsMonetized,
-          disabledAt: nextIsMonetized ? null : project.monetizationDisabledAt,
-        },
-      });
-
-      return res.json({
-        success: true,
-        isMonetized: nextIsMonetized,
-        message: nextIsMonetized
-          ? "Ads are now live for this project."
-          : "Ads are now turned off for this project.",
-        project,
-        user: toSafeUser(user),
-      });
-    } catch (error) {
-      console.error("Project monetization toggle failed:", error);
-      return res.status(error?.status || error?.response?.status || 500).json({
-        success: false,
-        message:
-          error?.message || "Could not update project monetization right now.",
-      });
-    }
-  },
-);
-
-app.post("/api/adsense/sync-status", async (req, res) => {
-  if (!req.isAuthenticated() || !req.user) {
-    return res
-      .status(401)
-      .json({ success: false, message: "You need to sign in first." });
-  }
-  try {
-    const user = await User.findById(req.user._id).select(
-      "+googleRefreshToken",
-    );
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found." });
-    }
-    const sync = await refreshAdsenseSiteStatusIfNeeded(user, {
-      force: Boolean(req.body?.force),
-    });
-    return res.json({
-      success: true,
-      siteStatus: sync.siteStatus,
-      reviewState: sync.reviewState,
-      lastCheckedAt: sync.lastCheckedAt,
-      approvedAt: sync.approvedAt,
-      changed: sync.changed,
-      user: toSafeUser(user),
-    });
-  } catch (error) {
-    console.warn("AdSense sync-status skipped:", error.message);
-    return res.status(500).json({
-      success: false,
-      message: error?.message || "Could not sync AdSense status right now.",
-    });
-  }
-});
-
-app.post("/api/adsense/disconnect", async (req, res) => {
-  if (!req.isAuthenticated() || !req.user) {
-    return res
-      .status(401)
-      .json({ success: false, message: "You need to sign in first." });
-  }
-  try {
-    const user = await User.findById(req.user._id).select(
-      "+googleRefreshToken +adsenseAdCode",
-    );
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found." });
-    }
-
-    user.adsenseId = "";
-    user.adsenseAccountName = "";
-    user.adsenseSiteUrl = "";
-    user.adsenseSiteStatus = "";
-    user.adsenseLastCheckedAt = null;
-    user.adsenseApprovedAt = null;
-    user.googleRefreshToken = "";
-    user.adsenseAdCode = "";
-    user.liveProjects = (user.liveProjects || []).map((project) => ({
-      ...project,
-      adsensePublisherId: "",
-      monetizationEnabled: false,
-      isMonetized: false,
-      monetizationVerifiedAt: null,
-    }));
-
-    await user.save();
-    req.user.adsenseId = "";
-    req.user.adsenseAccountName = "";
-    req.user.adsenseSiteUrl = "";
-    req.user.adsenseSiteStatus = "";
-    req.user.adsenseLastCheckedAt = null;
-    req.user.adsenseApprovedAt = null;
-
-    return res.json({
-      success: true,
-      message: "AdSense account removed from MediaLab.",
-      user: toSafeUser(user),
-    });
-  } catch (error) {
-    console.error("AdSense disconnect failed:", error);
-    return res.status(500).json({
-      success: false,
-      message: error?.message || "Could not remove AdSense right now.",
-    });
-  }
-});
-
-app.get("/api/adsense/report", async (req, res) => {
-  if (!req.isAuthenticated() || !req.user) {
-    return res
-      .status(401)
-      .json({ success: false, message: "You need to sign in first." });
-  }
-
-  try {
-    const user = await User.findById(req.user._id).select(
-      "+googleRefreshToken",
-    );
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found." });
-    }
-    let adsenseSync = null;
-    try {
-      adsenseSync = await refreshAdsenseSiteStatusIfNeeded(user);
-    } catch (error) {
-      console.warn("AdSense status refresh skipped:", error.message);
-    }
-
-    const targetUrl =
-      String(req.query?.url || "").trim() ||
-      String(
-        user.liveProjects?.find((project) => project?.renderHostedConfirmed)
-          ?.renderUrl ||
-          user.liveProjects?.[0]?.renderUrl ||
-          user.liveProjects?.[0]?.liveUrl ||
-          user.liveProjects?.[0]?.url ||
-          "",
-      ).trim();
-    const domainName = extractDomainNameFromUrl(targetUrl);
-    if (!user.googleRefreshToken) {
-      return res.json({
-        success: true,
-        connected: false,
-        stats: null,
-        domains: [],
-        message: "Connect AdSense for real-time stats.",
-        siteStatus: String(user.adsenseSiteStatus || "").trim(),
-        reviewState:
-          adsenseSync?.reviewState ||
-          normalizeAdsenseReviewState(user.adsenseSiteStatus || ""),
-        lastCheckedAt: user.adsenseLastCheckedAt || null,
-        approvedAt: user.adsenseApprovedAt || null,
-      });
-    }
-
-    const domains = collectHostedDomains(user.liveProjects || []);
-    if (!domains.length) {
-      return res.json({
-        success: true,
-        connected: true,
-        stats: {
-          estimatedEarnings: 0,
-          impressions: 0,
-          pageViewsRpm: 0,
-          clicks: 0,
-        },
-        domains: [],
-        message:
-          "Publish and host a project first to start matching AdSense domains.",
-        siteStatus: String(user.adsenseSiteStatus || "").trim(),
-        reviewState:
-          adsenseSync?.reviewState ||
-          normalizeAdsenseReviewState(user.adsenseSiteStatus || ""),
-        lastCheckedAt: user.adsenseLastCheckedAt || null,
-        approvedAt: user.adsenseApprovedAt || null,
-      });
-    }
-
-    const auth = getAdsenseOAuthClient(user);
-    const adsense = google.adsense({ version: "v2", auth });
-    const accountResponse = await adsense.accounts.list({ pageSize: 1 });
-    const accountName = accountResponse.data?.accounts?.[0]?.name;
-    if (!accountName) {
-      return res.json({
-        success: true,
-        connected: true,
-        stats: {
-          estimatedEarnings: 0,
-          impressions: 0,
-          pageViewsRpm: 0,
-          clicks: 0,
-        },
-        domains,
-        message:
-          "No AdSense account was returned for this Google connection yet.",
-        siteStatus: String(user.adsenseSiteStatus || "").trim(),
-        reviewState:
-          adsenseSync?.reviewState ||
-          normalizeAdsenseReviewState(user.adsenseSiteStatus || ""),
-        lastCheckedAt: user.adsenseLastCheckedAt || null,
-        approvedAt: user.adsenseApprovedAt || null,
-      });
-    }
-
-    const metrics = [
-      "ESTIMATED_EARNINGS",
-      "IMPRESSIONS",
-      "PAGE_VIEWS_RPM",
-      "CLICKS",
-    ];
-
-    const aggregate = {
-      estimatedEarnings: 0,
-      impressions: 0,
-      pageViewsRpm: 0,
-      clicks: 0,
-    };
-    let rpmSamples = 0;
-
-    const requestedDomains = domainName ? [domainName] : domains.slice(0, 10);
-
-    for (const domain of requestedDomains) {
-      const report = await adsense.accounts.reports.generate({
-        account: accountName,
-        dateRange: "LAST_7_DAYS",
-        dimensions: ["DOMAIN_NAME"],
-        metrics,
-        filters: [`DOMAIN_NAME==${domain}`],
-        languageCode: "en",
-        limit: 1,
-      });
-
-      const totals =
-        report.data?.totals?.cells || report.data?.rows?.[0]?.cells || [];
-      const metricCells = totals.slice(-metrics.length);
-      if (metricCells.length < metrics.length) continue;
-
-      aggregate.estimatedEarnings += Number(metricCells[0]?.value || 0);
-      aggregate.impressions += Number(metricCells[1]?.value || 0);
-      aggregate.pageViewsRpm += Number(metricCells[2]?.value || 0);
-      aggregate.clicks += Number(metricCells[3]?.value || 0);
-      rpmSamples += 1;
-    }
-
-    if (rpmSamples > 0) {
-      aggregate.pageViewsRpm = aggregate.pageViewsRpm / rpmSamples;
-    }
-
-    return res.json({
-      success: true,
-      connected: true,
-      hasDomain: Boolean(domainName),
-      domainName: domainName || "",
-      stats: {
-        estimatedEarnings: Number(aggregate.estimatedEarnings.toFixed(2)),
-        impressions: Math.round(aggregate.impressions),
-        pageViewsRpm: Number(aggregate.pageViewsRpm.toFixed(2)),
-        clicks: Math.round(aggregate.clicks),
-      },
-      report: {
-        estimatedEarnings: Number(aggregate.estimatedEarnings.toFixed(2)),
-        impressions: Math.round(aggregate.impressions),
-        pageViewsRpm: Number(aggregate.pageViewsRpm.toFixed(2)),
-        clicks: Math.round(aggregate.clicks),
-      },
-      domains: requestedDomains,
-      accountName,
-      message: "Real-time AdSense stats loaded.",
-      siteStatus: String(user.adsenseSiteStatus || "").trim(),
-      reviewState:
-        adsenseSync?.reviewState ||
-        normalizeAdsenseReviewState(user.adsenseSiteStatus || ""),
-      lastCheckedAt: user.adsenseLastCheckedAt || null,
-      approvedAt: user.adsenseApprovedAt || null,
-    });
-  } catch (error) {
-    console.error("AdSense report fetch failed:", error);
-    return res.status(500).json({
-      success: false,
-      message:
-        error?.response?.data?.error?.message ||
-        error?.message ||
-        "Could not load AdSense stats right now.",
-    });
-  }
-});
-
-app.get("/api/adsense/withdrawal-eligibility", async (req, res) => {
-  if (!req.isAuthenticated() || !req.user) {
-    return res
-      .status(401)
-      .json({ success: false, message: "You need to sign in first." });
-  }
-
-  try {
-    const user = await User.findById(req.user._id).select(
-      "+googleRefreshToken",
-    );
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found." });
-    }
-
-    if (!user.googleRefreshToken) {
-      return res.json({
-        success: true,
-        connected: false,
-        eligible: false,
-        threshold: 100,
-        currentBalance: 0,
-        progressPercent: 0,
-        message: "Connect AdSense first to check payout eligibility.",
-      });
-    }
-
-    const auth = getAdsenseOAuthClient(user);
-    const adsense = google.adsense({ version: "v2", auth });
-    const accountResponse = await adsense.accounts.list({ pageSize: 1 });
-    const accountName = accountResponse.data?.accounts?.[0]?.name;
-    if (!accountName) {
-      return res.json({
-        success: true,
-        connected: true,
-        eligible: false,
-        threshold: 100,
-        currentBalance: 0,
-        progressPercent: 0,
-        message:
-          "No AdSense account was returned for this Google connection yet.",
-      });
-    }
-
-    const report = await adsense.accounts.reports.generate({
-      account: accountName,
-      dateRange: "MONTH_TO_DATE",
-      metrics: ["ESTIMATED_EARNINGS"],
-      limit: 1,
-      languageCode: "en",
-    });
-    const totals =
-      report.data?.totals?.cells || report.data?.rows?.[0]?.cells || [];
-    const currentBalance = Number(totals?.[0]?.value || 0);
-    const threshold = 100;
-    const progressPercent = Math.max(
-      0,
-      Math.min(100, (currentBalance / threshold) * 100),
-    );
-
-    return res.json({
-      success: true,
-      connected: true,
-      eligible: currentBalance >= threshold,
-      threshold,
-      currentBalance: Number(currentBalance.toFixed(2)),
-      progressPercent: Number(progressPercent.toFixed(1)),
-      payoutUrl: "https://adsense.google.com/main/payments",
-      message:
-        currentBalance >= threshold
-          ? "Your AdSense revenue is eligible for withdrawal."
-          : "Your AdSense revenue has not reached the payout threshold yet.",
-    });
-  } catch (error) {
-    console.error("AdSense withdrawal eligibility failed:", error);
-    return res.status(500).json({
-      success: false,
-      message:
-        error?.response?.data?.error?.message ||
-        error?.message ||
-        "Could not check AdSense payout eligibility right now.",
-    });
-  }
-});
-
-app.get("/api/github/verify-ads-txt", async (req, res) => {
-  if (!req.isAuthenticated() || !req.user) {
-    return res
-      .status(401)
-      .json({ success: false, message: "You need to sign in first." });
-  }
-
-  try {
-    const user = await User.findById(req.user._id);
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found." });
-    }
-
-    let verified = false;
-    let resolvedUrl = "";
-    for (const candidateUrl of buildAdsTxtCandidateUrls(user)) {
-      try {
-        const response = await fetch(candidateUrl, {
-          method: "GET",
-          redirect: "follow",
-          headers: { "User-Agent": "MediaLab-AdsTxt-Verify" },
-        });
-        if (response.status < 400) {
-          verified = true;
-          resolvedUrl = candidateUrl;
-          break;
-        }
-      } catch {}
-    }
-    if (!resolvedUrl) {
-      resolvedUrl = buildAdsTxtCandidateUrls(user)[0] || "";
-    }
-
-    return res.json({
-      success: true,
-      verified,
-      url: resolvedUrl,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error?.message || "Could not verify ads.txt right now.",
-    });
-  }
-});
-
-app.post(
-  "/api/github/upload-ads-txt",
-  githubSettingsUpload.single("adsFile"),
-  async (req, res) => {
-    if (!req.isAuthenticated() || !req.user) {
-      return res
-        .status(401)
-        .json({ success: false, message: "You need to sign in first." });
     }
 
     try {
@@ -12833,128 +11954,6 @@ app.post("/api/account/cancel-premium", async (req, res) => {
   }
 });
 
-app.post("/api/account/withdrawals", accountRateLimit, async (req, res) => {
-  try {
-    if (!req.user?._id) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Login required." });
-    }
-
-    const user = await User.findById(req.user._id);
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found." });
-    }
-
-    const method = String(req.body?.method || "")
-      .trim()
-      .toLowerCase();
-    const amount = Number(req.body?.amount || 0);
-    const destination = String(req.body?.destination || "").trim();
-    const allowedMethods = ["paypal", "mpesa", "airtel"];
-
-    if (!allowedMethods.includes(method)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Select a valid withdrawal method." });
-    }
-    if (!destination) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Payment destination is required." });
-    }
-    if (!Number.isFinite(amount) || amount < 5) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Minimum withdrawal is $5." });
-    }
-    if (amount > Number(user.accountBalance || 0)) {
-      return res.status(400).json({
-        success: false,
-        message: "Withdrawal amount exceeds available balance.",
-      });
-    }
-
-    const now = Date.now();
-    const recentLock = user.lastWithdrawalRequestedAt
-      ? now - new Date(user.lastWithdrawalRequestedAt).getTime()
-      : Number.POSITIVE_INFINITY;
-    if (recentLock < 15000) {
-      return res.status(429).json({
-        success: false,
-        message:
-          "Please wait a few seconds before submitting another withdrawal.",
-      });
-    }
-
-    const pendingExisting = await WithdrawalRequest.findOne({
-      userId: user._id,
-      status: { $in: ["pending", "processing"] },
-      createdAt: { $gte: new Date(now - 120000) },
-    }).lean();
-    if (pendingExisting) {
-      return res.status(429).json({
-        success: false,
-        message:
-          "A withdrawal request is already being processed. Please wait.",
-      });
-    }
-
-    const fee = 0;
-    const request = await WithdrawalRequest.create({
-      userId: user._id,
-      email: user.email,
-      name: user.name,
-      method,
-      destination,
-      amount,
-      fee,
-      status: "pending",
-      metadata: {
-        provider: user.provider || "unknown",
-      },
-    });
-
-    user.accountBalance = Number(
-      (Number(user.accountBalance || 0) - amount).toFixed(2),
-    );
-    user.lastWithdrawalRequestedAt = new Date(now);
-    await user.save();
-    req.user.accountBalance = user.accountBalance;
-    req.user.lastWithdrawalRequestedAt = user.lastWithdrawalRequestedAt;
-    io.emit("admin:withdrawal-updated", request.toObject());
-
-    await createUsageLog({
-      ...buildUsageIdentity(req),
-      action: "withdrawal-request",
-      summary: `requested ${amount.toFixed(2)} withdrawal via ${method}`,
-      source: "account",
-      metadata: { withdrawalRequestId: request._id, method, amount },
-    });
-
-    res.json({
-      success: true,
-      message: "Withdrawal request submitted",
-      balance: user.accountBalance,
-      request,
-    });
-  } catch (error) {
-    console.error("Withdrawal request failed:", error);
-    res.status(500).json({
-      success: false,
-      message: "Could not submit withdrawal request right now.",
-    });
-  }
-});
-
-app.get("/api/account/withdrawals", async (req, res) => {
-  try {
-    if (!req.user?._id) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Login required." });
     }
 
     const requests = await WithdrawalRequest.find({ userId: req.user._id })
@@ -12973,6 +11972,84 @@ app.get("/api/account/withdrawals", async (req, res) => {
       success: false,
       message: "Could not load withdrawal history right now.",
     });
+  }
+});
+
+
+
+app.get("/api/account/redeem-xp", (req, res) => {
+  return res.json({ success: true, requests: [], current: null });
+});
+app.post("/api/account/redeem-xp", accountRateLimit, express.json(), async (req, res) => {
+  if (!req.isAuthenticated() || !req.user?._id) {
+    return res.status(401).json({ success: false, message: "Login required." });
+  }
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, message: "User not found." });
+
+    const cost = 1000;
+    if (Number(user.xp || 0) < cost) {
+      return res.status(400).json({ success: false, message: `You need at least ${cost} XP to redeem Pro.` });
+    }
+
+    user.xp = Number(user.xp || 0) - cost;
+    user.isPro = true;
+    user.proUnlockedAt = new Date();
+    user.aiQuota = user.aiQuota || {};
+    user.aiQuota.dailyLimit = (user.aiQuota.dailyLimit || 10) + 50;
+    await user.save();
+    
+    req.user.xp = user.xp;
+    req.user.isPro = true;
+    
+    await createUsageLog({
+      ...buildUsageIdentity(req),
+      action: "xp-redeemed",
+      summary: `redeemed ${cost} XP for Pro Access`,
+      source: "account"
+    });
+
+    return res.json({ success: true, message: "Successfully redeemed XP for AI Pro Access!", user: toSafeUser(user) });
+  } catch (error) {
+    console.error("XP Redeem error:", error);
+    return res.status(500).json({ success: false, message: "Could not redeem XP right now." });
+  }
+});
+app.post("/api/account/redeem-xp", accountRateLimit, express.json(), async (req, res) => {
+  if (!req.isAuthenticated() || !req.user?._id) {
+    return res.status(401).json({ success: false, message: "Login required." });
+  }
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, message: "User not found." });
+
+    const cost = 1000;
+    if (Number(user.xp || 0) < cost) {
+      return res.status(400).json({ success: false, message: `You need at least ${cost} XP to redeem Pro.` });
+    }
+
+    user.xp = Number(user.xp || 0) - cost;
+    user.isPro = true;
+    user.proUnlockedAt = new Date();
+    user.aiQuota = user.aiQuota || {};
+    user.aiQuota.dailyLimit = (user.aiQuota.dailyLimit || 10) + 50;
+    await user.save();
+    
+    req.user.xp = user.xp;
+    req.user.isPro = true;
+    
+    await createUsageLog({
+      ...buildUsageIdentity(req),
+      action: "xp-redeemed",
+      summary: `redeemed ${cost} XP for Pro Access`,
+      source: "account"
+    });
+
+    return res.json({ success: true, message: "Successfully redeemed XP for AI Pro Access!", user: toSafeUser(user) });
+  } catch (error) {
+    console.error("XP Redeem error:", error);
+    return res.status(500).json({ success: false, message: "Could not redeem XP right now." });
   }
 });
 
@@ -13036,9 +12113,7 @@ app.post(
           { targetId: { $in: marketplaceItemIds.map((id) => String(id)) } },
         ],
       });
-      await WithdrawalRequest.deleteMany({
-        $or: [{ userId }, { email: userEmail }],
-      });
+      
       await Download.deleteMany({
         $or: [{ userId }, { email: userEmail }],
       });
@@ -13271,13 +12346,6 @@ app.get(
   },
 );
 
-app.get(
-  "/api/admin/withdrawals",
-  adminRateLimit,
-  requireAdminApi,
-  async (_req, res) => {
-    try {
-      const cleanupBefore = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       await WithdrawalRequest.deleteMany({
         status: { $in: ["paid", "failed"] },
         reviewedAt: { $lte: cleanupBefore },
@@ -13307,7 +12375,7 @@ app.get(
         .sort({ activityWeight: -1, lastLogin: -1, createdAt: -1 })
         .limit(120)
         .select(
-          "name email profilePicture isPro location provider lastLogin createdAt accountBalance activityWeight activityStats lastActivityWeightCalculatedAt",
+          "name email profilePicture isPro location provider lastLogin createdAt xp activityWeight activityStats lastActivityWeightCalculatedAt",
         )
         .lean();
       res.json({ success: true, users });
@@ -13338,8 +12406,8 @@ app.post(
           .status(404)
           .json({ success: false, message: "User not found." });
       }
-      user.accountBalance = Number(
-        (Number(user.accountBalance || 0) + amount).toFixed(2),
+      user.xp = Number(
+        (Number(user.xp || 0) + amount).toFixed(2),
       );
       await user.save();
       await createUserNotification({
@@ -13596,15 +12664,6 @@ app.patch(
   },
 );
 
-app.patch(
-  "/api/admin/withdrawals/:id",
-  adminRateLimit,
-  requireAdminApi,
-  async (req, res) => {
-    try {
-      const nextStatus = String(req.body?.status || "")
-        .trim()
-        .toLowerCase();
       if (!["processing", "paid", "failed"].includes(nextStatus)) {
         return res.status(400).json({
           success: false,
@@ -13637,9 +12696,9 @@ app.patch(
       if (previousStatus !== "failed" && nextStatus === "failed") {
         const user = await User.findById(request.userId);
         if (user) {
-          user.accountBalance = Number(
+          user.xp = Number(
             (
-              Number(user.accountBalance || 0) + Number(request.amount || 0)
+              Number(user.xp || 0) + Number(request.amount || 0)
             ).toFixed(2),
           );
           await user.save();
@@ -13761,18 +12820,16 @@ app.get(
         UpgradeRequest.find({}).sort({ createdAt: -1 }).limit(30).lean(),
         UsageLog.countDocuments(),
         Download.countDocuments(),
-        WithdrawalRequest.countDocuments(),
-        WithdrawalRequest.countDocuments({
-          status: { $in: ["pending", "processing"] },
-        }),
-        WithdrawalRequest.countDocuments({ status: "paid" }),
+        Promise.resolve(0),
+        Promise.resolve(0),
+        Promise.resolve(0),
         UsageLog.countDocuments({ kind: "error" }),
         User.countDocuments({ createdAt: { $gte: last30Days } }),
         User.countDocuments({ isPro: true, createdAt: { $gte: last30Days } }),
         Feedback.countDocuments({ createdAt: { $gte: last30Days } }),
         UsageLog.countDocuments({ createdAt: { $gte: last30Days } }),
         Download.countDocuments({ createdAt: { $gte: last30Days } }),
-        WithdrawalRequest.countDocuments({ createdAt: { $gte: last30Days } }),
+        Promise.resolve(0),
         UsageLog.countDocuments({
           kind: "error",
           createdAt: { $gte: last30Days },

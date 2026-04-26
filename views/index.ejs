@@ -6576,7 +6576,7 @@
               Wallet and payouts
             </h3>
             <p class="text-sm text-slate-400 mt-2">
-              Track your available balance and submit secure withdrawal
+              Track your available balance and submit secure redemption
               requests.
             </p>
           </div>
@@ -6610,7 +6610,7 @@
                   id="account-balance-note"
                   class="text-sm text-slate-400 mt-3"
                 >
-                  Minimum withdrawal is $5.
+                  Minimum redemption is 1000 XP.
                 </p>
               </div>
               <div
@@ -6621,17 +6621,17 @@
             </div>
             <div class="mt-6">
               <button
-                id="open-withdraw-btn"
-                onclick="openWithdrawModal()"
+                id="open-redeem-btn"
+                onclick="openRedeem ProModal()"
                 class="w-full rounded-2xl bg-emerald-500 text-slate-950 py-3.5 font-black text-sm hover:bg-emerald-400 transition-all disabled:opacity-45 disabled:cursor-not-allowed disabled:hover:bg-emerald-500"
               >
-                Withdraw
+                Redeem Pro
               </button>
               <p
-                id="withdraw-minimum-note"
+                id="redeem-minimum-note"
                 class="text-xs text-amber-300 mt-3 font-bold uppercase tracking-[0.18em] hidden"
               >
-                Minimum withdrawal is $5
+                Minimum redemption is 1000 XP
               </p>
             </div>
           </div>
@@ -6717,7 +6717,7 @@
               <p
                 class="text-[11px] uppercase tracking-[0.18em] text-cyan-300 font-black"
               >
-                Withdrawal Policy
+                XP Redemption Policy
               </p>
               <p class="text-sm text-slate-300 mt-2 leading-relaxed">
                 Requests are reviewed securely. Use a valid payout address and
@@ -6749,11 +6749,11 @@
                 </div>
               </div>
               <button
-                id="open-adsense-withdraw-btn"
-                onclick="openAdsenseWithdrawalCenter()"
+                id="open-adsense-redeem-btn"
+                onclick="openAdsenseXP RedemptionCenter()"
                 class="mt-4 w-full rounded-2xl bg-white/5 border border-white/10 text-white py-3 text-sm font-black hover:bg-white/10 transition-all disabled:opacity-45 disabled:cursor-not-allowed"
               >
-                Open AdSense Withdrawal
+                Open AdSense XP Redemption
               </button>
             </div>
             <div
@@ -6764,27 +6764,27 @@
                   <p
                     class="text-[11px] uppercase tracking-[0.18em] text-slate-400 font-black"
                   >
-                    Withdrawal Status
+                    XP Redemption Status
                   </p>
                   <p
-                    id="account-withdraw-status-line"
+                    id="account-redeem-status-line"
                     class="text-sm text-white mt-2 font-semibold"
                   >
                     No payout requests yet
                   </p>
                   <p
-                    id="account-withdraw-status-subline"
+                    id="account-redeem-status-subline"
                     class="text-xs text-slate-400 mt-1"
                   >
                     Click for more details.
                   </p>
                 </div>
                 <button
-                  id="open-withdraw-status-btn"
-                  onclick="openWithdrawalStatusModal()"
+                  id="open-redeem-status-btn"
+                  onclick="openXP RedemptionStatusModal()"
                   class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-black uppercase tracking-[0.16em] text-slate-100 hover:bg-white/10 transition-all"
                 >
-                  Withdrawal Status
+                  XP Redemption Status
                 </button>
               </div>
             </div>
@@ -7278,9 +7278,9 @@
       </div>
     </div>
     <div
-      id="withdraw-modal"
+      id="redeem-modal"
       class="hidden builder-modal-backdrop"
-      onclick="if (event.target === this) closeWithdrawModal();"
+      onclick="if (event.target === this) closeRedeem ProModal();"
     >
       <div
         class="builder-modal-card w-full max-w-3xl max-h-[calc(100vh-20px)] overflow-y-auto p-5 sm:p-8"
@@ -7291,25 +7291,25 @@
             <p
               class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400"
             >
-              Withdrawal
+              XP Redemption
             </p>
             <h3 class="text-2xl font-black text-white mt-2">
               Request a payout
             </h3>
             <p class="text-sm text-slate-400 mt-2">
               Choose a payout method, confirm your details, and submit a secure
-              withdrawal request.
+              redemption request.
             </p>
           </div>
           <button
-            onclick="closeWithdrawModal()"
+            onclick="closeRedeem ProModal()"
             class="w-10 h-10 rounded-2xl border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 transition-all"
           >
             <i class="fas fa-times"></i>
           </button>
         </div>
 
-        <div id="withdraw-step-form" class="space-y-5">
+        <div id="redeem-step-form" class="space-y-5">
           <div>
             <p
               class="text-[11px] uppercase tracking-[0.18em] text-slate-500 font-black mb-3"
@@ -7317,14 +7317,14 @@
               Select Method
             </p>
             <div
-              id="withdraw-method-grid"
+              id="redeem-method-grid"
               class="grid grid-cols-1 sm:grid-cols-3 gap-3"
             >
               <button
                 type="button"
-                id="withdraw-method-paypal"
-                onclick="selectWithdrawMethod('paypal')"
-                class="withdraw-method-card rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-left transition-all hover:border-cyan-400/40"
+                id="redeem-method-paypal"
+                onclick="selectRedeem ProMethod('paypal')"
+                class="redeem-method-card rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-left transition-all hover:border-cyan-400/40"
               >
                 <div
                   class="w-11 h-11 rounded-2xl bg-sky-500/15 text-sky-300 flex items-center justify-center mb-3"
@@ -7338,9 +7338,9 @@
               </button>
               <button
                 type="button"
-                id="withdraw-method-mpesa"
-                onclick="selectWithdrawMethod('mpesa')"
-                class="withdraw-method-card rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-left transition-all hover:border-cyan-400/40"
+                id="redeem-method-mpesa"
+                onclick="selectRedeem ProMethod('mpesa')"
+                class="redeem-method-card rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-left transition-all hover:border-cyan-400/40"
               >
                 <div
                   class="w-11 h-11 rounded-2xl bg-emerald-500/15 text-emerald-300 flex items-center justify-center mb-3"
@@ -7354,9 +7354,9 @@
               </button>
               <button
                 type="button"
-                id="withdraw-method-airtel"
-                onclick="selectWithdrawMethod('airtel')"
-                class="withdraw-method-card rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-left transition-all hover:border-cyan-400/40"
+                id="redeem-method-airtel"
+                onclick="selectRedeem ProMethod('airtel')"
+                class="redeem-method-card rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 text-left transition-all hover:border-cyan-400/40"
               >
                 <div
                   class="w-11 h-11 rounded-2xl bg-rose-500/15 text-rose-300 flex items-center justify-center mb-3"
@@ -7372,16 +7372,16 @@
           </div>
 
           <div
-            id="withdraw-destination-block"
+            id="redeem-destination-block"
             class="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4 sm:p-5 hidden"
           >
             <label
-              id="withdraw-destination-label"
+              id="redeem-destination-label"
               class="text-[11px] uppercase tracking-[0.18em] text-slate-500 font-black mb-3 block"
               >Payout Details</label
             >
             <input
-              id="withdraw-destination-input"
+              id="redeem-destination-input"
               type="text"
               placeholder="Enter payout destination"
               class="w-full rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3.5 text-white outline-none focus:border-cyan-400 transition-all"
@@ -7393,7 +7393,7 @@
           >
             <label
               class="text-[11px] uppercase tracking-[0.18em] text-slate-500 font-black mb-3 block"
-              >Withdrawal Amount</label
+              >XP Redemption Amount</label
             >
             <div class="relative">
               <span
@@ -7401,7 +7401,7 @@
                 >$</span
               >
               <input
-                id="withdraw-amount-input"
+                id="redeem-amount-input"
                 type="number"
                 min="5"
                 step="0.01"
@@ -7414,7 +7414,7 @@
             >
               <span class="text-slate-400"
                 >Available balance:
-                <strong id="withdraw-available-balance" class="text-white"
+                <strong id="redeem-available-balance" class="text-white"
                   >$0.00</strong
                 ></span
               >
@@ -7423,7 +7423,7 @@
           </div>
 
           <p
-            id="withdraw-error"
+            id="redeem-error"
             class="hidden rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"
           ></p>
 
@@ -7431,14 +7431,14 @@
             class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3"
           >
             <button
-              onclick="closeWithdrawModal()"
+              onclick="closeRedeem ProModal()"
               class="px-4 py-3 rounded-2xl bg-white/5 text-sm font-bold text-slate-300 hover:bg-white/10 transition-all"
             >
               Cancel
             </button>
             <button
-              id="withdraw-continue-btn"
-              onclick="goToWithdrawConfirmation()"
+              id="redeem-continue-btn"
+              onclick="goToRedeem ProConfirmation()"
               class="px-5 py-3 rounded-2xl bg-cyan-500 text-slate-950 text-sm font-black hover:bg-cyan-400 transition-all"
             >
               Continue
@@ -7446,7 +7446,7 @@
           </div>
         </div>
 
-        <div id="withdraw-step-confirm" class="hidden space-y-5">
+        <div id="redeem-step-confirm" class="hidden space-y-5">
           <div
             class="rounded-[1.75rem] border border-emerald-400/20 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.12),transparent_30%),rgba(15,23,42,0.92)] p-5 sm:p-6"
           >
@@ -7459,7 +7459,7 @@
               <div class="flex items-center justify-between gap-3">
                 <span class="text-slate-400">Method</span
                 ><strong
-                  id="withdraw-confirm-method"
+                  id="redeem-confirm-method"
                   class="text-white text-right"
                   >PayPal</strong
                 >
@@ -7467,7 +7467,7 @@
               <div class="flex items-center justify-between gap-3">
                 <span class="text-slate-400">Destination</span
                 ><strong
-                  id="withdraw-confirm-destination"
+                  id="redeem-confirm-destination"
                   class="text-white text-right break-all"
                   >-</strong
                 >
@@ -7475,14 +7475,14 @@
               <div class="flex items-center justify-between gap-3">
                 <span class="text-slate-400">Amount</span
                 ><strong
-                  id="withdraw-confirm-amount"
+                  id="redeem-confirm-amount"
                   class="text-white text-right"
                   >$0.00</strong
                 >
               </div>
               <div class="flex items-center justify-between gap-3">
                 <span class="text-slate-400">Fees</span
-                ><strong id="withdraw-confirm-fee" class="text-white text-right"
+                ><strong id="redeem-confirm-fee" class="text-white text-right"
                   >$0.00</strong
                 >
               </div>
@@ -7490,13 +7490,13 @@
           </div>
 
           <p
-            id="withdraw-success"
+            id="redeem-success"
             class="hidden rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100"
           >
-            Withdrawal request submitted
+            XP Redemption request submitted
           </p>
           <p
-            id="withdraw-confirm-error"
+            id="redeem-confirm-error"
             class="hidden rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"
           ></p>
 
@@ -7504,27 +7504,27 @@
             class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3"
           >
             <button
-              id="withdraw-back-btn"
-              onclick="backToWithdrawForm()"
+              id="redeem-back-btn"
+              onclick="backToRedeem ProForm()"
               class="px-4 py-3 rounded-2xl bg-white/5 text-sm font-bold text-slate-300 hover:bg-white/10 transition-all"
             >
               Back
             </button>
             <button
-              id="withdraw-submit-btn"
-              onclick="submitWithdrawalRequest()"
+              id="redeem-submit-btn"
+              onclick="submitXP RedemptionRequest()"
               class="px-5 py-3 rounded-2xl bg-emerald-500 text-slate-950 text-sm font-black hover:bg-emerald-400 transition-all"
             >
-              Confirm Withdrawal
+              Confirm XP Redemption
             </button>
           </div>
         </div>
       </div>
     </div>
     <div
-      id="withdraw-success-modal"
+      id="redeem-success-modal"
       class="hidden builder-modal-backdrop"
-      onclick="if (event.target === this) closeWithdrawSuccessModal();"
+      onclick="if (event.target === this) closeRedeem ProSuccessModal();"
     >
       <div
         class="builder-modal-card w-full max-w-md p-5 sm:p-6"
@@ -7538,14 +7538,14 @@
               Request Sent
             </p>
             <h3 class="text-2xl font-black text-white mt-2">
-              Your withdrawal request is sent
+              Your redemption request is sent
             </h3>
             <p class="text-sm text-slate-400 mt-2">
               Track your payment status from your Console wallet.
             </p>
           </div>
           <button
-            onclick="closeWithdrawSuccessModal()"
+            onclick="closeRedeem ProSuccessModal()"
             class="w-10 h-10 rounded-2xl border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 transition-all"
           >
             <i class="fas fa-times"></i>
@@ -7553,13 +7553,13 @@
         </div>
         <div class="mt-5 flex flex-col gap-3">
           <button
-            onclick="openWithdrawalStatusFromSuccess()"
+            onclick="openXP RedemptionStatusFromSuccess()"
             class="w-full rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-emerald-300 transition-all"
           >
-            Withdrawal Status
+            XP Redemption Status
           </button>
           <button
-            onclick="closeWithdrawSuccessModal()"
+            onclick="closeRedeem ProSuccessModal()"
             class="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white hover:bg-white/10 transition-all"
           >
             Close
@@ -7568,9 +7568,9 @@
       </div>
     </div>
     <div
-      id="withdraw-status-modal"
+      id="redeem-status-modal"
       class="hidden builder-modal-backdrop"
-      onclick="if (event.target === this) closeWithdrawalStatusModal();"
+      onclick="if (event.target === this) closeXP RedemptionStatusModal();"
     >
       <div
         class="builder-modal-card w-full max-w-2xl max-h-[calc(100vh-20px)] overflow-y-auto p-5 sm:p-6"
@@ -7581,7 +7581,7 @@
             <p
               class="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300"
             >
-              Withdrawal Status
+              XP Redemption Status
             </p>
             <h3 class="text-2xl font-black text-white mt-2">
               Transaction details
@@ -7591,14 +7591,14 @@
             </p>
           </div>
           <button
-            onclick="closeWithdrawalStatusModal()"
+            onclick="closeXP RedemptionStatusModal()"
             class="w-10 h-10 rounded-2xl border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 transition-all"
           >
             <i class="fas fa-times"></i>
           </button>
         </div>
         <div
-          id="withdraw-status-current"
+          id="redeem-status-current"
           class="mt-5 rounded-[1.6rem] border border-white/10 bg-white/[0.03] p-5"
         ></div>
         <div class="mt-5">
@@ -7607,7 +7607,7 @@
           >
             Recent transactions
           </p>
-          <div id="withdraw-status-list" class="mt-3 space-y-2 text-sm"></div>
+          <div id="redeem-status-list" class="mt-3 space-y-2 text-sm"></div>
         </div>
       </div>
     </div>
@@ -7741,12 +7741,12 @@
       let pendingAdsTxtFile = null;
       let builderRunPreviewUrl = null;
       let customUpgradeFeatureLabel = "";
-      let selectedWithdrawalMethod = "";
-      let withdrawalStep = "form";
-      let withdrawalSubmissionInFlight = false;
-      let withdrawMethodsCollapsed = false;
-      let currentWithdrawalRequests = [];
-      let expandedWithdrawalRequestId = "";
+      let selectedXP RedemptionMethod = "";
+      let redemptionStep = "form";
+      let redemptionSubmissionInFlight = false;
+      let redeemMethodsCollapsed = false;
+      let currentXPRedemptionRequests = [];
+      let expandedXP RedemptionRequestId = "";
       let currentReferralStatus = null;
       let accountSuspendStep = "verify";
       let accountSuspendCaptcha = "";
@@ -8168,10 +8168,10 @@
           }
           if (modal === "account") {
             openAccountModal();
-          } else if (modal === "withdraw") {
-            openWithdrawModal();
+          } else if (modal === "redeem") {
+            openRedeem ProModal();
           } else {
-            closeWithdrawModal();
+            closeRedeem ProModal();
             closeAccountModal();
           }
         } finally {
@@ -17930,7 +17930,7 @@
         setupGithubRepositoryInternal(true).catch(() => {});
       }
       function getCurrentBalance() {
-        return Number(currentUser?.accountBalance || 0);
+        return Number(currentUser?.xp || 0);
       }
       function formatCurrency(value) {
         return `$${Number(value || 0).toFixed(2)}`;
@@ -17950,7 +17950,7 @@
               ? "Airtel Money"
               : "Not selected";
       }
-      function formatWithdrawalStatus(status = "") {
+      function formatXP RedemptionStatus(status = "") {
         const normalized = String(status || "").toLowerCase();
         return normalized === "paid"
           ? "Approved"
@@ -17962,7 +17962,7 @@
                 ? "Pending"
                 : "No status yet";
       }
-      function getWithdrawalStatusTone(status = "") {
+      function getXP RedemptionStatusTone(status = "") {
         const normalized = String(status || "").toLowerCase();
         return normalized === "paid"
           ? "text-emerald-300"
@@ -17972,23 +17972,23 @@
               ? "text-amber-300"
               : "text-cyan-300";
       }
-      async function fetchWithdrawalRequests() {
+      async function fetchXPRedemptionRequests() {
         if (!loggedIn || !currentUser) return [];
         try {
-          const res = await fetch("/api/account/withdrawals", {
+          const res = await fetch("/api/account/redeem-xp", {
             credentials: "include",
           });
           const data = await res.json();
           if (!res.ok || !data.success) {
-            throw new Error(data.message || "Could not load withdrawals.");
+            throw new Error(data.message || "Could not load redemptions.");
           }
-          currentWithdrawalRequests = Array.isArray(data.requests)
+          currentXPRedemptionRequests = Array.isArray(data.requests)
             ? data.requests
             : [];
-          return currentWithdrawalRequests;
+          return currentXPRedemptionRequests;
         } catch (error) {
-          console.warn("Withdrawal fetch skipped:", error.message);
-          return currentWithdrawalRequests;
+          console.warn("XP Redemption fetch skipped:", error.message);
+          return currentXPRedemptionRequests;
         }
       }
       async function fetchReferralStatus() {
@@ -18044,13 +18044,13 @@
           showBuilderSnackbar("Could not copy the referral link.", "error");
         }
       }
-      function updateWithdrawalStatusSummary() {
-        const latest = Array.isArray(currentWithdrawalRequests)
-          ? currentWithdrawalRequests[0]
+      function updateXPRedemptionStatusSummary() {
+        const latest = Array.isArray(currentXPRedemptionRequests)
+          ? currentXPRedemptionRequests[0]
           : null;
-        const line = document.getElementById("account-withdraw-status-line");
+        const line = document.getElementById("account-redeem-status-line");
         const subline = document.getElementById(
-          "account-withdraw-status-subline",
+          "account-redeem-status-subline",
         );
         if (!latest) {
           if (line) line.textContent = "No payout requests yet";
@@ -18058,10 +18058,10 @@
           return;
         }
         if (line) {
-          line.textContent = `${formatWithdrawalStatus(latest.status)} · ${formatCurrency(
+          line.textContent = `${formatXP RedemptionStatus(latest.status)} · ${formatCurrency(
             latest.amount,
           )}`;
-          line.className = `text-sm mt-2 font-semibold ${getWithdrawalStatusTone(latest.status)}`;
+          line.className = `text-sm mt-2 font-semibold ${getXP RedemptionStatusTone(latest.status)}`;
         }
         if (subline) {
           subline.textContent =
@@ -18072,18 +18072,18 @@
                 )}. Click for more details.`;
         }
       }
-      function renderWithdrawalStatusModal() {
-        const currentNode = document.getElementById("withdraw-status-current");
-        const listNode = document.getElementById("withdraw-status-list");
+      function renderXP RedemptionStatusModal() {
+        const currentNode = document.getElementById("redeem-status-current");
+        const listNode = document.getElementById("redeem-status-list");
         if (!currentNode || !listNode) return;
-        const latest = Array.isArray(currentWithdrawalRequests)
-          ? currentWithdrawalRequests[0]
+        const latest = Array.isArray(currentXPRedemptionRequests)
+          ? currentXPRedemptionRequests[0]
           : null;
         if (!latest) {
           currentNode.innerHTML = `
                   <div class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Current</div>
                   <div class="mt-3 text-2xl font-black text-white">No requests yet</div>
-                  <div class="mt-2 text-sm text-slate-400">Your recent withdrawal activity will appear here.</div>
+                  <div class="mt-2 text-sm text-slate-400">Your recent redemption activity will appear here.</div>
                 `;
           listNode.innerHTML = `<div class="text-slate-400 py-3">No transactions yet.</div>`;
           return;
@@ -18091,7 +18091,7 @@
         currentNode.innerHTML = `
                 <div class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Current</div>
                 <div class="mt-3 flex items-center justify-between gap-3">
-                  <div class="text-2xl font-black ${getWithdrawalStatusTone(latest.status)}">${formatWithdrawalStatus(
+                  <div class="text-2xl font-black ${getXP RedemptionStatusTone(latest.status)}">${formatXP RedemptionStatus(
                     latest.status,
                   )}</div>
                   <div class="text-sm text-slate-400">${formatCurrency(latest.amount)}</div>
@@ -18106,14 +18106,14 @@
                   }
                 </div>
               `;
-        listNode.innerHTML = currentWithdrawalRequests
+        listNode.innerHTML = currentXPRedemptionRequests
           .map((item) => {
             const expanded =
-              expandedWithdrawalRequestId === String(item._id || "");
+              expandedXP RedemptionRequestId === String(item._id || "");
             return `
                     <div class="border-b border-white/6 pb-2">
                       <button
-                        onclick="toggleWithdrawalStatusItem('${item._id || ""}')"
+                        onclick="toggleXP RedemptionStatusItem('${item._id || ""}')"
                         class="w-full text-left py-2 flex items-center justify-between gap-3 hover:text-white transition-all"
                       >
                         <span class="min-w-0 truncate text-slate-200">
@@ -18121,7 +18121,7 @@
                             item.amount,
                           )} - ${formatDate(item.createdAt)}
                         </span>
-                        <span class="text-xs ${getWithdrawalStatusTone(item.status)}">${formatWithdrawalStatus(
+                        <span class="text-xs ${getXP RedemptionStatusTone(item.status)}">${formatXP RedemptionStatus(
                           item.status,
                         )}</span>
                       </button>
@@ -18132,7 +18132,7 @@
                         <div>Fee: ${formatCurrency(item.fee || 0)}</div>
                         <div>Requested: ${formatDate(item.createdAt)}</div>
                         <div>Reviewed: ${item.reviewedAt ? formatDate(item.reviewedAt) : "Waiting"}</div>
-                        <div>Status: ${formatWithdrawalStatus(item.status)}</div>
+                        <div>Status: ${formatXP RedemptionStatus(item.status)}</div>
                         ${
                           item.deniedReason
                             ? `<div class="break-words text-rose-300">Denied reason: ${item.deniedReason}</div>`
@@ -18144,12 +18144,12 @@
           })
           .join("");
       }
-      function toggleWithdrawalStatusItem(id = "") {
-        expandedWithdrawalRequestId =
-          expandedWithdrawalRequestId === String(id || "")
+      function toggleXP RedemptionStatusItem(id = "") {
+        expandedXP RedemptionRequestId =
+          expandedXP RedemptionRequestId === String(id || "")
             ? ""
             : String(id || "");
-        renderWithdrawalStatusModal();
+        renderXP RedemptionStatusModal();
       }
       function getRecentLiveProjects(limit = 3) {
         return [...(currentUser?.liveProjects || [])]
@@ -18304,16 +18304,16 @@
       }
       function updateAccountModalUi() {
         const balance = getCurrentBalance();
-        const canWithdraw = balance >= 5;
-        const adsensePayoutEligible = canWithdraw && isAdsenseApprovedUser();
+        const canRedeem Pro = balance >= 5;
+        const adsensePayoutEligible = canRedeem Pro && isAdsenseApprovedUser();
         const balanceValue = document.getElementById("account-balance-value");
         const balanceNote = document.getElementById("account-balance-note");
-        const withdrawBtn = document.getElementById("open-withdraw-btn");
-        const minimumNote = document.getElementById("withdraw-minimum-note");
-        const adsenseWithdrawBtn = document.getElementById(
-          "open-adsense-withdraw-btn",
+        const redeemBtn = document.getElementById("open-redeem-btn");
+        const minimumNote = document.getElementById("redeem-minimum-note");
+        const adsenseRedeem ProBtn = document.getElementById(
+          "open-adsense-redeem-btn",
         );
-        const adsenseWithdrawNote = document.getElementById(
+        const adsenseRedeem ProNote = document.getElementById(
           "account-adsense-payout-note",
         );
         const accountName = document.getElementById("account-name");
@@ -18331,37 +18331,37 @@
         );
         if (balanceValue) balanceValue.textContent = formatCurrency(balance);
         if (balanceNote) {
-          balanceNote.textContent = canWithdraw
-            ? "Your MediaLab payout balance is ready for withdrawal."
-            : "Minimum MediaLab withdrawal is $5.";
+          balanceNote.textContent = canRedeem Pro
+            ? "Your MediaLab payout balance is ready for redemption."
+            : "Minimum MediaLab redemption is $5.";
         }
-        if (withdrawBtn) {
-          withdrawBtn.disabled = !canWithdraw;
-          withdrawBtn.title = canWithdraw
-            ? "Open withdrawal form"
-            : "Minimum MediaLab withdrawal is $5";
+        if (redeemBtn) {
+          redeemBtn.disabled = !canRedeem Pro;
+          redeemBtn.title = canRedeem Pro
+            ? "Open redemption form"
+            : "Minimum MediaLab redemption is $5";
         }
-        minimumNote?.classList.toggle("hidden", canWithdraw);
+        minimumNote?.classList.toggle("hidden", canRedeem Pro);
         if (minimumNote) {
-          minimumNote.textContent = "Minimum MediaLab withdrawal is $5";
+          minimumNote.textContent = "Minimum MediaLab redemption is $5";
         }
-        if (adsenseWithdrawBtn) {
-          adsenseWithdrawBtn.disabled = !adsensePayoutEligible;
+        if (adsenseRedeem ProBtn) {
+          adsenseRedeem ProBtn.disabled = !adsensePayoutEligible;
         }
-        if (adsenseWithdrawNote) {
-          adsenseWithdrawNote.textContent = !currentUser?.adsenseConnected
-            ? "Connect AdSense first, then use Google’s official payout center."
+        if (adsenseRedeem ProNote) {
+          adsenseRedeem ProNote.textContent = !currentUser?.adsenseConnected
+            ? "Monetization Disabled first, then use Google’s official payout center."
             : adsensePayoutEligible
               ? "Your AdSense account is eligible. Open Google’s payout center safely."
-              : canWithdraw
+              : canRedeem Pro
                 ? "Your AdSense approval is still pending."
                 : "AdSense payouts unlock when your balance reaches at least $5 and Google approval is complete.";
         }
-        if (adsenseWithdrawNote && !currentUser?.adsenseConnected) {
-          adsenseWithdrawNote.textContent =
-            "This is separate from your MediaLab payout balance. Connect AdSense first, then use Google’s official payout center.";
-        } else if (adsenseWithdrawNote && adsensePayoutEligible) {
-          adsenseWithdrawNote.textContent =
+        if (adsenseRedeem ProNote && !currentUser?.adsenseConnected) {
+          adsenseRedeem ProNote.textContent =
+            "This is separate from your MediaLab payout balance. Monetization Disabled first, then use Google’s official payout center.";
+        } else if (adsenseRedeem ProNote && adsensePayoutEligible) {
+          adsenseRedeem ProNote.textContent =
             "This is separate from your MediaLab payout balance. Your AdSense revenue is eligible for Google payout.";
         }
         if (accountName) accountName.textContent = currentUser?.name || "User";
@@ -18393,11 +18393,11 @@
           );
         }
         const availableBalance = document.getElementById(
-          "withdraw-available-balance",
+          "redeem-available-balance",
         );
         if (availableBalance)
           availableBalance.textContent = formatCurrency(balance);
-        updateWithdrawalStatusSummary();
+        updateXPRedemptionStatusSummary();
         updateReferralUi();
       }
       function openAccountModal() {
@@ -18419,8 +18419,8 @@
         document.getElementById("account-modal")?.classList.remove("hidden");
         document.getElementById("account-modal")?.classList.add("flex");
         syncUrl({ modal: "account" });
-        fetchWithdrawalRequests().then(() => {
-          updateWithdrawalStatusSummary();
+        fetchXPRedemptionRequests().then(() => {
+          updateXPRedemptionStatusSummary();
         });
         fetchReferralStatus();
       }
@@ -18701,9 +18701,9 @@
           );
         }
       }
-      async function openAdsenseWithdrawalCenter() {
+      async function openAdsenseXP RedemptionCenter() {
         try {
-          const res = await fetch("/api/adsense/withdrawal-eligibility", {
+          const res = await fetch("/api/adsense/redemption-eligibility", {
             credentials: "include",
           });
           const data = await res.json();
@@ -18744,40 +18744,40 @@
           );
         }
       }
-      function closeWithdrawSuccessModal() {
+      function closeRedeem ProSuccessModal() {
         document
-          .getElementById("withdraw-success-modal")
+          .getElementById("redeem-success-modal")
           ?.classList.add("hidden");
         document
-          .getElementById("withdraw-success-modal")
+          .getElementById("redeem-success-modal")
           ?.classList.remove("flex");
       }
-      async function openWithdrawalStatusModal() {
+      async function openXP RedemptionStatusModal() {
         logUsageActivityOnce(
-          "wallet-withdrawal-status-open",
-          "wallet-withdrawal-status-open",
-          "opened withdrawal status",
+          "wallet-redemption-status-open",
+          "wallet-redemption-status-open",
+          "opened redemption status",
           "wallet",
           { toolId: currentStudioToolId || "console" },
         );
-        await fetchWithdrawalRequests();
-        renderWithdrawalStatusModal();
+        await fetchXPRedemptionRequests();
+        renderXP RedemptionStatusModal();
         document
-          .getElementById("withdraw-status-modal")
+          .getElementById("redeem-status-modal")
           ?.classList.remove("hidden");
-        document.getElementById("withdraw-status-modal")?.classList.add("flex");
+        document.getElementById("redeem-status-modal")?.classList.add("flex");
       }
-      function closeWithdrawalStatusModal() {
+      function closeXP RedemptionStatusModal() {
         document
-          .getElementById("withdraw-status-modal")
+          .getElementById("redeem-status-modal")
           ?.classList.add("hidden");
         document
-          .getElementById("withdraw-status-modal")
+          .getElementById("redeem-status-modal")
           ?.classList.remove("flex");
       }
-      async function openWithdrawalStatusFromSuccess() {
-        closeWithdrawSuccessModal();
-        await openWithdrawalStatusModal();
+      async function openXP RedemptionStatusFromSuccess() {
+        closeRedeem ProSuccessModal();
+        await openXP RedemptionStatusModal();
       }
       function playAdsenseApprovedChime() {
         try {
@@ -19173,25 +19173,25 @@
           syncUrl({ modal: null }, { replace: true });
         }
       }
-      function resetWithdrawalFlow() {
-        selectedWithdrawalMethod = "";
-        withdrawMethodsCollapsed = false;
-        withdrawalStep = "form";
-        withdrawalSubmissionInFlight = false;
-        document.getElementById("withdraw-destination-input").value = "";
-        document.getElementById("withdraw-amount-input").value = "";
-        document.getElementById("withdraw-error")?.classList.add("hidden");
+      function resetXP RedemptionFlow() {
+        selectedXP RedemptionMethod = "";
+        redeemMethodsCollapsed = false;
+        redemptionStep = "form";
+        redemptionSubmissionInFlight = false;
+        document.getElementById("redeem-destination-input").value = "";
+        document.getElementById("redeem-amount-input").value = "";
+        document.getElementById("redeem-error")?.classList.add("hidden");
         document
-          .getElementById("withdraw-confirm-error")
+          .getElementById("redeem-confirm-error")
           ?.classList.add("hidden");
-        document.getElementById("withdraw-success")?.classList.add("hidden");
+        document.getElementById("redeem-success")?.classList.add("hidden");
         document
-          .getElementById("withdraw-step-form")
+          .getElementById("redeem-step-form")
           ?.classList.remove("hidden");
         document
-          .getElementById("withdraw-step-confirm")
+          .getElementById("redeem-step-confirm")
           ?.classList.add("hidden");
-        document.querySelectorAll(".withdraw-method-card").forEach((card) => {
+        document.querySelectorAll(".redeem-method-card").forEach((card) => {
           card.classList.remove(
             "border-cyan-400",
             "bg-cyan-500/10",
@@ -19200,20 +19200,20 @@
           card.classList.remove("hidden", "sm:col-span-3");
         });
         document
-          .getElementById("withdraw-method-grid")
+          .getElementById("redeem-method-grid")
           ?.classList.remove("sm:grid-cols-1");
         document
-          .getElementById("withdraw-method-grid")
+          .getElementById("redeem-method-grid")
           ?.classList.add("sm:grid-cols-3");
         document
-          .getElementById("withdraw-destination-block")
+          .getElementById("redeem-destination-block")
           ?.classList.add("hidden");
-        document.getElementById("withdraw-continue-btn").disabled = false;
-        document.getElementById("withdraw-submit-btn").disabled = false;
-        document.getElementById("withdraw-submit-btn").textContent =
-          "Confirm Withdrawal";
+        document.getElementById("redeem-continue-btn").disabled = false;
+        document.getElementById("redeem-submit-btn").disabled = false;
+        document.getElementById("redeem-submit-btn").textContent =
+          "Confirm XP Redemption";
       }
-      function openWithdrawModal() {
+      function openRedeem ProModal() {
         if (!loggedIn || !currentUser) {
           showLogin();
           return;
@@ -19222,62 +19222,62 @@
           updateAccountModalUi();
           return;
         }
-        resetWithdrawalFlow();
+        resetXP RedemptionFlow();
         updateAccountModalUi();
-        document.getElementById("withdraw-modal")?.classList.remove("hidden");
-        document.getElementById("withdraw-modal")?.classList.add("flex");
-        syncUrl({ modal: "withdraw" });
+        document.getElementById("redeem-modal")?.classList.remove("hidden");
+        document.getElementById("redeem-modal")?.classList.add("flex");
+        syncUrl({ modal: "redeem" });
       }
-      function closeWithdrawModal() {
-        document.getElementById("withdraw-modal")?.classList.add("hidden");
-        document.getElementById("withdraw-modal")?.classList.remove("flex");
+      function closeRedeem ProModal() {
+        document.getElementById("redeem-modal")?.classList.add("hidden");
+        document.getElementById("redeem-modal")?.classList.remove("flex");
         if (
-          new URL(window.location.href).searchParams.get("modal") === "withdraw"
+          new URL(window.location.href).searchParams.get("modal") === "redeem"
         ) {
           syncUrl({ modal: null }, { replace: true });
         }
       }
-      function updateWithdrawalMethodLayout() {
-        const methodGrid = document.getElementById("withdraw-method-grid");
-        document.querySelectorAll(".withdraw-method-card").forEach((card) => {
+      function updateXP RedemptionMethodLayout() {
+        const methodGrid = document.getElementById("redeem-method-grid");
+        document.querySelectorAll(".redeem-method-card").forEach((card) => {
           const isSelected =
-            card.id === `withdraw-method-${selectedWithdrawalMethod}`;
+            card.id === `redeem-method-${selectedXP RedemptionMethod}`;
           card.classList.toggle(
             "hidden",
-            withdrawMethodsCollapsed && !isSelected,
+            redeemMethodsCollapsed && !isSelected,
           );
           card.classList.toggle(
             "sm:col-span-3",
-            withdrawMethodsCollapsed && isSelected,
+            redeemMethodsCollapsed && isSelected,
           );
         });
         if (methodGrid) {
           methodGrid.classList.toggle(
             "sm:grid-cols-1",
-            withdrawMethodsCollapsed,
+            redeemMethodsCollapsed,
           );
           methodGrid.classList.toggle(
             "sm:grid-cols-3",
-            !withdrawMethodsCollapsed,
+            !redeemMethodsCollapsed,
           );
         }
       }
-      function selectWithdrawMethod(method) {
-        const clickedSameMethod = selectedWithdrawalMethod === method;
-        selectedWithdrawalMethod = method;
-        withdrawMethodsCollapsed = clickedSameMethod
-          ? !withdrawMethodsCollapsed
+      function selectRedeem ProMethod(method) {
+        const clickedSameMethod = selectedXP RedemptionMethod === method;
+        selectedXP RedemptionMethod = method;
+        redeemMethodsCollapsed = clickedSameMethod
+          ? !redeemMethodsCollapsed
           : true;
         const destinationBlock = document.getElementById(
-          "withdraw-destination-block",
+          "redeem-destination-block",
         );
         const destinationLabel = document.getElementById(
-          "withdraw-destination-label",
+          "redeem-destination-label",
         );
         const destinationInput = document.getElementById(
-          "withdraw-destination-input",
+          "redeem-destination-input",
         );
-        document.querySelectorAll(".withdraw-method-card").forEach((card) => {
+        document.querySelectorAll(".redeem-method-card").forEach((card) => {
           card.classList.remove(
             "border-cyan-400",
             "bg-cyan-500/10",
@@ -19285,13 +19285,13 @@
           );
         });
         document
-          .getElementById(`withdraw-method-${method}`)
+          .getElementById(`redeem-method-${method}`)
           ?.classList.add(
             "border-cyan-400",
             "bg-cyan-500/10",
             "shadow-[0_16px_40px_rgba(34,211,238,0.12)]",
           );
-        updateWithdrawalMethodLayout();
+        updateXP RedemptionMethodLayout();
         if (destinationBlock) destinationBlock.classList.remove("hidden");
         if (destinationLabel) {
           destinationLabel.textContent =
@@ -19307,109 +19307,109 @@
           destinationInput.focus();
         }
       }
-      function showWithdrawError(message, targetId = "withdraw-error") {
+      function showRedeem ProError(message, targetId = "redeem-error") {
         const el = document.getElementById(targetId);
         if (!el) return;
         el.textContent = message;
         el.classList.remove("hidden");
       }
-      function clearWithdrawErrors() {
-        document.getElementById("withdraw-error")?.classList.add("hidden");
+      function clearRedeem ProErrors() {
+        document.getElementById("redeem-error")?.classList.add("hidden");
         document
-          .getElementById("withdraw-confirm-error")
+          .getElementById("redeem-confirm-error")
           ?.classList.add("hidden");
       }
-      function validateWithdrawalForm() {
-        clearWithdrawErrors();
+      function validateXP RedemptionForm() {
+        clearRedeem ProErrors();
         const balance = getCurrentBalance();
         const destination = String(
-          document.getElementById("withdraw-destination-input")?.value || "",
+          document.getElementById("redeem-destination-input")?.value || "",
         ).trim();
         const amount = Number(
-          document.getElementById("withdraw-amount-input")?.value || 0,
+          document.getElementById("redeem-amount-input")?.value || 0,
         );
-        if (!selectedWithdrawalMethod) {
-          showWithdrawError("Select a withdrawal method first.");
+        if (!selectedXP RedemptionMethod) {
+          showRedeem ProError("Select a redemption method first.");
           return null;
         }
         if (!destination) {
-          showWithdrawError("Enter your payout destination.");
+          showRedeem ProError("Enter your payout destination.");
           return null;
         }
         if (
-          selectedWithdrawalMethod === "paypal" &&
+          selectedXP RedemptionMethod === "paypal" &&
           !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(destination)
         ) {
-          showWithdrawError("Enter a valid PayPal email address.");
+          showRedeem ProError("Enter a valid PayPal email address.");
           return null;
         }
         if (
-          (selectedWithdrawalMethod === "mpesa" ||
-            selectedWithdrawalMethod === "airtel") &&
+          (selectedXP RedemptionMethod === "mpesa" ||
+            selectedXP RedemptionMethod === "airtel") &&
           !/^\+?[0-9]{9,15}$/.test(destination.replace(/\s+/g, ""))
         ) {
-          showWithdrawError("Enter a valid phone number with country code.");
+          showRedeem ProError("Enter a valid phone number with country code.");
           return null;
         }
         if (!Number.isFinite(amount) || amount < 5) {
-          showWithdrawError("Minimum withdrawal is $5.");
+          showRedeem ProError("Minimum redemption is 1000 XP.");
           return null;
         }
         if (amount > balance) {
-          showWithdrawError(
-            "Withdrawal amount cannot exceed your available balance.",
+          showRedeem ProError(
+            "XP Redemption amount cannot exceed your available balance.",
           );
           return null;
         }
         return {
-          method: selectedWithdrawalMethod,
+          method: selectedXP RedemptionMethod,
           destination,
           amount: Number(amount.toFixed(2)),
           fee: 0,
         };
       }
-      function goToWithdrawConfirmation() {
-        const payload = validateWithdrawalForm();
+      function goToRedeem ProConfirmation() {
+        const payload = validateXP RedemptionForm();
         if (!payload) return;
-        withdrawalStep = "confirm";
-        document.getElementById("withdraw-step-form")?.classList.add("hidden");
+        redemptionStep = "confirm";
+        document.getElementById("redeem-step-form")?.classList.add("hidden");
         document
-          .getElementById("withdraw-step-confirm")
+          .getElementById("redeem-step-confirm")
           ?.classList.remove("hidden");
-        document.getElementById("withdraw-confirm-method").textContent =
+        document.getElementById("redeem-confirm-method").textContent =
           formatPayoutMethod(payload.method);
-        document.getElementById("withdraw-confirm-destination").textContent =
+        document.getElementById("redeem-confirm-destination").textContent =
           payload.destination;
-        document.getElementById("withdraw-confirm-amount").textContent =
+        document.getElementById("redeem-confirm-amount").textContent =
           formatCurrency(payload.amount);
-        document.getElementById("withdraw-confirm-fee").textContent =
+        document.getElementById("redeem-confirm-fee").textContent =
           formatCurrency(payload.fee);
       }
-      function backToWithdrawForm() {
-        withdrawalStep = "form";
+      function backToRedeem ProForm() {
+        redemptionStep = "form";
         document
-          .getElementById("withdraw-step-confirm")
+          .getElementById("redeem-step-confirm")
           ?.classList.add("hidden");
         document
-          .getElementById("withdraw-step-form")
+          .getElementById("redeem-step-form")
           ?.classList.remove("hidden");
       }
-      async function submitWithdrawalRequest() {
-        if (withdrawalSubmissionInFlight) return;
-        const payload = validateWithdrawalForm();
+      async function submitXP RedemptionRequest() {
+        if (redemptionSubmissionInFlight) return;
+        const payload = validateXP RedemptionForm();
         if (!payload) {
-          backToWithdrawForm();
+          backToRedeem ProForm();
           return;
         }
-        withdrawalSubmissionInFlight = true;
-        const submitBtn = document.getElementById("withdraw-submit-btn");
+        redemptionSubmissionInFlight = true;
+        const submitBtn = document.getElementById("redeem-submit-btn");
         if (submitBtn) {
           submitBtn.disabled = true;
           submitBtn.textContent = "Processing...";
         }
-        clearWithdrawErrors();
+        clearRedeem ProErrors();
         try {
-          const res = await fetch("/api/account/withdrawals", {
+          const res = await fetch("/api/account/redeem-xp", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
@@ -19418,48 +19418,48 @@
           const data = await res.json();
           if (!res.ok || !data.success) {
             throw new Error(
-              data.message || "Could not submit withdrawal request.",
+              data.message || "Could not submit redemption request.",
             );
           }
           if (currentUser) {
-            currentUser.accountBalance = Number(data.balance || 0);
+            currentUser.xp = Number(data.user?.xp || 0);
           }
           updateUserProfileUi();
           document
-            .getElementById("withdraw-success")
+            .getElementById("redeem-success")
             ?.classList.remove("hidden");
-          currentWithdrawalRequests = [
+          currentXPRedemptionRequests = [
             data.request,
-            ...currentWithdrawalRequests.filter(
+            ...currentXPRedemptionRequests.filter(
               (item) => item._id !== data.request?._id,
             ),
           ];
-          updateWithdrawalStatusSummary();
+          updateXPRedemptionStatusSummary();
           await logUsageActivity(
-            "withdrawal-request-ui",
-            `submitted withdrawal request via ${payload.method}`,
+            "redemption-request-ui",
+            `submitted redemption request via ${payload.method}`,
             "account",
             { amount: payload.amount },
           );
           setTimeout(() => {
-            closeWithdrawModal();
+            closeRedeem ProModal();
             document
-              .getElementById("withdraw-success-modal")
+              .getElementById("redeem-success-modal")
               ?.classList.remove("hidden");
             document
-              .getElementById("withdraw-success-modal")
+              .getElementById("redeem-success-modal")
               ?.classList.add("flex");
           }, 1400);
         } catch (error) {
-          showWithdrawError(
-            error.message || "Withdrawal request failed.",
-            "withdraw-confirm-error",
+          showRedeem ProError(
+            error.message || "XP Redemption request failed.",
+            "redeem-confirm-error",
           );
         } finally {
-          withdrawalSubmissionInFlight = false;
+          redemptionSubmissionInFlight = false;
           if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.textContent = "Confirm Withdrawal";
+            submitBtn.textContent = "Confirm XP Redemption";
           }
         }
       }
@@ -21054,7 +21054,7 @@
           aiInfrastructureModels = await fetchAiInfrastructureModels();
           const recentProjects = liveProjects.slice(0, 3);
           const balance = getCurrentBalance();
-          const canWithdraw = loggedIn && balance >= 5;
+          const canRedeem Pro = loggedIn && balance >= 5;
           html = `
                   <div class="animate-fadeIn h-full">
                     <div class="max-w-6xl mx-auto min-h-full space-y-6 sm:space-y-8">
@@ -21087,18 +21087,18 @@
                               <div class="relative mt-4 flex items-end justify-between gap-4">
                                 <div>
                                   <p class="text-4xl sm:text-5xl font-black text-white tracking-tight">${formatCurrency(balance)}</p>
-                                  <p class="mt-2 text-xs leading-5 text-cyan-100/70">This is your MediaLab wallet balance for creator rewards, secure withdrawals, and platform payouts.</p>
+                                  <p class="mt-2 text-xs leading-5 text-cyan-100/70">This is your MediaLab wallet balance for creator rewards, secure redemptions, and platform payouts.</p>
                                 </div>
                                 <div class="w-14 h-14 rounded-[1.4rem] border border-white/10 bg-white/10 flex items-center justify-center text-cyan-100 text-xl shadow-[0_10px_35px_rgba(34,211,238,0.18)]">
                                   <i class="fas fa-wallet"></i>
                                 </div>
                               </div>
                               <div class="relative mt-6 flex items-center justify-between gap-4">
-                                <button onclick="openAccountModal()" ${canWithdraw ? "" : "disabled"} class="inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] transition-all ${canWithdraw ? "bg-white text-slate-950 hover:bg-cyan-50 shadow-[0_18px_35px_rgba(255,255,255,0.16)]" : "bg-white/10 text-slate-400 cursor-not-allowed border border-white/10"}">
+                                <button onclick="openAccountModal()" ${canRedeem Pro ? "" : "disabled"} class="inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] transition-all ${canRedeem Pro ? "bg-white text-slate-950 hover:bg-cyan-50 shadow-[0_18px_35px_rgba(255,255,255,0.16)]" : "bg-white/10 text-slate-400 cursor-not-allowed border border-white/10"}">
                                   <i class="fas fa-arrow-up-right-from-square"></i>
-                                  Withdraw
+                                  Redeem Pro
                                 </button>
-                                <p class="text-[11px] text-right text-slate-300/70">${canWithdraw ? "Ready for payout" : balance >= 5 ? "Awaiting AdSense approval" : "Minimum withdrawal is $5"}</p>
+                                <p class="text-[11px] text-right text-slate-300/70">${canRedeem Pro ? "Ready for payout" : balance >= 5 ? "Awaiting AdSense approval" : "Minimum redemption is 1000 XP"}</p>
                               </div>
                             </div>
                             <div class="relative overflow-hidden rounded-[2rem] border border-emerald-400/20 bg-[linear-gradient(145deg,rgba(16,185,129,0.18),rgba(15,23,42,0.98))] p-5 sm:p-6 shadow-[0_24px_70px_rgba(16,185,129,0.18)] backdrop-blur-2xl">
@@ -21130,7 +21130,7 @@
                                 <p class="mt-2 text-sm text-slate-400">${
                                   adsenseReport?.connected
                                     ? "Live numbers pulled from your Google AdSense connection across your hosted MediaLab domains."
-                                    : "Connect AdSense for real-time earnings, impressions, RPM, and click performance."
+                                    : "Monetization Disabled for real-time earnings, impressions, RPM, and click performance."
                                 }</p>
                               </div>
                               <div class="flex items-center gap-2">
@@ -21183,11 +21183,11 @@
                                         <p class="mt-3 text-xs text-emerald-300">Last checked: ${adsenseReport.lastCheckedAt ? formatProjectTimestamp(adsenseReport.lastCheckedAt) : "Waiting"}</p>
                                       </div>`
                                     : `<div class="mt-5 rounded-[1.5rem] border border-dashed border-amber-400/20 bg-amber-500/5 p-5">
-                                      <p class="text-sm font-semibold text-white">Connect AdSense for Real-Time Stats</p>
+                                      <p class="text-sm font-semibold text-white">Monetization Disabled for Real-Time Stats</p>
                                       <p class="mt-2 text-sm leading-6 text-slate-400">MediaLab will reuse your Google sign-in, request AdSense read access, and then pull your actual earnings and traffic metrics into the Console.</p>
                                       <button onclick="openAdsenseLinkModal()" class="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white text-slate-950 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] hover:bg-amber-50 transition-all shadow-[0_18px_35px_rgba(255,255,255,0.12)]">
                                         <i class="fas fa-link"></i>
-                                        Connect AdSense
+                                        Monetization Disabled
                                       </button>
                                     </div>`
                               }
